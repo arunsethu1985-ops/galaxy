@@ -1,0 +1,454 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+
+  <title>Galaxy</title>
+
+  <script src="https://js.puter.com/v2/"></script>
+
+  <style>
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    :root {
+      --bg: #101218;
+      --sidebar: #171a22;
+      --panel: #20242e;
+      --input: #292e39;
+      --border: #363c49;
+      --text: #f4f6fb;
+      --muted: #a5adbb;
+      --purple: #8b5cf6;
+      --purple-dark: #7c3aed;
+    }
+
+    body {
+      height: 100vh;
+      overflow: hidden;
+      font-family: Arial, Helvetica, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+    }
+
+    button,
+    textarea {
+      font: inherit;
+    }
+
+    button {
+      cursor: pointer;
+    }
+
+    .app {
+      display: flex;
+      width: 100%;
+      height: 100vh;
+    }
+
+    .sidebar {
+      width: 260px;
+      flex-shrink: 0;
+      display: flex;
+      flex-direction: column;
+      padding: 14px;
+      background: var(--sidebar);
+      border-right: 1px solid var(--border);
+    }
+
+    .brand {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 8px 5px 18px;
+    }
+
+    .logo {
+      width: 40px;
+      height: 40px;
+      display: grid;
+      place-items: center;
+      border-radius: 12px;
+      background: linear-gradient(135deg, #8b5cf6, #4f46e5);
+      font-size: 22px;
+    }
+
+    .brand h1 {
+      font-size: 18px;
+    }
+
+    .brand p {
+      margin-top: 3px;
+      color: var(--muted);
+      font-size: 11px;
+    }
+
+    .new-chat-button {
+      width: 100%;
+      padding: 12px;
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      background: var(--panel);
+      color: var(--text);
+      text-align: left;
+    }
+
+    .new-chat-button:hover {
+      background: var(--input);
+    }
+
+    .section-title {
+      margin: 22px 7px 9px;
+      color: var(--muted);
+      font-size: 11px;
+      font-weight: bold;
+      text-transform: uppercase;
+    }
+
+    .recent-chats {
+      flex: 1;
+      overflow-y: auto;
+    }
+
+    .recent-empty {
+      padding: 10px 8px;
+      color: var(--muted);
+      font-size: 12px;
+    }
+
+    .sidebar-footer {
+      padding: 14px 5px 4px;
+      border-top: 1px solid var(--border);
+      color: var(--muted);
+      font-size: 11px;
+      line-height: 1.5;
+    }
+
+    .main {
+      min-width: 0;
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+    }
+
+    .topbar {
+      min-height: 62px;
+      display: flex;
+      align-items: center;
+      padding: 0 20px;
+      border-bottom: 1px solid var(--border);
+      background: var(--bg);
+    }
+
+    .topbar-title {
+      font-size: 15px;
+      font-weight: bold;
+    }
+
+    .status {
+      margin-left: auto;
+      display: flex;
+      align-items: center;
+      gap: 7px;
+      color: var(--muted);
+      font-size: 12px;
+    }
+
+    .status-dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background: #22c55e;
+    }
+
+    .chat-area {
+      flex: 1;
+      overflow-y: auto;
+    }
+
+    .messages {
+      width: 100%;
+      max-width: 850px;
+      margin: 0 auto;
+      padding: 32px 22px 160px;
+    }
+
+    .welcome {
+      min-height: 65vh;
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      align-items: center;
+      text-align: center;
+    }
+
+    .welcome-logo {
+      width: 72px;
+      height: 72px;
+      display: grid;
+      place-items: center;
+      margin-bottom: 20px;
+      border-radius: 22px;
+      background: linear-gradient(135deg, #8b5cf6, #4f46e5);
+      font-size: 38px;
+    }
+
+    .welcome h2 {
+      margin-bottom: 10px;
+      font-size: 36px;
+    }
+
+    .welcome p {
+      max-width: 530px;
+      color: var(--muted);
+      font-size: 15px;
+      line-height: 1.7;
+    }
+
+    .suggestions {
+      width: 100%;
+      max-width: 650px;
+      display: grid;
+      grid-template-columns: repeat(2, 1fr);
+      gap: 10px;
+      margin-top: 28px;
+    }
+
+    .suggestion {
+      padding: 14px;
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      background: var(--panel);
+      color: var(--text);
+      text-align: left;
+    }
+
+    .suggestion:hover {
+      background: var(--input);
+    }
+
+    .suggestion strong {
+      display: block;
+      margin-bottom: 5px;
+      font-size: 13px;
+    }
+
+    .suggestion span {
+      color: var(--muted);
+      font-size: 12px;
+    }
+
+    .input-section {
+      position: fixed;
+      right: 0;
+      bottom: 0;
+      left: 260px;
+      padding: 18px 22px 14px;
+      background: linear-gradient(transparent, var(--bg) 25%);
+    }
+
+    .input-wrapper {
+      max-width: 850px;
+      margin: 0 auto;
+    }
+
+    .input-box {
+      display: flex;
+      align-items: flex-end;
+      gap: 10px;
+      padding: 10px 10px 10px 15px;
+      border: 1px solid var(--border);
+      border-radius: 18px;
+      background: var(--input);
+    }
+
+    #messageInput {
+      min-height: 28px;
+      max-height: 170px;
+      flex: 1;
+      resize: none;
+      overflow-y: auto;
+      padding: 5px 0;
+      border: none;
+      outline: none;
+      background: transparent;
+      color: var(--text);
+      font-size: 15px;
+      line-height: 1.5;
+    }
+
+    #messageInput::placeholder {
+      color: #8f97a5;
+    }
+
+    .send-button {
+      width: 40px;
+      height: 40px;
+      flex-shrink: 0;
+      border: none;
+      border-radius: 12px;
+      background: var(--purple);
+      color: white;
+      font-size: 19px;
+    }
+
+    .send-button:hover {
+      background: var(--purple-dark);
+    }
+
+    .input-note {
+      margin-top: 9px;
+      color: var(--muted);
+      font-size: 10px;
+      text-align: center;
+    }
+
+    @media (max-width: 760px) {
+      .sidebar {
+        display: none;
+      }
+
+      .input-section {
+        left: 0;
+        padding-right: 12px;
+        padding-left: 12px;
+      }
+
+      .messages {
+        padding-right: 15px;
+        padding-left: 15px;
+      }
+
+      .suggestions {
+        grid-template-columns: 1fr;
+      }
+
+      .welcome h2 {
+        font-size: 29px;
+      }
+    }
+  </style>
+</head>
+
+<body>
+  <div class="app">
+
+    <aside class="sidebar">
+      <div class="brand">
+        <div class="logo">✦</div>
+
+        <div>
+          <h1>Galaxy</h1>
+          <p>Created by Harshavrdhan</p>
+        </div>
+      </div>
+
+      <button
+        class="new-chat-button"
+        id="newChatButton"
+        type="button"
+      >
+        ＋ New chat
+      </button>
+
+      <div class="section-title">Recent chats</div>
+
+      <div class="recent-chats" id="recentChats">
+        <div class="recent-empty">
+          No recent chats
+        </div>
+      </div>
+
+      <div class="sidebar-footer">
+        Galaxy AI Assistant<br />
+        Created by Harshavrdhan
+      </div>
+    </aside>
+
+    <main class="main">
+
+      <header class="topbar">
+        <div class="topbar-title">
+          Galaxy
+        </div>
+
+        <div class="status">
+          <span class="status-dot"></span>
+          <span>AI assistant</span>
+        </div>
+      </header>
+
+      <section class="chat-area" id="chatArea">
+        <div class="messages" id="messages">
+
+          <div class="welcome" id="welcome">
+            <div class="welcome-logo">✦</div>
+
+            <h2>How can I help you?</h2>
+
+            <p>
+              I'm Galaxy, an AI assistant created by
+              Harshavrdhan. Ask me questions, get help
+              with coding, writing, learning, and more.
+            </p>
+
+            <div class="suggestions">
+
+              <button class="suggestion" type="button">
+                <strong>Explain something</strong>
+                <span>Learn a difficult topic simply</span>
+              </button>
+
+              <button class="suggestion" type="button">
+                <strong>Help me write</strong>
+                <span>Create messages, essays, or ideas</span>
+              </button>
+
+              <button class="suggestion" type="button">
+                <strong>Help with coding</strong>
+                <span>Write or fix computer code</span>
+              </button>
+
+              <button class="suggestion" type="button">
+                <strong>Brainstorm ideas</strong>
+                <span>Generate creative suggestions</span>
+              </button>
+
+            </div>
+          </div>
+
+        </div>
+      </section>
+
+      <section class="input-section">
+        <div class="input-wrapper">
+
+          <div class="input-box">
+            <textarea
+              id="messageInput"
+              rows="1"
+              placeholder="Message Galaxy..."
+            ></textarea>
+
+            <button
+              class="send-button"
+              id="sendButton"
+              type="button"
+            >
+              ↑
+            </button>
+          </div>
+
+          <div class="input-note">
+            Press Enter to send · Shift + Enter for a new line
+          </div>
+
+        </div>
+      </section>
+
+    </main>
+  </div>
