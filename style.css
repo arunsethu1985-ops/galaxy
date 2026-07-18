@@ -443,6 +443,43 @@ button {
   .welcome h2 {
     font-size: 29px;
   }
+ </> css
+
+ #intro{
+    position:fixed;
+    inset:0;
+    width:100%;
+    height:100%;
+    background:black;
+    z-index:9999;
+    overflow:hidden;
+}
+
+#intro video{
+    width:100%;
+    height:100%;
+    object-fit:cover;
+}
+
+.intro-overlay{
+    position:absolute;
+    top:50%;
+    left:50%;
+    transform:translate(-50%,-50%);
+    text-align:center;
+    color:white;
+    text-shadow:0 0 20px rgba(0,0,0,.8);
+}
+
+.intro-overlay h1{
+    font-size:70px;
+    letter-spacing:10px;
+}
+
+.intro-overlay p{
+    margin-top:15px;
+    font-size:22px;
+}
 
   .status span:last-child {
     display: none;
