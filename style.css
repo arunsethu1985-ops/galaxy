@@ -1,20 +1,19 @@
- {
+ * {
   box-sizing: border-box;
   margin: 0;
   padding: 0;
 }
 
 :root {
-  --background: #101218;
-  --sidebar: #171a22;
-  --panel: #20242e;
-  --input: #292e39;
-  --border: #363c49;
+  --background: #0d1017;
+  --sidebar: #151923;
+  --panel: #202633;
+  --input: #2a303d;
+  --border: #394150;
   --text: #f5f7fb;
-  --muted: #a5adbb;
+  --muted: #a7afbd;
   --purple: #8b5cf6;
-  --purple-dark: #7c3aed;
-  --user-message: #343a48;
+  --purple-dark: #7048d8;
 }
 
 body {
@@ -35,13 +34,90 @@ button {
   cursor: pointer;
 }
 
+/* Intro */
+
+.intro-screen {
+  position: fixed;
+  inset: 0;
+  z-index: 9999;
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+  background: black;
+  transition: opacity 0.8s ease;
+}
+
+.intro-screen.hidden {
+  opacity: 0;
+  pointer-events: none;
+}
+
+.intro-video {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.intro-dark-layer {
+  position: absolute;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.28);
+}
+
+.intro-overlay {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  text-align: center;
+  color: white;
+  text-shadow: 0 4px 25px rgba(0, 0, 0, 0.9);
+}
+
+.intro-logo {
+  width: 88px;
+  height: 88px;
+  display: grid;
+  place-items: center;
+  margin-bottom: 20px;
+  border-radius: 26px;
+  background: linear-gradient(135deg, #a78bfa, #4f46e5);
+  font-size: 44px;
+  box-shadow: 0 0 45px rgba(139, 92, 246, 0.65);
+}
+
+.intro-overlay h1 {
+  font-size: clamp(42px, 8vw, 82px);
+  letter-spacing: 12px;
+}
+
+.intro-overlay p {
+  margin-top: 12px;
+  font-size: 18px;
+}
+
+.skip-intro-button {
+  margin-top: 30px;
+  padding: 11px 20px;
+  border: 1px solid rgba(255, 255, 255, 0.6);
+  border-radius: 999px;
+  background: rgba(0, 0, 0, 0.35);
+  color: white;
+}
+
+.skip-intro-button:hover {
+  background: rgba(255, 255, 255, 0.15);
+}
+
+/* Main app */
+
 .app {
   display: flex;
   width: 100%;
   height: 100vh;
 }
-
-/* Sidebar */
 
 .sidebar {
   width: 260px;
@@ -141,8 +217,6 @@ button {
   line-height: 1.5;
 }
 
-/* Main section */
-
 .main {
   min-width: 0;
   flex: 1;
@@ -156,7 +230,6 @@ button {
   align-items: center;
   padding: 0 20px;
   border-bottom: 1px solid var(--border);
-  background: var(--background);
 }
 
 .topbar h2 {
@@ -191,8 +264,6 @@ button {
   margin: 0 auto;
   padding: 32px 22px 160px;
 }
-
-/* Welcome screen */
 
 .welcome {
   min-height: 65vh;
@@ -259,8 +330,6 @@ button {
   font-size: 12px;
 }
 
-/* Messages */
-
 .message {
   display: flex;
   gap: 13px;
@@ -305,10 +374,16 @@ button {
 .user-message .message-content {
   padding: 13px 16px;
   border-radius: 15px;
-  background: var(--user-message);
+  background: #343a48;
 }
 
-/* Typing animation */
+.generated-image {
+  width: 100%;
+  max-width: 520px;
+  margin-top: 12px;
+  border-radius: 16px;
+  border: 1px solid var(--border);
+}
 
 .typing {
   display: inline-flex;
@@ -346,8 +421,6 @@ button {
   }
 }
 
-/* Input */
-
 .input-section {
   position: fixed;
   right: 0;
@@ -365,7 +438,7 @@ button {
 .input-box {
   display: flex;
   align-items: flex-end;
-  gap: 10px;
+  gap: 9px;
   padding: 10px 10px 10px 15px;
   border: 1px solid var(--border);
   border-radius: 18px;
@@ -391,14 +464,27 @@ button {
   color: #8f97a5;
 }
 
+.tool-button,
 .send-button {
   width: 40px;
   height: 40px;
   flex-shrink: 0;
   border: none;
   border-radius: 12px;
-  background: var(--purple);
   color: white;
+}
+
+.tool-button {
+  background: #3a4150;
+  font-size: 17px;
+}
+
+.tool-button:hover {
+  background: #4a5263;
+}
+
+.send-button {
+  background: var(--purple);
   font-size: 19px;
 }
 
@@ -406,7 +492,8 @@ button {
   background: var(--purple-dark);
 }
 
-.send-button:disabled {
+.send-button:disabled,
+.tool-button:disabled {
   cursor: not-allowed;
   opacity: 0.5;
 }
@@ -417,8 +504,6 @@ button {
   font-size: 10px;
   text-align: center;
 }
-
-/* Mobile */
 
 @media (max-width: 760px) {
   .sidebar {
@@ -443,45 +528,12 @@ button {
   .welcome h2 {
     font-size: 29px;
   }
- </> css
-
- #intro{
-    position:fixed;
-    inset:0;
-    width:100%;
-    height:100%;
-    background:black;
-    z-index:9999;
-    overflow:hidden;
-}
-
-#intro video{
-    width:100%;
-    height:100%;
-    object-fit:cover;
-}
-
-.intro-overlay{
-    position:absolute;
-    top:50%;
-    left:50%;
-    transform:translate(-50%,-50%);
-    text-align:center;
-    color:white;
-    text-shadow:0 0 20px rgba(0,0,0,.8);
-}
-
-.intro-overlay h1{
-    font-size:70px;
-    letter-spacing:10px;
-}
-
-.intro-overlay p{
-    margin-top:15px;
-    font-size:22px;
-}
 
   .status span:last-child {
     display: none;
+  }
+
+  .intro-overlay h1 {
+    letter-spacing: 7px;
   }
 }
