@@ -12,18 +12,33 @@
 
 <body>
 
-<div id="intro">
-  <video id="introVideo" autoplay muted playsinline>
- <source src="Initial_Scene_-_2026-07-18_202607181317 (1).mp4" type="video/mp4">
-  </video>
+  <div id="intro" class="intro-screen">
+    <video
+      id="introVideo"
+      class="intro-video"
+      autoplay
+      muted
+      playsinline
+      preload="auto"
+    >
+      <source src="sunrise.mp4" type="video/mp4" />
+      Your browser does not support video.
+    </video>
 
-  <div class="intro-overlay">
-    <h1>GALAXY</h1>
-    <p>Created by Harshavrdhan</p>
+    <div class="intro-dark-layer"></div>
+
+    <div class="intro-overlay">
+      <div class="intro-logo">✦</div>
+      <h1>GALAXY</h1>
+      <p>Created by Harshavrdhan</p>
+
+      <button id="skipIntroButton" class="skip-intro-button">
+        Skip intro
+      </button>
+    </div>
   </div>
-</div>
 
-<div class="app" id="app" style="display:none;">
+  <div class="app" id="app">
 
     <aside class="sidebar">
       <div class="brand">
@@ -75,22 +90,34 @@
             </p>
 
             <div class="suggestions">
-              <button class="suggestion" data-message="Explain artificial intelligence simply">
+              <button
+                class="suggestion"
+                data-message="Explain artificial intelligence simply"
+              >
                 <strong>Explain something</strong>
                 <span>Learn a difficult topic simply</span>
               </button>
 
-              <button class="suggestion" data-message="Help me write a professional message">
+              <button
+                class="suggestion"
+                data-message="Help me write a professional message"
+              >
                 <strong>Help me write</strong>
                 <span>Create messages and ideas</span>
               </button>
 
-              <button class="suggestion" data-message="Help me learn coding">
+              <button
+                class="suggestion"
+                data-message="Help me learn coding"
+              >
                 <strong>Help with coding</strong>
                 <span>Write or fix computer code</span>
               </button>
 
-              <button class="suggestion" data-message="Give me creative project ideas">
+              <button
+                class="suggestion"
+                data-message="Give me creative project ideas"
+              >
                 <strong>Brainstorm ideas</strong>
                 <span>Generate creative suggestions</span>
               </button>
@@ -110,6 +137,22 @@
               placeholder="Message Galaxy..."
             ></textarea>
 
+            <button
+              id="imageButton"
+              class="tool-button"
+              title="Create an image"
+            >
+              🖼️
+            </button>
+
+            <button
+              id="voiceButton"
+              class="tool-button"
+              title="Voice input"
+            >
+              🎤
+            </button>
+
             <button id="sendButton" class="send-button">
               ↑
             </button>
@@ -125,18 +168,7 @@
     </main>
   </div>
 
- <script src="script.js"></script>
-
-<script>
-const introVideo = document.getElementById("introVideo");
-const intro = document.getElementById("intro");
-const app = document.getElementById("app");
-
-introVideo.addEventListener("ended", () => {
-    intro.style.display = "none";
-    app.style.display = "flex";
-});
-</script>
+  <script src="script.js"></script>
 
 </body>
 </html>
