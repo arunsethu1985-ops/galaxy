@@ -71,8 +71,8 @@ if (introVideo) {
   introVideo.addEventListener("ended", closeIntro);
 
   introVideo.addEventListener("error", () => {
-    console.error("The intro video could not be loaded.");
-    closeIntro();
+  alert("Intro video could not be loaded.");
+closeIntro(); 
   });
 
   const playPromise = introVideo.play();
