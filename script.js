@@ -1,3 +1,7 @@
+Worked for 30s
+
+Replace everything inside script.js with this complete version. It keeps your existing chat logic and adds the intro video, image generation, and voice input. Puter’s current documentation supports both puter.ai.chat() and puter.ai.txt2img().
+
 "use strict";
 
 /*
@@ -71,8 +75,8 @@ if (introVideo) {
   introVideo.addEventListener("ended", closeIntro);
 
   introVideo.addEventListener("error", () => {
-  alert("Intro video could not be loaded.");
-closeIntro(); 
+    console.error("The intro video could not be loaded.");
+    closeIntro();
   });
 
   const playPromise = introVideo.play();
@@ -589,7 +593,7 @@ async function generateImage() {
       throw new Error("Image generation is unavailable.");
     }
 
-    const generatedImage = await puter.ai.txt2img(cleanPrompt);
+   const generatedImage = await puter.ai.txt2img(cleanPrompt, true);
 
     if (!generatedImage || !generatedImage.src) {
       throw new Error("No image was returned.");
