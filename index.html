@@ -11,7 +11,19 @@
 </head>
 
 <body>
-  <div class="app">
+
+<div id="intro">
+  <video id="introVideo" autoplay muted playsinline>
+    <source src="Initial_Scene_-_2026-07-18_202607181317.mp4" type="video/mp4">
+  </video>
+
+  <div class="intro-overlay">
+    <h1>GALAXY</h1>
+    <p>Created by Harshavrdhan</p>
+  </div>
+</div>
+
+<div class="app" id="app" style="display:none;">
 
     <aside class="sidebar">
       <div class="brand">
@@ -113,6 +125,18 @@
     </main>
   </div>
 
-  <script src="script.js"></script>
+ <script src="script.js"></script>
+
+<script>
+const introVideo = document.getElementById("introVideo");
+const intro = document.getElementById("intro");
+const app = document.getElementById("app");
+
+introVideo.addEventListener("ended", () => {
+    intro.style.display = "none";
+    app.style.display = "flex";
+});
+</script>
+
 </body>
 </html>
