@@ -1,174 +1,383 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta charset="UTF-8">
 
-  <title>Galaxy</title>
+  <meta
+    name="viewport"
+    content="width=device-width, initial-scale=1.0"
+  >
 
-  <link rel="stylesheet" href="style.css" />
+  <meta
+    name="description"
+    content="Galaxy OS — an intelligent AI assistant created by Harshavrdhan."
+  >
+
+  <title>Galaxy OS</title>
+
+  <link rel="stylesheet" href="style.css">
+
   <script src="https://js.puter.com/v2/"></script>
 </head>
 
 <body>
+  <!-- Animated background -->
+  <canvas id="backgroundCanvas"></canvas>
 
-  <div id="intro" class="intro-screen">
-    <video
-      id="introVideo"
-      class="intro-video"
-      autoplay
-      muted
-      playsinline
-      preload="auto"
-    >
-      <source src="sunrise.mp4.mp4" type="video/mp4" />
-      Your browser does not support video.
-    </video>
+  <div id="weatherEffects" aria-hidden="true"></div>
+  <div id="topicEffects" aria-hidden="true"></div>
+  <div class="background-overlay"></div>
 
-    <div class="intro-dark-layer"></div>
+  <!-- Intro -->
+  <section id="introScreen" class="intro-screen">
+    <div class="intro-stars"></div>
 
-    <div class="intro-overlay">
-      <div class="intro-logo">✦</div>
-      <h1>GALAXY</h1>
-      <p>Created by Harshavrdhan</p>
+    <div class="intro-content">
+      <div class="intro-logo-shell">
+        <img
+          src="space-galaxy-star-pink-purple-260nw-2537371667.webp"
+          alt="Galaxy logo"
+          class="intro-logo"
+        >
 
-      <button id="skipIntroButton" class="skip-intro-button">
-        Skip intro
-      </button>
-    </div>
-  </div>
-
-  <div class="app" id="app">
-
-    <aside class="sidebar">
-      <div class="brand">
-        <div class="logo">✦</div>
-
-        <div>
-          <h1>Galaxy</h1>
-          <p>Created by Harshavrdhan</p>
-        </div>
+        <div class="logo-glow"></div>
       </div>
 
-      <button id="newChatButton" class="new-chat-button">
-        ＋ New chat
+      <h1>GALAXY</h1>
+
+      <p class="intro-subtitle">
+        AI Operating System
+      </p>
+
+      <p class="creator-name">
+        Created by Harshavrdhan
+      </p>
+
+      <button id="enterGalaxyButton" type="button">
+        Enter Galaxy
+      </button>
+    </div>
+  </section>
+
+  <!-- Main application -->
+  <main id="galaxyApp" class="galaxy-app hidden">
+    <!-- Sidebar -->
+    <aside id="sidebar" class="sidebar">
+      <div class="sidebar-header">
+        <div class="brand">
+          <img
+            src="space-galaxy-star-pink-purple-260nw-2537371667.webp"
+            alt=""
+            class="brand-logo"
+          >
+
+          <div>
+            <h2>Galaxy</h2>
+            <span>AI Operating System</span>
+          </div>
+        </div>
+
+        <button
+          id="closeSidebarButton"
+          class="icon-button mobile-only"
+          type="button"
+          aria-label="Close sidebar"
+        >
+          ×
+        </button>
+      </div>
+
+      <button id="newChatButton" class="new-chat-button" type="button">
+        <span>＋</span>
+        New conversation
       </button>
 
-      <h2 class="section-title">Recent chats</h2>
+      <div class="sidebar-section">
+        <div class="section-heading">
+          <span>Recent chats</span>
 
-      <div id="recentChats" class="recent-chats">
-        <p class="empty-message">No recent chats</p>
+          <button
+            id="clearChatsButton"
+            type="button"
+            class="small-text-button"
+          >
+            Clear
+          </button>
+        </div>
+
+        <div id="recentChats" class="recent-chats"></div>
       </div>
 
       <div class="sidebar-footer">
-        Galaxy AI Assistant<br />
-        Created by Harshavrdhan
+        <button id="settingsButton" class="settings-button" type="button">
+          <span>⚙</span>
+          Settings
+        </button>
+
+        <p>Created by Harshavrdhan</p>
       </div>
     </aside>
 
-    <main class="main">
-
+    <!-- Main content -->
+    <section class="main-panel">
       <header class="topbar">
-        <h2 id="chatTitle">Galaxy</h2>
+        <div class="topbar-left">
+          <button
+            id="openSidebarButton"
+            class="icon-button mobile-only"
+            type="button"
+            aria-label="Open sidebar"
+          >
+            ☰
+          </button>
 
-        <div class="status">
-          <span class="status-dot"></span>
-          <span>AI assistant</span>
+          <div class="active-brand">
+            <div id="voiceOrb" class="voice-orb">
+              <img
+                src="space-galaxy-star-pink-purple-260nw-2537371667.webp"
+                alt="Galaxy"
+              >
+            </div>
+
+            <div>
+              <h1 id="chatTitle">Galaxy</h1>
+              <p id="galaxyStatus">Ready</p>
+            </div>
+          </div>
         </div>
-      </header>
 
-      <section id="chatArea" class="chat-area">
-        <div id="messages" class="messages">
+        <div class="live-information">
+          <div class="info-card">
+            <span class="info-icon">🕒</span>
 
-          <div id="welcome" class="welcome">
-            <div class="welcome-logo">✦</div>
-
-            <h2>How can I help you?</h2>
-
-            <p>
-              I'm Galaxy, an AI assistant created by Harshavrdhan.
-            </p>
-
-            <div class="suggestions">
-              <button
-                class="suggestion"
-                data-message="Explain artificial intelligence simply"
-              >
-                <strong>Explain something</strong>
-                <span>Learn a difficult topic simply</span>
-              </button>
-
-              <button
-                class="suggestion"
-                data-message="Help me write a professional message"
-              >
-                <strong>Help me write</strong>
-                <span>Create messages and ideas</span>
-              </button>
-
-              <button
-                class="suggestion"
-                data-message="Help me learn coding"
-              >
-                <strong>Help with coding</strong>
-                <span>Write or fix computer code</span>
-              </button>
-
-              <button
-                class="suggestion"
-                data-message="Give me creative project ideas"
-              >
-                <strong>Brainstorm ideas</strong>
-                <span>Generate creative suggestions</span>
-              </button>
+            <div>
+              <strong id="liveTime">--:--</strong>
+              <span id="liveDate">Loading date...</span>
             </div>
           </div>
 
-        </div>
-      </section>
+          <div class="info-card weather-card">
+            <span id="weatherIcon" class="info-icon">🌌</span>
 
-      <section class="input-section">
-        <div class="input-wrapper">
-
-          <div class="input-box">
-            <textarea
-              id="messageInput"
-              rows="1"
-              placeholder="Message Galaxy..."
-            ></textarea>
-
-            <button
-              id="imageButton"
-              class="tool-button"
-              title="Create an image"
-            >
-              🖼️
-            </button>
-
-            <button
-              id="voiceButton"
-              class="tool-button"
-              title="Voice input"
-            >
-              🎤
-            </button>
-
-            <button id="sendButton" class="send-button">
-              ↑
-            </button>
+            <div>
+              <strong id="weatherTemperature">Weather</strong>
+              <span id="weatherDescription">
+                Location not enabled
+              </span>
+            </div>
           </div>
+        </div>
+      </header>
 
-          <p class="input-note">
-            Press Enter to send · Shift + Enter for a new line
-          </p>
+      <!-- Chat -->
+      <section id="chatArea" class="chat-area">
+        <div id="messages" class="messages">
+          <section class="welcome-screen">
+            <div class="welcome-logo">
+              <img
+                src="space-galaxy-star-pink-purple-260nw-2537371667.webp"
+                alt="Galaxy"
+              >
+            </div>
 
+            <p id="greetingText" class="greeting-text">
+              Welcome
+            </p>
+
+            <h2>How can I help you?</h2>
+
+            <p class="welcome-description">
+              Type a message or say
+              <strong>“Galaxy”</strong>
+              to start speaking.
+            </p>
+
+            <div class="suggestion-grid">
+              <button
+                type="button"
+                class="suggestion-card"
+                data-prompt="Tell me something fascinating about space"
+              >
+                <span>🌌</span>
+
+                <div>
+                  <strong>Explore space</strong>
+                  <small>Stars, planets and galaxies</small>
+                </div>
+              </button>
+
+              <button
+                type="button"
+                class="suggestion-card"
+                data-prompt="What is the weather today?"
+              >
+                <span>🌦</span>
+
+                <div>
+                  <strong>Check weather</strong>
+                  <small>Live conditions and atmosphere</small>
+                </div>
+              </button>
+
+              <button
+                type="button"
+                class="suggestion-card"
+                data-prompt="Explain artificial intelligence simply"
+              >
+                <span>🤖</span>
+
+                <div>
+                  <strong>Learn about AI</strong>
+                  <small>Simple and useful explanations</small>
+                </div>
+              </button>
+
+              <button
+                type="button"
+                class="suggestion-card"
+                data-prompt="Tell me a creative story"
+              >
+                <span>✨</span>
+
+                <div>
+                  <strong>Create a story</strong>
+                  <small>Enter a new world</small>
+                </div>
+              </button>
+            </div>
+          </section>
         </div>
       </section>
 
-    </main>
+      <!-- Input -->
+      <footer class="composer-area">
+        <div id="voiceNotice" class="voice-notice hidden">
+          <span class="voice-dot"></span>
+          <span id="voiceNoticeText">
+            Listening for “Galaxy”...
+          </span>
+        </div>
+
+        <div class="composer">
+          <textarea
+            id="messageInput"
+            rows="1"
+            maxlength="8000"
+            placeholder="Message Galaxy..."
+            aria-label="Message Galaxy"
+          ></textarea>
+
+          <button
+            id="sendButton"
+            type="button"
+            aria-label="Send message"
+          >
+            ➤
+          </button>
+        </div>
+
+        <p class="composer-note">
+          Galaxy can make mistakes. Verify important information.
+        </p>
+      </footer>
+    </section>
+  </main>
+
+  <!-- Settings -->
+  <div id="settingsModal" class="modal hidden">
+    <div class="modal-backdrop"></div>
+
+    <section class="settings-panel">
+      <div class="settings-header">
+        <div>
+          <h2>Galaxy Settings</h2>
+          <p>Control voice and visual effects.</p>
+        </div>
+
+        <button
+          id="closeSettingsButton"
+          class="icon-button"
+          type="button"
+          aria-label="Close settings"
+        >
+          ×
+        </button>
+      </div>
+
+      <div class="setting-row">
+        <div>
+          <strong>Spoken answers</strong>
+          <span>Galaxy reads its answers aloud.</span>
+        </div>
+
+        <label class="switch">
+          <input id="speechToggle" type="checkbox" checked>
+          <span class="switch-slider"></span>
+        </label>
+      </div>
+
+      <div class="setting-row">
+        <div>
+          <strong>Wake word</strong>
+          <span>Say “Galaxy” to speak a request.</span>
+        </div>
+
+        <label class="switch">
+          <input id="wakeWordToggle" type="checkbox">
+          <span class="switch-slider"></span>
+        </label>
+      </div>
+
+      <div class="setting-row">
+        <div>
+          <strong>Animated backgrounds</strong>
+          <span>Change the environment based on topics.</span>
+        </div>
+
+        <label class="switch">
+          <input id="effectsToggle" type="checkbox" checked>
+          <span class="switch-slider"></span>
+        </label>
+      </div>
+
+      <div class="setting-row">
+        <div>
+          <strong>Live weather</strong>
+          <span>Use your location for weather effects.</span>
+        </div>
+
+        <button id="enableWeatherButton" type="button">
+          Enable
+        </button>
+      </div>
+
+      <div class="setting-row danger-row">
+        <div>
+          <strong>Delete chat history</strong>
+          <span>Remove all locally saved conversations.</span>
+        </div>
+
+        <button id="deleteHistoryButton" type="button">
+          Delete
+        </button>
+      </div>
+    </section>
+  </div>
+
+  <!-- Easter egg characters -->
+  <div id="chickenCharacter" class="chicken-character hidden">
+    <span class="chicken-body">🐔</span>
+    <span class="tandoori-body">🍗</span>
+  </div>
+
+  <div id="astronautCharacter" class="astronaut-character hidden">
+    👨‍🚀
+  </div>
+
+  <div id="dinosaurCharacter" class="dinosaur-character hidden">
+    🦖
   </div>
 
   <script src="script.js"></script>
-
 </body>
 </html>
