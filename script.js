@@ -3117,3 +3117,13 @@ document.addEventListener(
   "DOMContentLoaded",
   initializeGalaxy
 );
+const galaxyIntro = document.getElementById("galaxyIntro");
+
+setTimeout(() => {
+  galaxyIntro.style.opacity = "0";
+  galaxyIntro.style.transition = "opacity 1s ease";
+
+  setTimeout(() => {
+    galaxyIntro.style.display = "none";
+  }, 1000);
+}, 6500);
