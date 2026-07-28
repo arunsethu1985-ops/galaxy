@@ -3115,7 +3115,22 @@ async function initializeGalaxy() {
 
 document.addEventListener(
   "DOMContentLoaded",
-  initializeGalaxy
+ document.addEventListener("DOMContentLoaded", () => {
+  const intro = document.getElementById("introScreen");
+  const app = document.getElementById("galaxyApp");
+
+  setTimeout(() => {
+    intro.classList.add("intro-exit");
+
+    if (app) {
+      app.classList.remove("hidden");
+    }
+
+    setTimeout(() => {
+      intro.style.display = "none";
+    }, 700);
+  }, 6500);
+});
 );
 document.addEventListener("DOMContentLoaded", () => {
   const intro = document.getElementById("galaxyIntro");
