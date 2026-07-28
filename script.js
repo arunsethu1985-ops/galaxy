@@ -3117,37 +3117,21 @@ document.addEventListener(
   "DOMContentLoaded",
   initializeGalaxy
 );
-const galaxyIntro = document.getElementById("galaxyIntro");
+document.addEventListener("DOMContentLoaded", () => {
+  const intro = document.getElementById("galaxyIntro");
 
-setTimeout(() => {
-  galaxyIntro.style.opacity = "0";
-  galaxyIntro.style.transition = "opacity 1s ease";
+  if (!intro) {
+    console.error("galaxyIntro was not found");
+    return;
+  }
 
   setTimeout(() => {
-    galaxyIntro.style.display = "none";
-  }, 1000);
-}, 6500);
+    intro.style.transition = "opacity 1s ease";
+    intro.style.opacity = "0";
+    intro.style.pointerEvents = "none";
 
-// Galaxy Intro Animation
-window.addEventListener("load", () => {
-    const intro = document.getElementById("galaxyIntro");
-
-    // Show the title after the swirl animation
     setTimeout(() => {
-        const title = document.querySelector(".intro-title");
-        if (title) {
-            title.style.opacity = "1";
-            title.style.transform = "scale(1)";
-        }
-    }, 3200);
-
-    // Fade out the intro
-    setTimeout(() => {
-        intro.style.transition = "opacity 1s ease";
-        intro.style.opacity = "0";
-
-        setTimeout(() => {
-            intro.style.display = "none";
-        }, 1000);
-    }, 6500);
+      intro.remove();
+    }, 1000);
+  }, 6500);
 });
