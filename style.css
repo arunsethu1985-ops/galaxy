@@ -6528,3 +6528,90 @@ body.settings-open {
    Parts 1, 2 and 3 are now finished.
    Keep everything in one style.css file.
    ========================================================= */
+#galaxyIntro {
+  position: fixed;
+  inset: 0;
+  z-index: 99999;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+  background:
+    radial-gradient(circle at center, #16002d 0%, #05000f 45%, #000 100%);
+}
+
+.galaxy-swirl {
+  width: 230px;
+  height: 230px;
+  border-radius: 50%;
+  background:
+    radial-gradient(circle at center, #fff 0 2%, #bd7cff 8%, transparent 24%),
+    conic-gradient(
+      from 0deg,
+      transparent,
+      #7837ff,
+      #e985ff,
+      transparent,
+      #4b9cff,
+      transparent
+    );
+  box-shadow:
+    0 0 35px #984cff,
+    0 0 90px rgba(117, 55, 255, 0.8),
+    inset 0 0 45px white;
+  animation:
+    galaxySpin 1.6s linear infinite,
+    galaxyDisappear 1s ease 2.7s forwards;
+}
+
+.intro-title {
+  position: absolute;
+  text-align: center;
+  opacity: 0;
+  transform: scale(0.85);
+  animation: showGalaxyTitle 1.3s ease 3.2s forwards;
+}
+
+.intro-title h1 {
+  margin: 0;
+  font-size: clamp(3rem, 10vw, 7rem);
+  letter-spacing: 0.22em;
+  color: white;
+  text-shadow:
+    0 0 12px white,
+    0 0 30px #9c51ff,
+    0 0 65px #6234ff;
+}
+
+.intro-title p {
+  margin-top: 16px;
+  font-size: 1.1rem;
+  letter-spacing: 0.22em;
+  color: #d8c6ff;
+}
+
+@keyframes galaxySpin {
+  from {
+    transform: rotate(0deg) scale(0.8);
+  }
+
+  to {
+    transform: rotate(360deg) scale(1.08);
+  }
+}
+
+@keyframes galaxyDisappear {
+  to {
+    opacity: 0;
+    transform: rotate(720deg) scale(2);
+    filter: blur(20px);
+    visibility: hidden;
+  }
+}
+
+@keyframes showGalaxyTitle {
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
