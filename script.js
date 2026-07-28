@@ -3127,3 +3127,27 @@ setTimeout(() => {
     galaxyIntro.style.display = "none";
   }, 1000);
 }, 6500);
+
+// Galaxy Intro Animation
+window.addEventListener("load", () => {
+    const intro = document.getElementById("galaxyIntro");
+
+    // Show the title after the swirl animation
+    setTimeout(() => {
+        const title = document.querySelector(".intro-title");
+        if (title) {
+            title.style.opacity = "1";
+            title.style.transform = "scale(1)";
+        }
+    }, 3200);
+
+    // Fade out the intro
+    setTimeout(() => {
+        intro.style.transition = "opacity 1s ease";
+        intro.style.opacity = "0";
+
+        setTimeout(() => {
+            intro.style.display = "none";
+        }, 1000);
+    }, 6500);
+});
