@@ -1,647 +1,519 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
-  <meta charset="UTF-8">
+    <meta charset="UTF-8">
 
-  <meta
-    name="viewport"
-    content="width=device-width, initial-scale=1.0"
-  >
+    <meta
+        name="viewport"
+        content="width=device-width, initial-scale=1.0"
+    >
 
-  <meta
-    name="description"
-    content="Galaxy AI Assistant created by Harshavrdhan."
-  >
+    <meta
+        name="theme-color"
+        content="#07090f"
+    >
 
-  <meta name="theme-color" content="#050511">
+    <title>GALAXY</title>
 
-  <title>Galaxy AI Assistant</title>
+    <link
+        rel="stylesheet"
+        href="style.css"
+    >
 
-  <link
-    rel="icon"
-    type="image/png"
-    href="space-galaxy-stars-260nw-2537371667.webp.png"
-  >
-
-  <link rel="stylesheet" href="style.css">
-
-  <script src="https://js.puter.com/v2/"></script>
+    <script
+        src="script.js"
+        defer
+    ></script>
 </head>
 
+
 <body>
-  <!-- Dynamic animated background -->
-  <canvas
-    id="backgroundCanvas"
-    aria-hidden="true"
-  ></canvas>
 
-  <div
-    id="weatherEffects"
-    class="weather-effects"
-    aria-hidden="true"
-  ></div>
+<!-- ===================================================== -->
+<!-- MAIN GALAXY APPLICATION -->
+<!-- ===================================================== -->
 
-  <div
-    id="topicEffects"
-    class="topic-effects"
-    aria-hidden="true"
-  ></div>
+<div id="app">
 
-  <div
-    class="background-overlay"
-    aria-hidden="true"
-  ></div>
 
-  <!-- Intro screen -->
-  <section
-    id="introScreen"
-    class="intro-screen"
-    aria-label="Galaxy introduction"
-  >
-    <div
-      class="intro-stars"
-      aria-hidden="true"
-    ></div>
+    <!-- ================================================= -->
+    <!-- SIDEBAR -->
+    <!-- ================================================= -->
 
-    <div class="intro-content">
-      <div class="intro-logo-shell">
-        <div class="intro-orbit-ring"></div>
+    <aside id="sidebar">
 
-        <img
-          src="space-galaxy-stars-260nw-2537371667.webp.png"
-          alt="Galaxy AI Assistant logo"
-          class="intro-logo spinning-logo"
-        >
 
-        <div class="intro-logo-glow"></div>
-      </div>
+        <!-- BRAND -->
 
-      <h1>GALAXY</h1>
+        <div class="brand-area">
 
-      <p class="intro-subtitle">
-        AI Assistant
-      </p>
+            <div class="brand-logo">
+                G
+            </div>
 
-      <p class="intro-creator">
-        Created by Harshavrdhan
-      </p>
+            <div class="brand-text">
 
-      <button
-        id="enterGalaxyButton"
-        class="enter-galaxy-button"
-        type="button"
-      >
-        <span>Enter Galaxy</span>
-        <span aria-hidden="true">✦</span>
-      </button>
-    </div>
+                <div class="brand-name">
+                    GALAXY
+                </div>
 
-    <button
-      id="skipIntroButton"
-      class="skip-intro-button"
-      type="button"
-    >
-      Skip intro
-    </button>
-  </section>
+                <div class="brand-creator">
+                    by Harshavardhan
+                </div>
 
-  <!-- Galaxy application -->
-  <main
-    id="galaxyApp"
-    class="galaxy-app hidden"
-  >
-    <!-- Mobile sidebar overlay -->
-    <button
-      id="sidebarOverlay"
-      class="sidebar-overlay"
-      type="button"
-      aria-label="Close sidebar"
-    ></button>
+            </div>
 
-    <!-- Sidebar -->
-    <aside
-      id="sidebar"
-      class="sidebar"
-    >
-      <header class="sidebar-header">
-        <div class="sidebar-brand">
-          <div class="sidebar-logo-shell">
-            <img
-              src="space-galaxy-stars-260nw-2537371667.webp.png"
-              alt=""
-              class="sidebar-logo spinning-logo"
-            >
-          </div>
-
-          <div class="sidebar-brand-text">
-            <h1>Galaxy</h1>
-            <p>AI Assistant</p>
-          </div>
         </div>
 
-        <button
-          id="closeSidebarButton"
-          class="icon-button mobile-only"
-          type="button"
-          aria-label="Close sidebar"
-        >
-          ×
-        </button>
-      </header>
 
-      <button
-        id="newChatButton"
-        class="new-chat-button"
-        type="button"
-      >
-        <span
-          class="new-chat-icon"
-          aria-hidden="true"
-        >
-          ＋
-        </span>
-
-        <span>New conversation</span>
-      </button>
-
-      <section class="recent-section">
-        <header class="recent-header">
-          <h2>Recent chats</h2>
-
-          <button
-            id="clearChatsButton"
-            class="clear-chats-button"
-            type="button"
-          >
-            Clear
-          </button>
-        </header>
+        <!-- NEW CHAT -->
 
         <div
-          id="recentChats"
-          class="recent-chats"
-        ></div>
-      </section>
-
-      <footer class="sidebar-footer">
-        <button
-          id="settingsButton"
-          class="settings-button"
-          type="button"
+            id="new-chat"
+            class="sidebar-action"
+            role="button"
+            tabindex="0"
         >
-          <span aria-hidden="true">⚙</span>
-          <span>Settings</span>
-        </button>
 
-        <p>
-          Created by Harshavrdhan
-        </p>
-      </footer>
+            <span class="sidebar-icon">
+                ＋
+            </span>
+
+            <span>
+                New Chat
+            </span>
+
+        </div>
+
+
+        <!-- RECENTS TITLE -->
+
+        <div class="sidebar-heading">
+            RECENTS
+        </div>
+
+
+        <!-- RECENTS -->
+
+        <div id="recent-chats">
+
+            <!-- Generated by JavaScript -->
+
+        </div>
+
+
+        <!-- BOTTOM ACCOUNT AREA -->
+
+        <div class="sidebar-bottom">
+
+            <div class="account-card">
+
+                <div class="account-top">
+
+                    <div class="account-avatar">
+                        H
+                    </div>
+
+                    <div>
+
+                        <div id="pack-name">
+                            STARTER
+                        </div>
+
+                        <div class="account-small">
+                            GALAXY Access
+                        </div>
+
+                    </div>
+
+                </div>
+
+
+                <div class="usage-row">
+
+                    <span>
+                        Questions
+                    </span>
+
+                    <span id="question-usage">
+                        0 / 10,000
+                    </span>
+
+                </div>
+
+
+                <div class="usage-bar">
+
+                    <div
+                        id="question-bar"
+                        class="usage-fill"
+                    ></div>
+
+                </div>
+
+
+                <div class="usage-row video-row">
+
+                    <span>
+                        Videos
+                    </span>
+
+                    <span id="video-usage">
+                        0 / 5
+                    </span>
+
+                </div>
+
+
+                <div class="usage-bar">
+
+                    <div
+                        id="video-bar"
+                        class="usage-fill"
+                    ></div>
+
+                </div>
+
+            </div>
+
+        </div>
+
     </aside>
 
-    <!-- Main panel -->
-    <section class="main-panel">
-      <!-- Topbar -->
-      <header class="topbar">
-        <div class="topbar-left">
-          <button
-            id="openSidebarButton"
-            class="menu-button mobile-only"
-            type="button"
-            aria-label="Open sidebar"
-          >
-            <span></span>
-            <span></span>
-            <span></span>
-          </button>
 
-          <div class="active-assistant">
+
+    <!-- ================================================= -->
+    <!-- MAIN ASSISTANT AREA -->
+    <!-- ================================================= -->
+
+    <main id="assistant-screen">
+
+
+        <!-- TOP BAR -->
+
+        <header id="top-bar">
+
+
+            <!-- MOBILE MENU -->
+
             <div
-              id="voiceOrb"
-              class="voice-orb"
-              aria-label="Galaxy voice status"
+                id="menu-trigger"
+                class="top-icon"
+                role="button"
+                tabindex="0"
+                title="Menu"
             >
-              <img
-                src="space-galaxy-stars-260nw-2537371667.webp.png"
-                alt="Galaxy"
-                class="voice-orb-logo spinning-logo"
-              >
 
-              <div class="voice-orb-ring"></div>
+                ☰
+
             </div>
 
-            <div class="assistant-details">
-              <h1 id="chatTitle">
-                Galaxy
-              </h1>
 
-              <div class="assistant-status">
-                <span
-                  id="statusDot"
-                  class="status-dot"
-                ></span>
+            <div class="top-title">
 
-                <span id="galaxyStatus">
-                  Ready
+                <span>
+                    GALAXY
                 </span>
-              </div>
-            </div>
-          </div>
-        </div>
 
-        <div class="live-information">
-          <!-- Live clock -->
-          <article class="information-card time-card">
+                <span
+                    id="ai-status"
+                    class="ai-status"
+                >
+                    Ready
+                </span>
+
+            </div>
+
+
             <div
-              class="information-icon"
-              aria-hidden="true"
+                id="pack-indicator"
+                class="pack-indicator"
             >
-              ◷
+                STARTER
             </div>
 
-            <div class="information-content">
-              <strong id="liveTime">
-                --:--:--
-              </strong>
+        </header>
 
-              <span id="liveDate">
-                Loading date...
-              </span>
+
+
+        <!-- ================================================= -->
+        <!-- CHAT AREA -->
+        <!-- ================================================= -->
+
+        <section id="chat-scroll">
+
+
+            <!-- WELCOME SCREEN -->
+
+            <div id="welcome-screen">
+
+                <div class="welcome-orbit">
+
+                    <div class="welcome-core">
+                        G
+                    </div>
+
+                </div>
+
+
+                <h1>
+                    GALAXY
+                </h1>
+
+
+                <p class="welcome-main">
+                    What can I help you with?
+                </p>
+
+
+                <p class="welcome-sub">
+
+                    Ask anything, create something,
+                    or say <strong>Game Mode</strong>.
+
+                </p>
+
+
+                <div class="example-area">
+
+                    <div class="example-text">
+                        Try:
+                    </div>
+
+                    <div class="example">
+                        Explain black holes
+                    </div>
+
+                    <div class="example">
+                        Create an image of a futuristic city
+                    </div>
+
+                    <div class="example">
+                        Create a video of a dragon flying through space
+                    </div>
+
+                    <div class="example">
+                        Game Mode
+                    </div>
+
+                </div>
+
             </div>
-          </article>
 
-          <!-- Live weather -->
-          <article
-            id="weatherCard"
-            class="information-card weather-card"
-          >
-            <div
-              id="weatherIcon"
-              class="information-icon weather-icon"
-              aria-hidden="true"
-            >
-              🌌
+
+
+            <!-- CHAT MESSAGES -->
+
+            <div id="messages">
+
             </div>
 
-            <div class="information-content">
-              <strong id="weatherTemperature">
-                Weather
-              </strong>
+        </section>
 
-              <span id="weatherDescription">
-                Enable location in settings
-              </span>
+
+
+        <!-- ================================================= -->
+        <!-- INPUT AREA -->
+        <!-- ================================================= -->
+
+        <footer id="composer-wrapper">
+
+
+            <div id="composer">
+
+
+                <textarea
+                    id="user-input"
+                    rows="1"
+                    maxlength="10000"
+                    placeholder="Message GALAXY..."
+                    autocomplete="off"
+                ></textarea>
+
+
+                <div class="composer-tools">
+
+
+                    <!-- MICROPHONE -->
+
+                    <div
+                        id="mic-trigger"
+                        class="composer-icon"
+                        role="button"
+                        tabindex="0"
+                        title="Voice input"
+                    >
+
+                        🎤
+
+                    </div>
+
+
+                    <!-- SEND -->
+
+                    <div
+                        id="send-trigger"
+                        class="send-icon"
+                        role="button"
+                        tabindex="0"
+                        title="Send"
+                    >
+
+                        ↑
+
+                    </div>
+
+                </div>
+
             </div>
-          </article>
-        </div>
-      </header>
 
-      <!-- Chat area -->
-      <section
-        id="chatArea"
-        class="chat-area"
-      >
-        <div
-          id="messages"
-          class="messages"
-          aria-live="polite"
-        >
-          <section class="welcome-screen">
-            <p
-              id="greetingText"
-              class="greeting-text"
-            >
-              Welcome
-            </p>
 
-            <h2>
-              How can I help you?
-            </h2>
+            <div class="composer-note">
 
-            <p class="welcome-description">
-              Type a message or say
-              <strong>“Galaxy”</strong>
-              to start speaking.
-            </p>
+                GALAXY can make mistakes.
+                Important information should be checked.
 
-            <div class="suggestion-grid">
-              <button
-                class="suggestion-card space-card"
-                type="button"
-                data-prompt="Tell me something fascinating about space"
-              >
-                <span
-                  class="suggestion-icon"
-                  aria-hidden="true"
-                >
-                  🪐
-                </span>
-
-                <span class="suggestion-text">
-                  <strong>Explore space</strong>
-
-                  <small>
-                    Stars, planets and galaxies
-                  </small>
-                </span>
-              </button>
-
-              <button
-                class="suggestion-card weather-suggestion-card"
-                type="button"
-                data-prompt="What is the live weather right now?"
-              >
-                <span
-                  class="suggestion-icon"
-                  aria-hidden="true"
-                >
-                  🌧️
-                </span>
-
-                <span class="suggestion-text">
-                  <strong>Check weather</strong>
-
-                  <small>
-                    Live conditions and atmosphere
-                  </small>
-                </span>
-              </button>
-
-              <button
-                class="suggestion-card ai-card"
-                type="button"
-                data-prompt="Explain artificial intelligence simply"
-              >
-                <span
-                  class="suggestion-icon"
-                  aria-hidden="true"
-                >
-                  🤖
-                </span>
-
-                <span class="suggestion-text">
-                  <strong>Learn about AI</strong>
-
-                  <small>
-                    Simple and useful explanations
-                  </small>
-                </span>
-              </button>
-
-              <button
-                class="suggestion-card story-card"
-                type="button"
-                data-prompt="Tell me a creative story"
-              >
-                <span
-                  class="suggestion-icon"
-                  aria-hidden="true"
-                >
-                  ✨
-                </span>
-
-                <span class="suggestion-text">
-                  <strong>Create a story</strong>
-
-                  <small>
-                    Enter a new world
-                  </small>
-                </span>
-              </button>
             </div>
-          </section>
-        </div>
-      </section>
 
-      <!-- Composer -->
-      <footer class="composer-section">
-        <div
-          id="voiceNotice"
-          class="voice-notice hidden"
-        >
-          <span class="voice-notice-dot"></span>
+        </footer>
 
-          <span id="voiceNoticeText">
-            Listening for “Galaxy”...
-          </span>
-        </div>
 
-        <div class="composer-shell">
-          <textarea
-            id="messageInput"
-            rows="1"
-            maxlength="8000"
-            placeholder="Message Galaxy..."
-            aria-label="Message Galaxy"
-            autocomplete="off"
-          ></textarea>
+    </main>
 
-          <button
-            id="sendButton"
-            class="send-button"
-            type="button"
-            aria-label="Send message"
-          >
-            <span aria-hidden="true">➤</span>
-          </button>
-        </div>
-
-        <p class="composer-note">
-          Galaxy can make mistakes. Verify important information.
-        </p>
-      </footer>
-    </section>
-  </main>
-
-  <!-- Settings modal -->
-  <div
-    id="settingsModal"
-    class="modal hidden"
-    role="dialog"
-    aria-modal="true"
-    aria-labelledby="settingsTitle"
-  >
-    <button
-      class="modal-backdrop"
-      type="button"
-      aria-label="Close settings"
-    ></button>
-
-    <section class="settings-panel">
-      <header class="settings-header">
-        <div>
-          <h2 id="settingsTitle">
-            Galaxy Settings
-          </h2>
-
-          <p>
-            Control voice, weather and visual effects.
-          </p>
-        </div>
-
-        <button
-          id="closeSettingsButton"
-          class="icon-button"
-          type="button"
-          aria-label="Close settings"
-        >
-          ×
-        </button>
-      </header>
-
-      <div class="settings-content">
-        <div class="setting-row">
-          <div class="setting-description">
-            <strong>Spoken answers</strong>
-
-            <span>
-              Galaxy reads answers aloud.
-            </span>
-          </div>
-
-          <label class="switch">
-            <input
-              id="speechToggle"
-              type="checkbox"
-              checked
-            >
-
-            <span class="switch-slider"></span>
-          </label>
-        </div>
-
-        <div class="setting-row">
-          <div class="setting-description">
-            <strong>Wake word</strong>
-
-            <span>
-              Say “Galaxy” followed by your request.
-            </span>
-          </div>
-
-          <label class="switch">
-            <input
-              id="wakeWordToggle"
-              type="checkbox"
-            >
-
-            <span class="switch-slider"></span>
-          </label>
-        </div>
-
-        <div class="setting-row">
-          <div class="setting-description">
-            <strong>Animated backgrounds</strong>
-
-            <span>
-              Change the environment based on topics.
-            </span>
-          </div>
-
-          <label class="switch">
-            <input
-              id="effectsToggle"
-              type="checkbox"
-              checked
-            >
-
-            <span class="switch-slider"></span>
-          </label>
-        </div>
-
-        <div class="setting-row">
-          <div class="setting-description">
-            <strong>Live weather</strong>
-
-            <span>
-              Use your location for weather information.
-            </span>
-          </div>
-
-          <button
-            id="enableWeatherButton"
-            class="setting-action-button"
-            type="button"
-          >
-            Enable
-          </button>
-        </div>
-
-        <div class="setting-row danger-setting">
-          <div class="setting-description">
-            <strong>Delete chat history</strong>
-
-            <span>
-              Remove conversations saved in this browser.
-            </span>
-          </div>
-
-          <button
-            id="deleteHistoryButton"
-            class="danger-button"
-            type="button"
-          >
-            Delete
-          </button>
-        </div>
-      </div>
-    </section>
-  </div>
-
-  <!-- Easter egg characters -->
-  <div
-    id="chickenCharacter"
-    class="chicken-character hidden"
-    aria-hidden="true"
-  >
-    <span class="normal-chicken">🐔</span>
-    <span class="tandoori-chicken">🍗</span>
-  </div>
-
-  <div
-    id="astronautCharacter"
-    class="astronaut-character hidden"
-    aria-hidden="true"
-  >
-    👨‍🚀
-  </div>
-
-  <div
-    id="dinosaurCharacter"
-    class="dinosaur-character hidden"
-    aria-hidden="true"
-  >
-    🦖
-  </div>
-
-  <noscript>
-    <div class="noscript-message">
-      Galaxy requires JavaScript to work.
-    </div>
-  </noscript>
-
-  <script src="script.js"></script>
-</body>
-</html>
-<!-- Your website content -->
-
-    <div id="galaxyIntro">
-      <div class="galaxy-swirl"></div>
-
-      <div class="intro-title">
-        <h1>GALAXY</h1>
-        <p>Created by Harshavardhan</p>
-      </div>
-    </div>
-
-<div id="galaxyIntro">
-    <div class="galaxy-swirl"></div>
-
-    <div class="intro-title">
-        <h1>GALAXY</h1>
-        <p>Created by Harshavardhan</p>
-    </div>
 </div>
 
+
+
+<!-- ===================================================== -->
+<!-- GAME MODE INTRO -->
+<!-- ===================================================== -->
+
+<div id="game-intro">
+
+
+    <video
+        id="intro-video"
+        preload="metadata"
+        playsinline
+    >
+
+        <source
+            src="game-intro.mp4"
+            type="video/mp4"
+        >
+
+    </video>
+
+
+    <div class="intro-top">
+
+        <div class="intro-brand">
+            GALAXY • GAME MODE
+        </div>
+
+        <div
+            id="skip-intro"
+            class="skip-intro"
+            role="button"
+            tabindex="0"
+        >
+            Skip Intro
+        </div>
+
+    </div>
+
+
+    <div
+        id="intro-play-message"
+        class="intro-play-message"
+    >
+        Tap anywhere to start
+    </div>
+
+</div>
+
+
+
+<!-- ===================================================== -->
+<!-- GAME MODE DASHBOARD -->
+<!-- ===================================================== -->
+
+<div id="game-mode">
+
+
+    <div class="game-mode-header">
+
+
+        <div>
+
+            <div class="game-mode-small">
+                GALAXY
+            </div>
+
+            <h1>
+                GAME MODE
+            </h1>
+
+        </div>
+
+
+        <div
+            id="exit-game-mode"
+            class="game-exit"
+            role="button"
+            tabindex="0"
+        >
+            ✕ Exit
+        </div>
+
+    </div>
+
+
+
+    <div class="game-hero">
+
+        <h2>
+            What do you want to play?
+        </h2>
+
+        <p>
+            Search for a game, category, or online experience.
+        </p>
+
+
+        <input
+            id="game-search"
+            type="text"
+            placeholder="Racing, football, survival, multiplayer..."
+        >
+
+    </div>
+
+
+
+    <div class="game-section-title">
+        Popular worlds
+    </div>
+
+
+    <div id="game-results" class="game-grid">
+
+    </div>
+
+</div>
+
+
+
+<!-- ===================================================== -->
+<!-- TOAST MESSAGE -->
+<!-- ===================================================== -->
+
+<div id="toast">
+
+</div>
+
+
 </body>
+
 </html>
