@@ -5551,3 +5551,2536 @@ function setSearchFilter(filter) {
     `[data-search-filter="${filter}"]`
   )?.classList.add
    ("active");
+("active");
+
+  const input = $("#commandInput");
+
+  if (
+    input &&
+    input.dataset.commandMode === "search"
+  ) {
+    renderFilteredSearchResults(
+      input.value,
+      filter
+    );
+  }
+}
+
+
+/* =========================================================
+   SECTION 59 — CONTENT HEADER
+   ========================================================= */
+
+function renderContentHeader(
+  eyebrow,
+  title,
+  actions = ""
+) {
+  const eyebrowElement =
+    $("#contentEyebrow");
+
+  const titleElement =
+    $("#contentTitle");
+
+  const actionsElement =
+    $("#contentActions");
+
+  if (eyebrowElement) {
+    eyebrowElement.textContent =
+      eyebrow || "Workspace";
+  }
+
+  if (titleElement) {
+    titleElement.textContent =
+      title || "GALAXY";
+  }
+
+  if (actionsElement) {
+    actionsElement.innerHTML =
+      actions || "";
+  }
+}
+
+
+/* =========================================================
+   SECTION 60 — CONTENT TABS
+   ========================================================= */
+
+function renderContentTabs(
+  tabs = [],
+  active = "",
+  group = ""
+) {
+  const root =
+    $("#contentTabs");
+
+  if (!root) return;
+
+  root.innerHTML =
+    tabs
+      .map(
+        ([value, label]) => `
+        <button
+          class="flat-tab ${
+            value === active
+              ? "active"
+              : ""
+          }"
+          data-content-tab="${escapeHTML(value)}"
+          data-content-group="${escapeHTML(group)}"
+        >
+          ${escapeHTML(label)}
+        </button>
+      `
+      )
+      .join("");
+}
+
+
+/* =========================================================
+   SECTION 61 — FILTERED SEARCH RESULTS
+   ========================================================= */
+
+function renderFilteredSearchResults(
+  query,
+  filter = Galaxy.state.activeSearchFilter
+) {
+  const root =
+    $("#commandList");
+
+  if (!root) return;
+
+  const results =
+    searchEverything(query);
+
+  const filtered =
+    filter === "all"
+      ? results
+      : results.filter(
+          item =>
+            item.type === filter
+        );
+
+  if (!query.trim()) {
+    root.innerHTML = `
+      <div class="command-hint">
+        Start typing to search GALAXY AI.
+      </div>
+    `;
+
+    return;
+  }
+
+  if (!filtered.length) {
+    root.innerHTML = `
+      <div class="empty-panel">
+        No results.
+      </div>
+    `;
+
+    return;
+  }
+
+  root.innerHTML =
+    filtered
+      .map(
+        item => `
+        <button
+          class="command-row"
+          data-search-result="${item.type}"
+          data-search-id="${item.id}"
+        >
+
+          <span class="command-icon">
+            ${item.icon}
+          </span>
+
+          <span>
+            ${escapeHTML(item.title)}
+          </span>
+
+          <small>
+            ${escapeHTML(item.type)}
+          </small>
+
+        </button>
+      `
+      )
+      .join("");
+}
+
+
+/* =========================================================
+   SECTION 62 — WORKSPACE ROUTER
+   ========================================================= */
+
+function openWorkspaceView(
+  view
+) {
+  Galaxy.state.view =
+    view;
+
+  $("#chatView")
+    ?.classList.remove(
+      "active-view"
+    );
+
+  $("#workView")
+    ?.classList.remove(
+      "active-view"
+    );
+
+  $("#contentView")
+    ?.classList.add(
+      "active-view"
+    );
+
+  document
+    .querySelectorAll(
+      "[data-view]"
+    )
+    .forEach(
+      item => {
+        item.classList.toggle(
+          "active",
+          item.dataset.view ===
+            view
+        );
+      }
+    );
+
+  switch (view) {
+    case "projects":
+      renderProjects();
+      break;
+
+    case "library":
+      renderLibrary();
+      break;
+
+    case "packs":
+      renderPacks(
+        Galaxy.state.activePackFilter ||
+          "all"
+      );
+      break;
+
+    case "scheduled":
+      renderScheduled();
+      break;
+
+    case "plugins":
+      renderPlugins();
+      break;
+
+    case "gpts":
+      renderAgents();
+      break;
+
+    case "sites":
+      renderSites();
+      break;
+
+    case "images":
+      renderImages();
+      break;
+
+    case "tools":
+      renderTools();
+      break;
+
+    default:
+      renderFallbackView(
+        view
+      );
+  }
+
+  if (
+    window.innerWidth <=
+    900
+  ) {
+    $("#app")
+      ?.classList.remove(
+        "mobile-sidebar-open"
+      );
+  }
+}
+
+
+/* =========================================================
+   SECTION 63 — FALLBACK VIEW
+   ========================================================= */
+
+function renderFallbackView(
+  view
+) {
+  renderContentHeader(
+    "Workspace",
+    view
+      ? view
+          .charAt(0)
+          .toUpperCase() +
+        view.slice(1)
+      : "GALAXY"
+  );
+
+  const root =
+    $("#contentBody");
+
+  if (!root) return;
+
+  root.innerHTML = `
+    <div class="empty-panel">
+
+      <span>
+        ✦
+      </span>
+
+      <h3>
+        ${escapeHTML(view || "Workspace")}
+      </h3>
+
+      <p>
+        This workspace is ready.
+      </p>
+
+    </div>
+  `;
+}
+
+
+/* =========================================================
+   SECTION 64 — TOOLS
+   ========================================================= */
+
+function renderTools() {
+  renderContentHeader(
+    "Power",
+    "Tools"
+  );
+
+  renderContentTabs(
+    [
+      [
+        "all",
+        "All"
+      ],
+      [
+        "developer",
+        "Developer"
+      ],
+      [
+        "creative",
+        "Creative"
+      ],
+      [
+        "utilities",
+        "Utilities"
+      ]
+    ],
+    "all",
+    "tools"
+  );
+
+  const root =
+    $("#contentBody");
+
+  if (!root) return;
+
+  const tools = [
+    {
+      icon: "⌘",
+      name:
+        "Command Palette",
+      description:
+        "Search and run GALAXY commands.",
+      action:
+        "command"
+    },
+
+    {
+      icon: "✦",
+      name:
+        "Prompt Templates",
+      description:
+        "Use powerful saved prompts.",
+      action:
+        "prompt-templates"
+    },
+
+    {
+      icon: "{}",
+      name:
+        "JSON Viewer",
+      description:
+        "Format and inspect JSON.",
+      action:
+        "json-viewer"
+    },
+
+    {
+      icon: "⇄",
+      name:
+        "Diff Viewer",
+      description:
+        "Compare two pieces of text.",
+      action:
+        "diff-viewer"
+    },
+
+    {
+      icon: "▦",
+      name:
+        "Scratchpad",
+      description:
+        "Quick notes and data workspace.",
+      action:
+        "scratchpad"
+    },
+
+    {
+      icon: "◌",
+      name:
+        "Focus Mode",
+      description:
+        "Hide distractions.",
+      action:
+        "focus"
+    }
+  ];
+
+  root.innerHTML = `
+    <div class="resource-grid">
+
+      ${tools
+        .map(
+          tool => `
+          <button
+            class="resource-card"
+            data-tool-action="${tool.action}"
+          >
+
+            <div class="resource-icon">
+              ${tool.icon}
+            </div>
+
+            <div class="resource-copy">
+
+              <strong>
+                ${escapeHTML(tool.name)}
+              </strong>
+
+              <span>
+                ${escapeHTML(tool.description)}
+              </span>
+
+            </div>
+
+            <span class="resource-arrow">
+              ›
+            </span>
+
+          </button>
+        `
+        )
+        .join("")}
+
+    </div>
+  `;
+}
+
+
+/* =========================================================
+   SECTION 65 — SEARCH RESULT OPENING
+   ========================================================= */
+
+function openSearchResult(
+  type,
+  id
+) {
+  closeOverlay();
+
+  switch (type) {
+    case "chat":
+      Galaxy.state.currentChatId =
+        id;
+
+      persistAll();
+
+      switchMode(
+        "chat"
+      );
+
+      renderChat();
+
+      renderRecentChats();
+
+      break;
+
+    case "project":
+      openWorkspaceView(
+        "projects"
+      );
+
+      break;
+
+    case "pack":
+      openWorkspaceView(
+        "packs"
+      );
+
+      setTimeout(
+        () => {
+          openPack?.(
+            id
+          );
+        },
+        0
+      );
+
+      break;
+
+    case "library":
+      openWorkspaceView(
+        "library"
+      );
+
+      setTimeout(
+        () => {
+          previewLibraryItem?.(
+            id
+          );
+        },
+        0
+      );
+
+      break;
+
+    case "agent":
+      openWorkspaceView(
+        "gpts"
+      );
+
+      break;
+
+    default:
+      toast(
+        "Opened"
+      );
+  }
+}
+
+
+/* =========================================================
+   SECTION 66 — FOCUS MODE
+   ========================================================= */
+
+function toggleFocusMode() {
+  Galaxy.state.settings.focusMode =
+    !Galaxy.state.settings.focusMode;
+
+  document.body.classList.toggle(
+    "focus-mode",
+    Galaxy.state.settings.focusMode
+  );
+
+  persistAll();
+
+  toast(
+    Galaxy.state.settings.focusMode
+      ? "Focus mode on"
+      : "Focus mode off"
+  );
+}
+
+
+function applyFocusMode() {
+  document.body.classList.toggle(
+    "focus-mode",
+    Boolean(
+      Galaxy.state.settings.focusMode
+    )
+  );
+}
+
+
+/* =========================================================
+   SECTION 67 — SIDEBAR
+   ========================================================= */
+
+function toggleSidebar() {
+  const app =
+    $("#app");
+
+  if (!app) return;
+
+  if (
+    window.innerWidth <=
+    900
+  ) {
+    app.classList.toggle(
+      "mobile-sidebar-open"
+    );
+
+    Galaxy.state.sidebarOpen =
+      app.classList.contains(
+        "mobile-sidebar-open"
+      );
+
+    return;
+  }
+
+  app.classList.toggle(
+    "sidebar-collapsed"
+  );
+
+  Galaxy.state.sidebarOpen =
+    !app.classList.contains(
+      "sidebar-collapsed"
+    );
+}
+
+
+/* =========================================================
+   SECTION 68 — SHARE
+   ========================================================= */
+
+async function shareWorkspace() {
+  const data = {
+    title:
+      "GALAXY AI",
+
+    text:
+      "GALAXY AI Workspace",
+
+    url:
+      window.location.href
+  };
+
+  try {
+    if (
+      navigator.share
+    ) {
+      await navigator.share(
+        data
+      );
+    } else {
+      await copyText(
+        window.location.href
+      );
+    }
+  } catch (error) {
+    if (
+      error?.name !==
+      "AbortError"
+    ) {
+      handleError(
+        error,
+        "Share"
+      );
+    }
+  }
+}
+
+
+/* =========================================================
+   SECTION 69 — CHAT CONTEXT MENU
+   ========================================================= */
+
+function closeContextMenu() {
+  document
+    .querySelectorAll(
+      ".context-menu"
+    )
+    .forEach(
+      menu =>
+        menu.remove()
+    );
+
+  Galaxy.state.contextTarget =
+    null;
+}
+
+
+function openContextMenu(
+  type,
+  id,
+  x,
+  y
+) {
+  closeContextMenu();
+
+  const menu =
+    document.createElement(
+      "div"
+    );
+
+  menu.className =
+    "context-menu";
+
+  menu.style.left =
+    `${x}px`;
+
+  menu.style.top =
+    `${y}px`;
+
+  Galaxy.state.contextTarget =
+    {
+      type,
+      id
+    };
+
+  if (
+    type === "chat"
+  ) {
+    const chat =
+      Galaxy.state.chats.find(
+        item =>
+          item.id === id
+      );
+
+    if (!chat) return;
+
+    menu.innerHTML = `
+      <button
+        class="context-row"
+        data-context-action="rename-chat"
+        data-context-id="${id}"
+      >
+        ✎
+        <span>
+          Rename
+        </span>
+      </button>
+
+      <button
+        class="context-row"
+        data-context-action="pin-chat"
+        data-context-id="${id}"
+      >
+        ◉
+        <span>
+          ${
+            chat.pinned
+              ? "Unpin"
+              : "Pin"
+          }
+        </span>
+      </button>
+
+      <button
+        class="context-row"
+        data-context-action="archive-chat"
+        data-context-id="${id}"
+      >
+        ▱
+        <span>
+          ${
+            chat.archived
+              ? "Restore"
+              : "Archive"
+          }
+        </span>
+      </button>
+
+      <button
+        class="context-row"
+        data-context-action="export-chat"
+        data-context-id="${id}"
+      >
+        ↗
+        <span>
+          Export
+        </span>
+      </button>
+
+      <button
+        class="context-row danger"
+        data-context-action="delete-chat"
+        data-context-id="${id}"
+      >
+        ×
+        <span>
+          Delete
+        </span>
+      </button>
+    `;
+  }
+
+  if (
+    type === "project"
+  ) {
+    menu.innerHTML = `
+      <button
+        class="context-row"
+        data-context-action="edit-project"
+        data-context-id="${id}"
+      >
+        ✎
+        <span>
+          Edit
+        </span>
+      </button>
+
+      <button
+        class="context-row danger"
+        data-context-action="delete-project"
+        data-context-id="${id}"
+      >
+        ×
+        <span>
+          Delete
+        </span>
+      </button>
+    `;
+  }
+
+  document.body.appendChild(
+    menu
+  );
+}
+
+
+/* =========================================================
+   SECTION 70 — CONTEXT ACTIONS
+   ========================================================= */
+
+function handleContextAction(
+  action,
+  id
+) {
+  closeContextMenu();
+
+  switch (action) {
+    case "rename-chat":
+      renameChat(
+        id
+      );
+      break;
+
+    case "pin-chat":
+      togglePinChat(
+        id
+      );
+      break;
+
+    case "archive-chat":
+      toggleArchiveChat(
+        id
+      );
+      break;
+
+    case "export-chat":
+      exportConversation(
+        id
+      );
+      break;
+
+    case "delete-chat":
+      deleteChat(
+        id
+      );
+      break;
+
+    case "edit-project":
+      editProject(
+        id
+      );
+      break;
+
+    case "delete-project":
+      deleteProject(
+        id
+      );
+      break;
+  }
+}
+
+
+/* =========================================================
+   SECTION 71 — JSON VIEWER
+   ========================================================= */
+
+function openJSONViewer() {
+  openModal({
+    title:
+      "JSON Viewer",
+
+    body: `
+      <div class="form-stack">
+
+        <textarea
+          id="jsonViewerInput"
+          class="field textarea-field"
+          placeholder='{"hello":"GALAXY"}'
+        ></textarea>
+
+        <button
+          id="formatJSONButton"
+          class="text-action primary"
+        >
+          Format JSON
+        </button>
+
+        <pre
+          id="jsonViewerOutput"
+          class="code-block"
+        ></pre>
+
+      </div>
+    `
+  });
+
+  setTimeout(
+    () => {
+      $("#formatJSONButton")
+        ?.addEventListener(
+          "click",
+          () => {
+            const input =
+              $("#jsonViewerInput");
+
+            const output =
+              $("#jsonViewerOutput");
+
+            try {
+              const parsed =
+                JSON.parse(
+                  input.value
+                );
+
+              output.textContent =
+                JSON.stringify(
+                  parsed,
+                  null,
+                  2
+                );
+            } catch (error) {
+              output.textContent =
+                `Invalid JSON: ${error.message}`;
+            }
+          }
+        );
+    },
+    0
+  );
+}
+
+
+/* =========================================================
+   SECTION 72 — DIFF VIEWER
+   ========================================================= */
+
+function openDiffViewer() {
+  openModal({
+    title:
+      "Diff Viewer",
+
+    width:
+      "900px",
+
+    body: `
+      <div class="diff-grid">
+
+        <textarea
+          id="diffLeft"
+          class="field textarea-field"
+          placeholder="Original text"
+        ></textarea>
+
+        <textarea
+          id="diffRight"
+          class="field textarea-field"
+          placeholder="Changed text"
+        ></textarea>
+
+      </div>
+
+      <button
+        id="compareDiffButton"
+        class="text-action primary"
+      >
+        Compare
+      </button>
+
+      <div
+        id="diffOutput"
+        class="diff-output"
+      ></div>
+    `
+  });
+
+  setTimeout(
+    () => {
+      $("#compareDiffButton")
+        ?.addEventListener(
+          "click",
+          () => {
+            const left =
+              $("#diffLeft")
+                ?.value ||
+              "";
+
+            const right =
+              $("#diffRight")
+                ?.value ||
+              "";
+
+            const output =
+              $("#diffOutput");
+
+            if (
+              left === right
+            ) {
+              output.innerHTML = `
+                <div class="empty-panel">
+                  Text is identical.
+                </div>
+              `;
+
+              return;
+            }
+
+            output.innerHTML = `
+              <div class="diff-result">
+
+                <div>
+                  <strong>
+                    Original
+                  </strong>
+
+                  <pre>${escapeHTML(left)}</pre>
+                </div>
+
+                <div>
+                  <strong>
+                    Changed
+                  </strong>
+
+                  <pre>${escapeHTML(right)}</pre>
+                </div>
+
+              </div>
+            `;
+          }
+        );
+    },
+    0
+  );
+}
+
+
+/* =========================================================
+   SECTION 73 — SCRATCHPAD
+   ========================================================= */
+
+function openScratchpad() {
+  const saved =
+    DB.get(
+      "scratchpad",
+      ""
+    );
+
+  openModal({
+    title:
+      "Scratchpad",
+
+    body: `
+      <textarea
+        id="scratchpadInput"
+        class="field textarea-field scratchpad-field"
+        placeholder="Write anything..."
+      >${escapeHTML(saved)}</textarea>
+    `
+  });
+
+  setTimeout(
+    () => {
+      $("#scratchpadInput")
+        ?.addEventListener(
+          "input",
+          event => {
+            DB.set(
+              "scratchpad",
+              event.target.value
+            );
+          }
+        );
+    },
+    0
+  );
+}
+
+
+/* =========================================================
+   SECTION 74 — TOOL ACTION ROUTER
+   ========================================================= */
+
+function handleToolAction(
+  action
+) {
+  switch (action) {
+    case "command":
+      openCommandPalette();
+      break;
+
+    case "prompt-templates":
+      openPromptTemplates();
+      break;
+
+    case "json-viewer":
+      openJSONViewer();
+      break;
+
+    case "diff-viewer":
+      openDiffViewer();
+      break;
+
+    case "scratchpad":
+      openScratchpad();
+      break;
+
+    case "focus":
+      toggleFocusMode();
+      break;
+  }
+}
+
+
+/* =========================================================
+   SECTION 75 — SITE EDITOR TAB
+   ========================================================= */
+
+function switchSiteEditorTab(
+  language
+) {
+  const site =
+    Galaxy.state.sites.find(
+      item =>
+        item.id ===
+        Galaxy.state.activeSiteId
+    );
+
+  const editor =
+    $("#siteEditor");
+
+  if (
+    !site ||
+    !editor
+  ) {
+    return;
+  }
+
+  const oldLanguage =
+    editor.dataset.language;
+
+  if (
+    oldLanguage &&
+    site[
+      oldLanguage
+    ] !== undefined
+  ) {
+    site[
+      oldLanguage
+    ] =
+      editor.value;
+  }
+
+  editor.dataset.language =
+    language;
+
+  editor.value =
+    site[
+      language
+    ] ||
+    "";
+
+  $$(".editor-tab")
+    .forEach(
+      tab =>
+        tab.classList.toggle(
+          "active",
+          tab.dataset.siteTab ===
+            language
+        )
+    );
+
+  persistAll();
+}
+
+
+/* =========================================================
+   SECTION 76 — PACK INSTALL TOGGLE
+   ========================================================= */
+
+function togglePackInstall(
+  id
+) {
+  const pack =
+    Galaxy.state.packs.find(
+      item =>
+        item.id === id
+    );
+
+  if (!pack) return;
+
+  if (
+    pack.installed
+  ) {
+    removePack(
+      id
+    );
+  } else {
+    installPack(
+      id
+    );
+  }
+}
+
+
+/* =========================================================
+   SECTION 77 — CONTENT TAB ROUTING
+   ========================================================= */
+
+function handleContentTab(
+  group,
+  tab
+) {
+  switch (group) {
+    case "library":
+      renderLibrary(
+        tab
+      );
+      break;
+
+    case "packs":
+      renderPacks(
+        tab
+      );
+      break;
+
+    case "projects":
+      renderProjects();
+      break;
+
+    case "scheduled":
+      renderScheduled();
+      break;
+
+    case "plugins":
+      renderPlugins();
+      break;
+
+    case "gpts":
+      renderAgents();
+      break;
+
+    case "sites":
+      renderSites();
+      break;
+
+    case "images":
+      renderImages();
+      break;
+
+    case "tools":
+      renderTools();
+      break;
+  }
+
+  $$(".flat-tab")
+    .forEach(
+      button =>
+        button.classList.toggle(
+          "active",
+          button.dataset.contentTab ===
+            tab
+        )
+    );
+}
+
+
+/* =========================================================
+   SECTION 78 — GENERAL CLICK ROUTER
+   ========================================================= */
+
+function handleDocumentClick(
+  event
+) {
+  const actionElement =
+    event.target.closest(
+      "[data-action]"
+    );
+
+  const action =
+    actionElement
+      ?.dataset.action;
+
+  const viewElement =
+    event.target.closest(
+      "[data-view]"
+    );
+
+  const view =
+    viewElement
+      ?.dataset.view;
+
+  const chatOpen =
+    event.target.closest(
+      "[data-chat-open]"
+    );
+
+  const contextOpen =
+    event.target.closest(
+      "[data-context-open]"
+    );
+
+  const contextAction =
+    event.target.closest(
+      "[data-context-action]"
+    );
+
+  const contentTab =
+    event.target.closest(
+      "[data-content-tab]"
+    );
+
+  const searchResult =
+    event.target.closest(
+      "[data-search-result]"
+    );
+
+  const command =
+    event.target.closest(
+      "[data-command-name]"
+    );
+
+  const toolAction =
+    event.target.closest(
+      "[data-tool-action]"
+    );
+
+  const codeCopy =
+    event.target.closest(
+      "[data-copy-code]"
+    );
+
+  const copyMessage =
+    event.target.closest(
+      "[data-copy-message]"
+    );
+
+  const editMessageButton =
+    event.target.closest(
+      "[data-edit-message]"
+    );
+
+  const retryMessageButton =
+    event.target.closest(
+      "[data-retry-message]"
+    );
+
+  const readMessageButton =
+    event.target.closest(
+      "[data-read-message]"
+    );
+
+  const branchMessageButton =
+    event.target.closest(
+      "[data-branch-message]"
+    );
+
+  const previewLibrary =
+    event.target.closest(
+      "[data-preview-library]"
+    );
+
+  const libraryFavorite =
+    event.target.closest(
+      "[data-library-favorite]"
+    );
+
+  const deleteLibrary =
+    event.target.closest(
+      "[data-delete-library]"
+    );
+
+  const editProjectButton =
+    event.target.closest(
+      "[data-edit-project]"
+    );
+
+  const toggleScheduled =
+    event.target.closest(
+      "[data-toggle-scheduled]"
+    );
+
+  const deleteScheduled =
+    event.target.closest(
+      "[data-delete-scheduled]"
+    );
+
+  const pluginInstall =
+    event.target.closest(
+      "[data-plugin-install]"
+    );
+
+  const pluginConnect =
+    event.target.closest(
+      "[data-plugin-connect]"
+    );
+
+  const editAgentButton =
+    event.target.closest(
+      "[data-edit-agent]"
+    );
+
+  const openSiteButton =
+    event.target.closest(
+      "[data-open-site]"
+    );
+
+  const siteTab =
+    event.target.closest(
+      "[data-site-tab]"
+    );
+
+  const openPackButton =
+    event.target.closest(
+      "[data-open-pack]"
+    );
+
+  const packInstall =
+    event.target.closest(
+      "[data-pack-install-toggle]"
+    );
+
+  const packItem =
+    event.target.closest(
+      "[data-pack-item]"
+    );
+
+  const promptTemplate =
+    event.target.closest(
+      "[data-use-prompt]"
+    );
+
+  const workView =
+    event.target.closest(
+      "[data-work-view]"
+    );
+
+
+  if (
+    event.target.classList.contains(
+      "overlay"
+    )
+  ) {
+    closeOverlay();
+  }
+
+
+  if (view) {
+    openWorkspaceView(
+      view
+    );
+  }
+
+
+  if (action) {
+    switch (action) {
+      case "home":
+        switchMode(
+          "chat"
+        );
+        break;
+
+      case "new-chat":
+        newChat();
+        break;
+
+      case "search":
+        openSearch();
+        break;
+
+      case "command":
+        openCommandPalette();
+        break;
+
+      case "toggle-sidebar":
+        toggleSidebar();
+        break;
+
+      case "toggle-more": {
+        const menu =
+          $("#moreMenu");
+
+        if (menu) {
+          menu.hidden =
+            !menu.hidden;
+
+          actionElement.setAttribute(
+            "aria-expanded",
+            String(
+              !menu.hidden
+            )
+          );
+        }
+
+        break;
+      }
+
+      case "attach":
+        $("#fileInput")
+          ?.click();
+        break;
+
+      case "image":
+        $("#imageInput")
+          ?.click();
+        break;
+
+      case "video":
+        $("#videoInput")
+          ?.click();
+        break;
+
+      case "voice":
+        toggleVoiceRecording();
+        break;
+
+      case "web-search":
+        toggleWebSearch();
+        break;
+
+      case "send":
+        sendMessage();
+        break;
+
+      case "send-work":
+        sendWorkMessage();
+        break;
+
+      case "focus":
+        toggleFocusMode();
+        break;
+
+      case "notifications":
+        openNotifications();
+        break;
+
+      case "settings":
+        openSettings();
+        break;
+
+      case "share":
+        shareWorkspace();
+        break;
+
+      case "close-overlay":
+        closeOverlay();
+        break;
+
+      case "new-project":
+        createProject();
+        break;
+
+      case "new-scheduled":
+        createScheduledTask();
+        break;
+
+      case "new-agent":
+        createAgent();
+        break;
+
+      case "new-site":
+        createSite();
+        break;
+
+      case "new-image":
+        createImageConcept();
+        break;
+
+      case "save-site":
+        saveActiveSite();
+        break;
+
+      case "preview-site":
+        previewActiveSite();
+        break;
+
+      case "prompt-templates":
+        openPromptTemplates();
+        break;
+
+      case "refresh-preview":
+        renderWorkDocument();
+        break;
+
+      case "fullscreen-preview":
+        $("#previewSurface")
+          ?.requestFullscreen
+          ?.();
+        break;
+
+      case "reset-data":
+        confirmAction({
+          title:
+            "Reset GALAXY",
+
+          message:
+            "Delete all locally saved GALAXY data?",
+
+          confirmLabel:
+            "Reset",
+
+          onConfirm() {
+            DB.clear();
+
+            window.location.reload();
+          }
+        });
+
+        break;
+    }
+  }
+
+
+  if (chatOpen) {
+    Galaxy.state.currentChatId =
+      chatOpen.dataset.chatOpen;
+
+    persistAll();
+
+    switchMode(
+      "chat"
+    );
+
+    renderChat();
+
+    renderRecentChats();
+  }
+
+
+  if (contextOpen) {
+    const type =
+      contextOpen.dataset.contextOpen;
+
+    const id =
+      contextOpen.dataset.contextId;
+
+    const rect =
+      contextOpen.getBoundingClientRect();
+
+    openContextMenu(
+      type,
+      id,
+      rect.right,
+      rect.bottom
+    );
+  }
+
+
+  if (contextAction) {
+    handleContextAction(
+      contextAction.dataset.contextAction,
+      contextAction.dataset.contextId
+    );
+  }
+
+
+  if (contentTab) {
+    handleContentTab(
+      contentTab.dataset.contentGroup,
+      contentTab.dataset.contentTab
+    );
+  }
+
+
+  if (searchResult) {
+    openSearchResult(
+      searchResult.dataset.searchResult,
+      searchResult.dataset.searchId
+    );
+  }
+
+
+  if (command) {
+    const item =
+      COMMANDS.find(
+        commandItem =>
+          commandItem.name ===
+          command.dataset.commandName
+      );
+
+    closeOverlay();
+
+    item?.run?.();
+  }
+
+
+  if (toolAction) {
+    handleToolAction(
+      toolAction.dataset.toolAction
+    );
+  }
+
+
+  if (codeCopy) {
+    copyText(
+      decodeURIComponent(
+        codeCopy.dataset.copyCode
+      )
+    );
+  }
+
+
+  if (copyMessage) {
+    const chat =
+      getCurrentChat();
+
+    const message =
+      chat?.messages.find(
+        item =>
+          item.id ===
+          copyMessage.dataset.copyMessage
+      );
+
+    if (message) {
+      copyText(
+        message.text
+      );
+    }
+  }
+
+
+  if (editMessageButton) {
+    editMessage(
+      editMessageButton.dataset.editMessage
+    );
+  }
+
+
+  if (retryMessageButton) {
+    retryMessage(
+      retryMessageButton.dataset.retryMessage
+    );
+  }
+
+
+  if (readMessageButton) {
+    readAloud(
+      readMessageButton.dataset.readMessage
+    );
+  }
+
+
+  if (branchMessageButton) {
+    branchConversation(
+      branchMessageButton.dataset.branchMessage
+    );
+  }
+
+
+  if (previewLibrary) {
+    previewLibraryItem(
+      previewLibrary.dataset.previewLibrary
+    );
+  }
+
+
+  if (libraryFavorite) {
+    toggleLibraryFavorite(
+      libraryFavorite.dataset.libraryFavorite
+    );
+  }
+
+
+  if (deleteLibrary) {
+    deleteLibraryItem(
+      deleteLibrary.dataset.deleteLibrary
+    );
+  }
+
+
+  if (editProjectButton) {
+    editProject(
+      editProjectButton.dataset.editProject
+    );
+  }
+
+
+  if (toggleScheduled) {
+    toggleScheduledTask(
+      toggleScheduled.dataset.toggleScheduled
+    );
+  }
+
+
+  if (deleteScheduled) {
+    deleteScheduledTask(
+      deleteScheduled.dataset.deleteScheduled
+    );
+  }
+
+
+  if (pluginInstall) {
+    togglePluginInstall(
+      pluginInstall.dataset.pluginInstall
+    );
+  }
+
+
+  if (pluginConnect) {
+    togglePluginConnection(
+      pluginConnect.dataset.pluginConnect
+    );
+  }
+
+
+  if (editAgentButton) {
+    const agent =
+      Galaxy.state.agents.find(
+        item =>
+          item.id ===
+          editAgentButton.dataset.editAgent
+      );
+
+    if (agent) {
+      openAgentEditor(
+        agent
+      );
+    }
+  }
+
+
+  if (openSiteButton) {
+    openSiteEditor(
+      openSiteButton.dataset.openSite
+    );
+  }
+
+
+  if (siteTab) {
+    switchSiteEditorTab(
+      siteTab.dataset.siteTab
+    );
+  }
+
+
+  if (openPackButton) {
+    openPack(
+      openPackButton.dataset.openPack
+    );
+  }
+
+
+  if (packInstall) {
+    togglePackInstall(
+      packInstall.dataset.packInstallToggle
+    );
+  }
+
+
+  if (packItem) {
+    const input =
+      $("#promptInput");
+
+    if (input) {
+      input.value =
+        packItem.dataset.packItem;
+
+      switchMode(
+        "chat"
+      );
+
+      autoResizeTextarea(
+        input
+      );
+
+      input.focus();
+    }
+  }
+
+
+  if (promptTemplate) {
+    usePromptTemplate(
+      promptTemplate.dataset.usePrompt
+    );
+  }
+
+
+  if (workView) {
+    if (
+      workView.dataset.workView ===
+      "preview"
+    ) {
+      previewWorkDocument();
+    }
+
+    if (
+      workView.dataset.workView ===
+      "edit"
+    ) {
+      renderWorkDocument();
+    }
+  }
+}
+
+
+/* =========================================================
+   SECTION 79 — RIGHT CLICK
+   ========================================================= */
+
+function handleContextMenuEvent(
+  event
+) {
+  const target =
+    event.target.closest(
+      "[data-context-type]"
+    );
+
+  if (!target) return;
+
+  event.preventDefault();
+
+  openContextMenu(
+    target.dataset.contextType,
+    target.dataset.contextId,
+    event.clientX,
+    event.clientY
+  );
+}
+
+
+/* =========================================================
+   SECTION 80 — INPUT EVENTS
+   ========================================================= */
+
+function handleDocumentInput(
+  event
+) {
+  if (
+    event.target.id ===
+    "promptInput"
+  ) {
+    autoResizeTextarea(
+      event.target
+    );
+
+    if (
+      Galaxy.state.settings.autosave
+    ) {
+      clearTimeout(
+        handleDocumentInput.autosaveTimer
+      );
+
+      handleDocumentInput.autosaveTimer =
+        setTimeout(
+          () => {
+            DB.set(
+              "draft",
+              event.target.value
+            );
+
+            const state =
+              $("#draftState");
+
+            if (state) {
+              state.textContent =
+                event.target.value
+                  ? "Draft saved"
+                  : "Ready";
+            }
+          },
+          Galaxy.state.settings.autosaveDelay
+        );
+    }
+  }
+
+
+  if (
+    event.target.id ===
+    "commandInput"
+  ) {
+    const mode =
+      event.target.dataset.commandMode;
+
+    if (
+      mode === "search"
+    ) {
+      renderFilteredSearchResults(
+        event.target.value
+      );
+    } else {
+      renderCommandResults(
+        event.target.value,
+        mode
+      );
+    }
+  }
+}
+
+
+/* =========================================================
+   SECTION 81 — MESSAGE INPUT KEYDOWN
+   ========================================================= */
+
+function handlePromptKeydown(
+  event
+) {
+  if (
+    event.target.id !==
+    "promptInput"
+  ) {
+    return;
+  }
+
+  if (
+    event.key ===
+      "Enter" &&
+    !event.shiftKey &&
+    Galaxy.state.settings.enterToSend
+  ) {
+    event.preventDefault();
+
+    sendMessage();
+  }
+}
+
+
+/* =========================================================
+   SECTION 82 — GLOBAL KEYBOARD SHORTCUTS
+   ========================================================= */
+
+function handleKeyboardShortcuts(
+  event
+) {
+  const key =
+    event.key.toLowerCase();
+
+  const modifier =
+    event.ctrlKey ||
+    event.metaKey;
+
+  if (
+    event.key ===
+    "Escape"
+  ) {
+    closeOverlay();
+
+    closeContextMenu();
+
+    return;
+  }
+
+
+  if (
+    modifier &&
+    key === "k"
+  ) {
+    event.preventDefault();
+
+    openSearch();
+
+    return;
+  }
+
+
+  if (
+    modifier &&
+    key === "n"
+  ) {
+    event.preventDefault();
+
+    newChat();
+
+    return;
+  }
+
+
+  if (
+    modifier &&
+    event.key === "."
+  ) {
+    event.preventDefault();
+
+    toggleFocusMode();
+
+    return;
+  }
+
+
+  if (
+    modifier &&
+    event.key === "/"
+  ) {
+    event.preventDefault();
+
+    toggleTheme();
+
+    return;
+  }
+
+
+  if (
+    event.altKey &&
+    event.key === "1"
+  ) {
+    event.preventDefault();
+
+    switchMode(
+      "chat"
+    );
+
+    return;
+  }
+
+
+  if (
+    event.altKey &&
+    event.key === "2"
+  ) {
+    event.preventDefault();
+
+    switchMode(
+      "work"
+    );
+  }
+}
+
+
+/* =========================================================
+   SECTION 83 — FILE INPUT EVENTS
+   ========================================================= */
+
+function bindFileInputs() {
+  on(
+    $("#fileInput"),
+    "change",
+    event => {
+      if (
+        event.target.files
+          ?.length
+      ) {
+        addFiles(
+          event.target.files
+        );
+      }
+
+      event.target.value =
+        "";
+    }
+  );
+
+
+  on(
+    $("#imageInput"),
+    "change",
+    event => {
+      if (
+        event.target.files
+          ?.length
+      ) {
+        addFiles(
+          event.target.files
+        );
+
+        Array.from(
+          event.target.files
+        )
+          .forEach(
+            file =>
+              addLibraryFile(
+                file
+              )
+          );
+      }
+
+      event.target.value =
+        "";
+    }
+  );
+
+
+  on(
+    $("#videoInput"),
+    "change",
+    event => {
+      if (
+        event.target.files
+          ?.length
+      ) {
+        addFiles(
+          event.target.files
+        );
+
+        Array.from(
+          event.target.files
+        )
+          .forEach(
+            file =>
+              addLibraryFile(
+                file
+              )
+          );
+      }
+
+      event.target.value =
+        "";
+    }
+  );
+
+
+  on(
+    $("#libraryInput"),
+    "change",
+    event => {
+      Array.from(
+        event.target.files ||
+          []
+      )
+        .forEach(
+          file =>
+            addLibraryFile(
+              file
+            )
+        );
+
+      event.target.value =
+        "";
+    }
+  );
+
+
+  on(
+    $("#conversationImportInput"),
+    "change",
+    event => {
+      const file =
+        event.target.files?.[
+          0
+        ];
+
+      if (file) {
+        importConversation(
+          file
+        );
+      }
+
+      event.target.value =
+        "";
+    }
+  );
+}
+
+
+/* =========================================================
+   SECTION 84 — MODE TABS
+   ========================================================= */
+
+function bindModeTabs() {
+  $$(".mode-tab")
+    .forEach(
+      tab => {
+        on(
+          tab,
+          "click",
+          () => {
+            switchMode(
+              tab.dataset.mode
+            );
+          }
+        );
+      }
+    );
+}
+
+
+/* =========================================================
+   SECTION 85 — WINDOW RESIZE
+   ========================================================= */
+
+function handleResize() {
+  if (
+    window.innerWidth >
+    900
+  ) {
+    $("#app")
+      ?.classList.remove(
+        "mobile-sidebar-open"
+      );
+  }
+}
+
+
+/* =========================================================
+   SECTION 86 — SETTINGS CHANGE EVENTS
+   ========================================================= */
+
+function bindSettingsEvents() {
+  document.addEventListener(
+    "click",
+    event => {
+      const toggle =
+        event.target.closest(
+          "[data-setting-toggle]"
+        );
+
+      if (!toggle) return;
+
+      const key =
+        toggle.dataset.settingToggle;
+
+      Galaxy.state.settings[
+        key
+      ] =
+        !Galaxy.state.settings[
+          key
+        ];
+
+      persistAll();
+
+      applyTheme();
+
+      applyFocusMode();
+
+      toggle.classList.toggle(
+        "active",
+        Galaxy.state.settings[
+          key
+        ]
+      );
+
+      toggle.setAttribute(
+        "aria-pressed",
+        String(
+          Galaxy.state.settings[
+            key
+          ]
+        )
+      );
+    }
+  );
+
+
+  document.addEventListener(
+    "change",
+    event => {
+      const select =
+        event.target.closest(
+          "[data-setting-select]"
+        );
+
+      if (!select) return;
+
+      Galaxy.state.settings[
+        select.dataset.settingSelect
+      ] =
+        select.value;
+
+      persistAll();
+
+      applyTheme();
+    }
+  );
+}
+
+
+/* =========================================================
+   SECTION 87 — INITIAL CHAT
+   ========================================================= */
+
+function ensureInitialChatState() {
+  if (
+    Galaxy.state.currentChatId &&
+    !Galaxy.state.chats.some(
+      chat =>
+        chat.id ===
+        Galaxy.state.currentChatId
+    )
+  ) {
+    Galaxy.state.currentChatId =
+      null;
+  }
+
+  if (
+    !Galaxy.state.currentChatId &&
+    Galaxy.state.chats.length
+  ) {
+    Galaxy.state.currentChatId =
+      Galaxy.state.chats[0].id;
+  }
+}
+
+
+/* =========================================================
+   SECTION 88 — RESTORE DRAFT
+   ========================================================= */
+
+function restoreDraft() {
+  const input =
+    $("#promptInput");
+
+  if (!input) return;
+
+  const draft =
+    DB.get(
+      "draft",
+      ""
+    );
+
+  input.value =
+    draft || "";
+
+  autoResizeTextarea(
+    input
+  );
+
+  const status =
+    $("#draftState");
+
+  if (
+    status &&
+    draft
+  ) {
+    status.textContent =
+      "Draft restored";
+  }
+}
+
+
+/* =========================================================
+   SECTION 89 — INITIAL VIEW
+   ========================================================= */
+
+function restoreView() {
+  if (
+    Galaxy.state.mode ===
+    "work"
+  ) {
+    switchMode(
+      "work"
+    );
+
+    return;
+  }
+
+  switchMode(
+    "chat"
+  );
+}
+
+
+/* =========================================================
+   SECTION 90 — INITIALIZE GALAXY
+   ========================================================= */
+
+function initGalaxy() {
+  try {
+    seedGalaxyData();
+
+    ensureInitialChatState();
+
+    applyTheme();
+
+    applyFocusMode();
+
+    restoreDraft();
+
+    renderRecentChats();
+
+    renderChat();
+
+    renderWebSearchState();
+
+    renderVoiceState();
+
+    updateNotificationIndicator();
+
+    updateSendButtonState();
+
+    bindModeTabs();
+
+    bindFileInputs();
+
+    bindSettingsEvents();
+
+    document.addEventListener(
+      "click",
+      handleDocumentClick
+    );
+
+    document.addEventListener(
+      "contextmenu",
+      handleContextMenuEvent
+    );
+
+    document.addEventListener(
+      "input",
+      handleDocumentInput
+    );
+
+    document.addEventListener(
+      "keydown",
+      handlePromptKeydown
+    );
+
+    document.addEventListener(
+      "keydown",
+      handleKeyboardShortcuts
+    );
+
+    window.addEventListener(
+      "resize",
+      handleResize
+    );
+
+    window.addEventListener(
+      "blur",
+      closeContextMenu
+    );
+
+    restoreView();
+
+    addNotification({
+      title:
+        "GALAXY ready",
+
+      message:
+        "Your AI workspace is ready.",
+
+      type:
+        "info"
+    });
+
+    console.log(
+      `GALAXY AI ${Galaxy.version} ready`
+    );
+  } catch (error) {
+    handleError(
+      error,
+      "Initialization"
+    );
+  }
+}
+
+
+/* =========================================================
+   SECTION 91 — START APPLICATION
+   ========================================================= */
+
+if (
+  document.readyState ===
+  "loading"
+) {
+  document.addEventListener(
+    "DOMContentLoaded",
+    initGalaxy,
+    {
+      once: true
+    }
+  );
+} else {
+  initGalaxy();
+}
