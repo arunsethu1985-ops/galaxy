@@ -7084,7 +7084,94 @@ function stopGeneration() {
    REAL AI BACKEND
    ========================================================= */
 
-async function fetchAIResponse(
+async function 
+   async function fetchAIResponse(
+  prompt,
+  extra = {}
+) {
+  const provider =
+    $("#aiProvider")?.value ||
+    "openai";
+
+  const endpoint =
+    provider === "gemini"
+      ? "/api/gemini"
+      : "/api/chat";
+
+  const response =
+    await fetch(
+      endpoint,
+      {
+        method: "POST",
+
+        headers: {
+          "Content-Type":
+            "application/json"
+        },
+
+        body:
+          JSON.stringify({
+            message: prompt,
+
+            provider,
+
+            webSearch:
+              Galaxy.state.webSearchState ===
+              "ready",
+
+            mode:
+              extra.mode ||
+              Galaxy.state.mode,
+
+            history:
+              getCurrentChat()
+                ?.messages
+                ?.slice(-20)
+                .map(
+                  item => ({
+                    role:
+                      item.role,
+
+                    content:
+                      item.text
+                  })
+                ) ||
+              []
+          }),
+
+        signal:
+          Galaxy.state.generation
+            .controller
+            ?.signal
+      }
+    );
+
+  let data;
+
+  try {
+    data =
+      await response.json();
+  } catch {
+    throw new Error(
+      "GALAXY received an invalid response."
+    );
+  }
+
+  if (!response.ok) {
+    throw new Error(
+      data.error ||
+      `AI request failed (${response.status})`
+    );
+  }
+
+  return (
+    data.reply ||
+    data.message ||
+    data.output ||
+    data.text ||
+    "No response received."
+  );
+}
   prompt,
   extra = {}
 ) {
