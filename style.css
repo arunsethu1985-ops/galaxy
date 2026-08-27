@@ -1940,7 +1940,41 @@ body.light
 #promptInput {
   min-width:
     0;
+.ai-provider-select {
+  height: 34px;
+  flex: 0 0 auto;
+  margin-bottom: 2px;
+  padding: 0 24px 0 10px;
+  border: 0;
+  border-radius: 16px;
+  background: transparent;
+  color: var(--muted);
+  cursor: pointer;
+  font-size: 12px;
+  font-weight: 500;
+  appearance: none;
+  -webkit-appearance: none;
+  transition:
+    background var(--transition-fast),
+    color var(--transition-fast);
+}
 
+.ai-provider-select:hover {
+  background: var(--bg-hover);
+  color: var(--text);
+}
+
+.ai-provider-select:focus {
+  background: var(--bg-hover);
+  color: var(--text);
+}
+
+.ai-provider-select option {
+  background: var(--bg-elevated);
+  color: var(--text);
+}
+
+#promptInput {
   min-height:
     39px;
 
