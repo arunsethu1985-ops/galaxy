@@ -9,22 +9,11 @@ const $ = (selector, root = document) =>
   root.querySelector(selector);
 
 const $$ = (selector, root = document) =>
-  Array.from(
-    root.querySelectorAll(selector)
-  );
+  Array.from(root.querySelectorAll(selector));
 
-const on = (
-  target,
-  type,
-  handler,
-  options
-) => {
+const on = (target, type, handler, options) => {
   if (target) {
-    target.addEventListener(
-      type,
-      handler,
-      options
-    );
+    target.addEventListener(type, handler, options);
   }
 };
 
@@ -33,21 +22,15 @@ const uid = prefix =>
     .toString(36)
     .slice(2, 9)}`;
 
-const now = () =>
-  Date.now();
+const now = () => Date.now();
 
 const sleep = ms =>
   new Promise(resolve =>
-    setTimeout(
-      resolve,
-      ms
-    )
+    setTimeout(resolve, ms)
   );
 
 const escapeHTML = value =>
-  String(
-    value ?? ""
-  ).replace(
+  String(value ?? "").replace(
     /[&<>"']/g,
     ch =>
       ({
@@ -66,17 +49,13 @@ const escapeHTML = value =>
 
 const DB = {
 
-  prefix:
-    "galaxy.ai.",
+  prefix: "galaxy.ai.",
 
   key(name) {
     return `${this.prefix}${name}`;
   },
 
-  get(
-    name,
-    fallback = null
-  ) {
+  get(name, fallback = null) {
 
     try {
 
@@ -102,10 +81,7 @@ const DB = {
 
   },
 
-  set(
-    name,
-    value
-  ) {
+  set(name, value) {
 
     try {
 
@@ -151,20 +127,14 @@ const DB = {
 
   clear() {
 
-    Object.keys(
-      localStorage
-    )
+    Object.keys(localStorage)
       .filter(
         key =>
-          key.startsWith(
-            this.prefix
-          )
+          key.startsWith(this.prefix)
       )
       .forEach(
         key =>
-          localStorage.removeItem(
-            key
-          )
+          localStorage.removeItem(key)
       );
 
   }
@@ -178,41 +148,29 @@ const DB = {
 
 const DEFAULT_SETTINGS = {
 
-  theme:
-    "dark",
+  theme: "dark",
 
-  accent:
-    "violet",
+  accent: "violet",
 
-  focusMode:
-    false,
+  focusMode: false,
 
-  enterToSend:
-    true,
+  enterToSend: true,
 
-  autosave:
-    true,
+  autosave: true,
 
-  autosaveDelay:
-    300,
+  autosaveDelay: 300,
 
-  streaming:
-    true,
+  streaming: true,
 
-  streamSpeed:
-    10,
+  streamSpeed: 10,
 
-  showTimestamps:
-    false,
+  showTimestamps: false,
 
-  voiceLanguage:
-    "en-US",
+  voiceLanguage: "en-US",
 
-  confirmDeletes:
-    true,
+  confirmDeletes: true,
 
-  webSearchDefault:
-    false
+  webSearchDefault: false
 
 };
 
@@ -224,27 +182,14 @@ const DEFAULT_SETTINGS = {
 const DEFAULT_PACKS = [
 
   {
-    id:
-      "pack_prompt",
-
-    name:
-      "Ultimate Prompt Pack",
-
-    category:
-      "prompt",
-
-    icon:
-      "✦",
-
+    id: "pack_prompt",
+    name: "Ultimate Prompt Pack",
+    category: "prompt",
+    icon: "✦",
     description:
       "Research, writing, analysis and planning prompts.",
-
-    installed:
-      true,
-
-    featured:
-      true,
-
+    installed: true,
+    featured: true,
     items: [
       "Deep Research",
       "Executive Summary",
@@ -256,29 +201,15 @@ const DEFAULT_PACKS = [
     ]
   },
 
-
   {
-    id:
-      "pack_sites",
-
-    name:
-      "Website Builder Pack",
-
-    category:
-      "website",
-
-    icon:
-      "⌘",
-
+    id: "pack_sites",
+    name: "Website Builder Pack",
+    category: "website",
+    icon: "⌘",
     description:
       "Modern website creation workflows.",
-
-    installed:
-      true,
-
-    featured:
-      true,
-
+    installed: true,
+    featured: true,
     items: [
       "Landing Page",
       "Portfolio",
@@ -291,29 +222,15 @@ const DEFAULT_PACKS = [
     ]
   },
 
-
   {
-    id:
-      "pack_creator",
-
-    name:
-      "Creator Power Pack",
-
-    category:
-      "creator",
-
-    icon:
-      "◫",
-
+    id: "pack_creator",
+    name: "Creator Power Pack",
+    category: "creator",
+    icon: "◫",
     description:
       "Content, video and campaign workflows.",
-
-    installed:
-      true,
-
-    featured:
-      true,
-
+    installed: true,
+    featured: true,
     items: [
       "YouTube Script",
       "Short Video Script",
@@ -324,29 +241,15 @@ const DEFAULT_PACKS = [
     ]
   },
 
-
   {
-    id:
-      "pack_productivity",
-
-    name:
-      "Productivity Pack",
-
-    category:
-      "productivity",
-
-    icon:
-      "✓",
-
+    id: "pack_productivity",
+    name: "Productivity Pack",
+    category: "productivity",
+    icon: "✓",
     description:
       "Tasks, goals, meetings and planning.",
-
-    installed:
-      true,
-
-    featured:
-      false,
-
+    installed: true,
+    featured: false,
     items: [
       "Daily Planner",
       "Weekly Planner",
@@ -357,29 +260,15 @@ const DEFAULT_PACKS = [
     ]
   },
 
-
   {
-    id:
-      "pack_research",
-
-    name:
-      "Research Intelligence Pack",
-
-    category:
-      "research",
-
-    icon:
-      "⌕",
-
+    id: "pack_research",
+    name: "Research Intelligence Pack",
+    category: "research",
+    icon: "⌕",
     description:
       "Advanced research and evidence workflows.",
-
-    installed:
-      true,
-
-    featured:
-      true,
-
+    installed: true,
+    featured: true,
     items: [
       "Research Question Builder",
       "Evidence Table",
@@ -390,29 +279,15 @@ const DEFAULT_PACKS = [
     ]
   },
 
-
   {
-    id:
-      "pack_developer",
-
-    name:
-      "Developer Pack",
-
-    category:
-      "developer",
-
-    icon:
-      "</>",
-
+    id: "pack_developer",
+    name: "Developer Pack",
+    category: "developer",
+    icon: "</>",
     description:
       "Coding, debugging and architecture workflows.",
-
-    installed:
-      true,
-
-    featured:
-      true,
-
+    installed: true,
+    featured: true,
     items: [
       "Code Generator",
       "Bug Finder",
@@ -424,29 +299,15 @@ const DEFAULT_PACKS = [
     ]
   },
 
-
   {
-    id:
-      "pack_design",
-
-    name:
-      "Design System Pack",
-
-    category:
-      "design",
-
-    icon:
-      "◇",
-
+    id: "pack_design",
+    name: "Design System Pack",
+    category: "design",
+    icon: "◇",
     description:
       "UI systems, visual direction and UX review.",
-
-    installed:
-      true,
-
-    featured:
-      false,
-
+    installed: true,
+    featured: false,
     items: [
       "UI Audit",
       "UX Review",
@@ -457,29 +318,15 @@ const DEFAULT_PACKS = [
     ]
   },
 
-
   {
-    id:
-      "pack_video",
-
-    name:
-      "Video Creator Pack",
-
-    category:
-      "video",
-
-    icon:
-      "▷",
-
+    id: "pack_video",
+    name: "Video Creator Pack",
+    category: "video",
+    icon: "▷",
     description:
       "Video ideas, scenes, scripts and production plans.",
-
-    installed:
-      true,
-
-    featured:
-      false,
-
+    installed: true,
+    featured: false,
     items: [
       "30 Second Video",
       "Scene Generator",
@@ -490,29 +337,15 @@ const DEFAULT_PACKS = [
     ]
   },
 
-
   {
-    id:
-      "pack_startup",
-
-    name:
-      "Startup Launch Pack",
-
-    category:
-      "startup",
-
-    icon:
-      "↗",
-
+    id: "pack_startup",
+    name: "Startup Launch Pack",
+    category: "startup",
+    icon: "↗",
     description:
       "Validate ideas and prepare go-to-market plans.",
-
-    installed:
-      true,
-
-    featured:
-      true,
-
+    installed: true,
+    featured: true,
     items: [
       "Idea Validator",
       "MVP Planner",
@@ -523,29 +356,15 @@ const DEFAULT_PACKS = [
     ]
   },
 
-
   {
-    id:
-      "pack_data",
-
-    name:
-      "Data Analysis Pack",
-
-    category:
-      "data",
-
-    icon:
-      "▦",
-
+    id: "pack_data",
+    name: "Data Analysis Pack",
+    category: "data",
+    icon: "▦",
     description:
       "Analyze metrics, tables and structured data.",
-
-    installed:
-      true,
-
-    featured:
-      false,
-
+    installed: true,
+    featured: false,
     items: [
       "Dataset Summary",
       "Trend Detection",
@@ -566,99 +385,57 @@ const DEFAULT_PACKS = [
 const DEFAULT_PROMPTS = [
 
   {
-    id:
-      "p_site",
-
-    title:
-      "Build a modern website",
-
-    category:
-      "website",
-
+    id: "p_site",
+    title: "Build a modern website",
+    category: "website",
     prompt:
       "Build a modern responsive website with excellent typography, spacing, accessibility and mobile behavior."
   },
 
   {
-    id:
-      "p_research",
-
-    title:
-      "Deep research",
-
-    category:
-      "research",
-
+    id: "p_research",
+    title: "Deep research",
+    category: "research",
     prompt:
       "Research this topic deeply. Separate facts, assumptions, uncertainties, risks and conclusions."
   },
 
   {
-    id:
-      "p_project",
-
-    title:
-      "Project planner",
-
-    category:
-      "project",
-
+    id: "p_project",
+    title: "Project planner",
+    category: "project",
     prompt:
       "Create a structured project plan with scope, milestones, tasks, owners, risks and next actions."
   },
 
   {
-    id:
-      "p_improve",
-
-    title:
-      "Improve my idea",
-
-    category:
-      "creative",
-
+    id: "p_improve",
+    title: "Improve my idea",
+    category: "creative",
     prompt:
       "Analyze this idea, identify weaknesses and propose a much stronger version."
   },
 
   {
-    id:
-      "p_compare",
-
-    title:
-      "Compare options",
-
-    category:
-      "analysis",
-
+    id: "p_compare",
+    title: "Compare options",
+    category: "analysis",
     prompt:
       "Compare these options across cost, quality, risk, usability, scalability and long-term value."
   },
 
   {
-    id:
-      "p_video",
-
-    title:
-      "Video creator",
-
-    category:
-      "video",
-
+    id: "p_video",
+    title: "Video creator",
+    category: "video",
     prompt:
       "Create a complete short-video plan with hook, scenes, dialogue, camera instructions and ending."
   },
 
   {
-    id:
-      "p_code",
-
-    title:
-      "Code builder",
-
-    category:
-      "developer",
-
+    id: "p_code",
+    title: "Code builder",
+    category: "developer",
     prompt:
       "Build production-quality code for this requirement. Keep the architecture clean and explain important tradeoffs."
   }
@@ -673,103 +450,53 @@ const DEFAULT_PROMPTS = [
 const DEFAULT_PLUGINS = [
 
   {
-    id:
-      "plugin_mail",
-
-    name:
-      "Mail",
-
+    id: "plugin_mail",
+    name: "Mail",
     description:
       "Search messages and draft replies.",
-
-    icon:
-      "✉",
-
-    installed:
-      false,
-
-    connected:
-      false
+    icon: "✉",
+    installed: false,
+    connected: false
   },
 
   {
-    id:
-      "plugin_calendar",
-
-    name:
-      "Calendar",
-
+    id: "plugin_calendar",
+    name: "Calendar",
     description:
       "Find events and manage meetings.",
-
-    icon:
-      "◷",
-
-    installed:
-      false,
-
-    connected:
-      false
+    icon: "◷",
+    installed: false,
+    connected: false
   },
 
   {
-    id:
-      "plugin_drive",
-
-    name:
-      "Drive",
-
+    id: "plugin_drive",
+    name: "Drive",
     description:
       "Find and work with cloud files.",
-
-    icon:
-      "▱",
-
-    installed:
-      false,
-
-    connected:
-      false
+    icon: "▱",
+    installed: false,
+    connected: false
   },
 
   {
-    id:
-      "plugin_github",
-
-    name:
-      "GitHub",
-
+    id: "plugin_github",
+    name: "GitHub",
     description:
       "Repositories and development workflows.",
-
-    icon:
-      "⌘",
-
-    installed:
-      false,
-
-    connected:
-      false
+    icon: "⌘",
+    installed: false,
+    connected: false
   },
 
   {
-    id:
-      "plugin_slack",
-
-    name:
-      "Slack",
-
+    id: "plugin_slack",
+    name: "Slack",
     description:
       "Search channels and team conversations.",
-
-    icon:
-      "#",
-
-    installed:
-      false,
-
-    connected:
-      false
+    icon: "#",
+    installed: false,
+    connected: false
   }
 
 ];
@@ -781,102 +508,57 @@ const DEFAULT_PLUGINS = [
 
 const Galaxy = {
 
-  version:
-    "4.0.0",
+  version: "4.0.0",
 
   state: {
 
-    mode:
-      "chat",
+    mode: "chat",
 
-    view:
-      "chat",
+    view: "chat",
 
     settings: {
       ...DEFAULT_SETTINGS,
-      ...DB.get(
-        "settings",
-        {}
-      )
+      ...DB.get("settings", {})
     },
 
     chats:
-      DB.get(
-        "chats",
-        []
-      ),
+      DB.get("chats", []),
 
     currentChatId:
-      DB.get(
-        "currentChatId",
-        null
-      ),
+      DB.get("currentChatId", null),
 
     projects:
-      DB.get(
-        "projects",
-        []
-      ),
+      DB.get("projects", []),
 
     library:
-      DB.get(
-        "library",
-        []
-      ),
+      DB.get("library", []),
 
     packs:
-      DB.get(
-        "packs",
-        []
-      ),
+      DB.get("packs", []),
 
     scheduled:
-      DB.get(
-        "scheduled",
-        []
-      ),
+      DB.get("scheduled", []),
 
     plugins:
-      DB.get(
-        "plugins",
-        []
-      ),
+      DB.get("plugins", []),
 
     agents:
-      DB.get(
-        "agents",
-        []
-      ),
+      DB.get("agents", []),
 
     sites:
-      DB.get(
-        "sites",
-        []
-      ),
+      DB.get("sites", []),
 
     images:
-      DB.get(
-        "images",
-        []
-      ),
+      DB.get("images", []),
 
     prompts:
-      DB.get(
-        "prompts",
-        []
-      ),
+      DB.get("prompts", []),
 
     notifications:
-      DB.get(
-        "notifications",
-        []
-      ),
+      DB.get("notifications", []),
 
     workDocuments:
-      DB.get(
-        "workDocuments",
-        []
-      ),
+      DB.get("workDocuments", []),
 
     activeWorkDocumentId:
       DB.get(
@@ -884,20 +566,15 @@ const Galaxy = {
         null
       ),
 
-    activeSiteId:
-      null,
+    activeSiteId: null,
 
-    activeLibraryFilter:
-      "all",
+    activeLibraryFilter: "all",
 
-    activePackFilter:
-      "all",
+    activePackFilter: "all",
 
-    activeSearchFilter:
-      "all",
+    activeSearchFilter: "all",
 
-    attachments:
-      [],
+    attachments: [],
 
     webSearchState:
       DB.get(
@@ -905,28 +582,18 @@ const Galaxy = {
         "off"
       ),
 
-    voiceState:
-      "idle",
+    voiceState: "idle",
 
-    voiceRecognition:
-      null,
+    voiceRecognition: null,
 
     generation: {
-      active:
-        false,
-
-      stopped:
-        false,
-
-      controller:
-        null,
-
-      messageId:
-        null
+      active: false,
+      stopped: false,
+      controller: null,
+      messageId: null
     },
 
-    dragCounter:
-      0
+    dragCounter: 0
 
   }
 
@@ -939,31 +606,19 @@ const Galaxy = {
 
 function seedData() {
 
-  if (
-    !Galaxy.state.packs.length
-  ) {
+  if (!Galaxy.state.packs.length) {
     Galaxy.state.packs =
-      structuredClone(
-        DEFAULT_PACKS
-      );
+      structuredClone(DEFAULT_PACKS);
   }
 
-  if (
-    !Galaxy.state.prompts.length
-  ) {
+  if (!Galaxy.state.prompts.length) {
     Galaxy.state.prompts =
-      structuredClone(
-        DEFAULT_PROMPTS
-      );
+      structuredClone(DEFAULT_PROMPTS);
   }
 
-  if (
-    !Galaxy.state.plugins.length
-  ) {
+  if (!Galaxy.state.plugins.length) {
     Galaxy.state.plugins =
-      structuredClone(
-        DEFAULT_PLUGINS
-      );
+      structuredClone(DEFAULT_PLUGINS);
   }
 
   persistAll();
@@ -1076,9 +731,7 @@ function toast(
   }
 
   const node =
-    document.createElement(
-      "div"
-    );
+    document.createElement("div");
 
   node.className =
     `toast toast-${type}`;
@@ -1086,9 +739,7 @@ function toast(
   node.textContent =
     message;
 
-  root.appendChild(
-    node
-  );
+  root.appendChild(node);
 
   setTimeout(
     () =>
@@ -1191,8 +842,7 @@ function closeOverlay() {
     $("#overlayRoot");
 
   if (root) {
-    root.innerHTML =
-      "";
+    root.innerHTML = "";
   }
 
 }
@@ -1371,8 +1021,7 @@ function addNotification(
 
     type,
 
-    read:
-      false,
+    read: false,
 
     createdAt:
       now()
@@ -1569,7 +1218,6 @@ function openSettings() {
 
         </div>
 
-
         <div class="setting-row">
 
           <strong>
@@ -1632,13 +1280,11 @@ function openSettings() {
 
         </div>
 
-
         ${renderSettingToggle(
           "Focus mode",
           "focusMode",
           s.focusMode
         )}
-
 
         ${renderSettingToggle(
           "Enter to send",
@@ -1646,13 +1292,11 @@ function openSettings() {
           s.enterToSend
         )}
 
-
         ${renderSettingToggle(
           "Autosave",
           "autosave",
           s.autosave
         )}
-
 
         ${renderSettingToggle(
           "Streaming responses",
@@ -1660,13 +1304,11 @@ function openSettings() {
           s.streaming
         )}
 
-
         ${renderSettingToggle(
           "Show timestamps",
           "showTimestamps",
           s.showTimestamps
         )}
-
 
         <div class="setting-row">
 
@@ -1719,8 +1361,7 @@ function getCurrentChat() {
 
 
 function createChat(
-  title =
-    "New conversation"
+  title = "New conversation"
 ) {
 
   const chat = {
@@ -1730,14 +1371,11 @@ function createChat(
 
     title,
 
-    messages:
-      [],
+    messages: [],
 
-    pinned:
-      false,
+    pinned: false,
 
-    archived:
-      false,
+    archived: false,
 
     createdAt:
       now(),
@@ -1745,8 +1383,7 @@ function createChat(
     updatedAt:
       now(),
 
-    branchOf:
-      null
+    branchOf: null
 
   };
 
@@ -1782,9 +1419,7 @@ function newChat() {
 
   createChat();
 
-  switchMode(
-    "chat"
-  );
+  switchMode("chat");
 
   $("#promptInput")
     ?.focus();
@@ -1799,10 +1434,7 @@ function newChat() {
 function sortChats() {
 
   Galaxy.state.chats.sort(
-    (
-      a,
-      b
-    ) => {
+    (a, b) => {
 
       if (
         a.pinned !==
@@ -1845,10 +1477,7 @@ function renderRecentChats() {
           !chat.archived
       )
 
-      .slice(
-        0,
-        40
-      )
+      .slice(0, 40)
 
       .map(
         chat => `
@@ -2018,9 +1647,7 @@ function deleteChat(id) {
       ) {
 
         Galaxy.state.currentChatId =
-          Galaxy.state.chats[
-            0
-          ]?.id ||
+          Galaxy.state.chats[0]?.id ||
           null;
 
       }
@@ -2115,9 +1742,7 @@ function branchConversation(
           messageId
       );
 
-  if (
-    index < 0
-  ) {
+  if (index < 0) {
     return;
   }
 
@@ -2137,11 +1762,9 @@ function branchConversation(
         )
       ),
 
-    pinned:
-      false,
+    pinned: false,
 
-    archived:
-      false,
+    archived: false,
 
     createdAt:
       now(),
@@ -2187,10 +1810,7 @@ function safeFilename(value) {
         /\s+/g,
         "_"
       )
-      .slice(
-        0,
-        80
-      ) ||
+      .slice(0, 80) ||
     "galaxy"
   );
 
@@ -2200,39 +1820,28 @@ function safeFilename(value) {
 function downloadText(
   filename,
   content,
-  type =
-    "text/plain"
+  type = "text/plain"
 ) {
 
   const blob =
     new Blob(
       [content],
-      {
-        type
-      }
+      { type }
     );
 
   const url =
-    URL.createObjectURL(
-      blob
-    );
+    URL.createObjectURL(blob);
 
   const a =
-    document.createElement(
-      "a"
-    );
+    document.createElement("a");
 
-  a.href =
-    url;
+  a.href = url;
 
-  a.download =
-    filename;
+  a.download = filename;
 
   a.click();
 
-  URL.revokeObjectURL(
-    url
-  );
+  URL.revokeObjectURL(url);
 
 }
 
@@ -2255,7 +1864,6 @@ function exportConversation(id) {
       {
         galaxyVersion:
           Galaxy.version,
-
         chat
       },
       null,
@@ -2339,55 +1947,46 @@ function importConversation(file) {
 
     };
 
-  reader.readAsText(
-    file
-  );
+  reader.readAsText(file);
 
 }
 
 
 /* =========================================================
    MARKDOWN RENDERER
-   IMPORTANT: fixes the broken code HTML from old JS
    ========================================================= */
 
 function renderMarkdown(input) {
 
-  const codeBlocks =
-    [];
+  const codeBlocks = [];
 
   let text =
-    String(
-      input ??
-      ""
-    ).replace(
-      /```([\w-]*)\n([\s\S]*?)```/g,
-      (
-        _,
-        language,
-        code
-      ) => {
-
-        const index =
-          codeBlocks.length;
-
-        codeBlocks.push({
-          language:
-            language ||
-            "code",
-
+    String(input ?? "")
+      .replace(
+        /```([\w-]*)\n([\s\S]*?)```/g,
+        (
+          _,
+          language,
           code
-        });
+        ) => {
 
-        return `@@GALAXY_CODE_${index}@@`;
+          const index =
+            codeBlocks.length;
 
-      }
-    );
+          codeBlocks.push({
+            language:
+              language ||
+              "code",
+            code
+          });
+
+          return `@@GALAXY_CODE_${index}@@`;
+
+        }
+      );
 
   text =
-    escapeHTML(
-      text
-    );
+    escapeHTML(text);
 
   text =
     text
@@ -2433,10 +2032,7 @@ function renderMarkdown(input) {
       );
 
   codeBlocks.forEach(
-    (
-      block,
-      index
-    ) => {
+    (block, index) => {
 
       const encoded =
         encodeURIComponent(
@@ -2484,9 +2080,7 @@ function renderMarkdown(input) {
    MESSAGE RENDERING
    ========================================================= */
 
-function renderMessage(
-  message
-) {
+function renderMessage(message) {
 
   const user =
     message.role ===
@@ -2574,11 +2168,8 @@ function renderMessage(
           ).toLocaleTimeString(
             [],
             {
-              hour:
-                "2-digit",
-
-              minute:
-                "2-digit"
+              hour: "2-digit",
+              minute: "2-digit"
             }
           )}
         </time>
@@ -2634,9 +2225,7 @@ function renderChat() {
 
   root.innerHTML =
     messages
-      .map(
-        renderMessage
-      )
+      .map(renderMessage)
       .join("");
 
   requestAnimationFrame(
@@ -2668,9 +2257,7 @@ async function copyText(text) {
 
     await navigator
       .clipboard
-      .writeText(
-        text
-      );
+      .writeText(text);
 
   } catch {
 
@@ -2679,26 +2266,19 @@ async function copyText(text) {
         "textarea"
       );
 
-    area.value =
-      text;
+    area.value = text;
 
-    document.body.appendChild(
-      area
-    );
+    document.body.appendChild(area);
 
     area.select();
 
-    document.execCommand(
-      "copy"
-    );
+    document.execCommand("copy");
 
     area.remove();
 
   }
 
-  toast(
-    "Copied"
-  );
+  toast("Copied");
 
 }
 
@@ -2707,9 +2287,7 @@ async function copyText(text) {
    READ ALOUD
    ========================================================= */
 
-function readAloud(
-  messageId
-) {
+function readAloud(messageId) {
 
   const message =
     getCurrentChat()
@@ -2741,9 +2319,7 @@ function readAloud(
     Galaxy.state.settings
       .voiceLanguage;
 
-  speechSynthesis.speak(
-    speech
-  );
+  speechSynthesis.speak(speech);
 
 }
 
@@ -2752,9 +2328,7 @@ function readAloud(
    EDIT MESSAGE
    ========================================================= */
 
-function editMessage(
-  messageId
-) {
+function editMessage(messageId) {
 
   const chat =
     getCurrentChat();
@@ -2877,18 +2451,13 @@ async function retryMessage(
         messageId
     );
 
-  if (
-    index < 0
-  ) {
+  if (index < 0) {
     return;
   }
 
   const previous =
     [...chat.messages]
-      .slice(
-        0,
-        index
-      )
+      .slice(0, index)
       .reverse()
       .find(
         item =>
@@ -2971,8 +2540,7 @@ function detectFileType(file) {
 function addFiles(files) {
 
   Array.from(
-    files ||
-    []
+    files || []
   ).forEach(
     file => {
 
@@ -2991,9 +2559,7 @@ function addFiles(files) {
           file.type,
 
         type:
-          detectFileType(
-            file
-          ),
+          detectFileType(file),
 
         file
 
@@ -3013,8 +2579,7 @@ function removeAttachment(id) {
     Galaxy.state.attachments
       .filter(
         item =>
-          item.id !==
-          id
+          item.id !== id
       );
 
   renderAttachments();
@@ -3036,18 +2601,15 @@ function renderAttachments() {
       .length
   ) {
 
-    strip.hidden =
-      true;
+    strip.hidden = true;
 
-    strip.innerHTML =
-      "";
+    strip.innerHTML = "";
 
     return;
 
   }
 
-  strip.hidden =
-    false;
+  strip.hidden = false;
 
   strip.innerHTML =
     Galaxy.state.attachments
@@ -3094,9 +2656,7 @@ function describeAttachments() {
       item =>
         `[${item.type}: ${item.name}]`
     )
-    .join(
-      "\n"
-    );
+    .join("\n");
 
 }
 
@@ -3119,9 +2679,7 @@ function addLibraryFile(file) {
       file.name,
 
     type:
-      detectFileType(
-        file
-      ),
+      detectFileType(file),
 
     mime:
       file.type,
@@ -3132,11 +2690,9 @@ function addLibraryFile(file) {
     createdAt:
       now(),
 
-    favorite:
-      false,
+    favorite: false,
 
-    dataUrl:
-      null
+    dataUrl: null
 
   };
 
@@ -3172,9 +2728,7 @@ function addLibraryFile(file) {
         "Library"
       );
 
-  reader.readAsDataURL(
-    file
-  );
+  reader.readAsDataURL(file);
 
 }
 
@@ -3265,16 +2819,10 @@ function renderContentTabs(
   root.innerHTML =
     tabs
       .map(
-        (
-          [
-            value,
-            label
-          ]
-        ) => `
+        ([value, label]) => `
           <button
             class="flat-tab ${
-              value ===
-              active
+              value === active
                 ? "active"
                 : ""
             }"
@@ -3782,9 +3330,7 @@ function editProject(id) {
     );
 
   if (project) {
-    openProjectEditor(
-      project
-    );
+    openProjectEditor(project);
   }
 
 }
@@ -4057,8 +3603,7 @@ function createScheduledTask() {
             datetime:
               form.get("datetime"),
 
-            enabled:
-              true,
+            enabled: true,
 
             createdAt:
               now()
@@ -4249,11 +3794,8 @@ function togglePluginInstall(id) {
   plugin.installed =
     !plugin.installed;
 
-  if (
-    !plugin.installed
-  ) {
-    plugin.connected =
-      false;
+  if (!plugin.installed) {
+    plugin.connected = false;
   }
 
   persistAll();
@@ -4275,8 +3817,7 @@ function togglePluginConnection(id) {
     return;
   }
 
-  plugin.installed =
-    true;
+  plugin.installed = true;
 
   plugin.connected =
     !plugin.connected;
@@ -4682,11 +4223,9 @@ function createSite() {
     css:
       "body { font-family: system-ui; padding: 40px; }",
 
-    js:
-      "",
+    js: "",
 
-    status:
-      "draft",
+    status: "draft",
 
     createdAt:
       now(),
@@ -4696,18 +4235,14 @@ function createSite() {
 
   };
 
-  Galaxy.state.sites.unshift(
-    site
-  );
+  Galaxy.state.sites.unshift(site);
 
   Galaxy.state.activeSiteId =
     site.id;
 
   persistAll();
 
-  openSiteEditor(
-    site.id
-  );
+  openSiteEditor(site.id);
 
 }
 
@@ -4823,9 +4358,7 @@ function saveActiveSite() {
 
   persistAll();
 
-  toast(
-    "Site saved"
-  );
+  toast("Site saved");
 
 }
 
@@ -4860,15 +4393,12 @@ function switchSiteEditorTab(
     language;
 
   editor.value =
-    site[
-      language
-    ] ||
+    site[language] ||
     "";
 
   $$(".editor-tab")
     .forEach(
       tab =>
-
         tab.classList.toggle(
           "active",
           tab.dataset.siteTab ===
@@ -5145,8 +4675,7 @@ function createImageConcept() {
             ratio:
               form.get("ratio"),
 
-            status:
-              "concept",
+            status: "concept",
 
             createdAt:
               now()
@@ -5274,8 +4803,7 @@ function installPack(id) {
     return;
   }
 
-  pack.installed =
-    true;
+  pack.installed = true;
 
   persistAll();
 
@@ -5299,8 +4827,7 @@ function removePack(id) {
     return;
   }
 
-  pack.installed =
-    false;
+  pack.installed = false;
 
   persistAll();
 
@@ -5324,19 +4851,13 @@ function togglePackInstall(id) {
     return;
   }
 
-  if (
-    pack.installed
-  ) {
+  if (pack.installed) {
 
-    removePack(
-      id
-    );
+    removePack(id);
 
   } else {
 
-    installPack(
-      id
-    );
+    installPack(id);
 
   }
 
@@ -5414,8 +4935,7 @@ function openPack(id) {
 
 
 function renderPacks(
-  filter =
-    "all"
+  filter = "all"
 ) {
 
   Galaxy.state.activePackFilter =
@@ -5602,9 +5122,7 @@ function usePromptTemplate(id) {
 
   closeOverlay();
 
-  switchMode(
-    "chat"
-  );
+  switchMode("chat");
 
   const input =
     $("#promptInput");
@@ -5616,9 +5134,7 @@ function usePromptTemplate(id) {
   input.value =
     `${prompt.prompt}\n\n`;
 
-  autoResizeTextarea(
-    input
-  );
+  autoResizeTextarea(input);
 
   input.focus();
 
@@ -5792,8 +5308,7 @@ async function sendWorkMessage() {
     $("#workMessages");
 
   const text =
-    input?.value
-      .trim();
+    input?.value.trim();
 
   if (
     !input ||
@@ -5803,8 +5318,7 @@ async function sendWorkMessage() {
     return;
   }
 
-  input.value =
-    "";
+  input.value = "";
 
   root.insertAdjacentHTML(
     "beforeend",
@@ -5825,8 +5339,7 @@ async function sendWorkMessage() {
       await fetchAIResponse(
         text,
         {
-          mode:
-            "work"
+          mode: "work"
         }
       );
 
@@ -5909,12 +5422,2516 @@ function switchMode(mode) {
       "active-view"
     );
 
+  if (mode === "work") {
+    renderWorkDocument();
+  }
+
+}
+
+
+/* =========================================================
+   GAMING CENTER
+   ========================================================= */
+
+const GameCenter = {
+
+  activeGame: "home",
+
+  chess: null,
+
+  ticTacToe: null,
+
+  connectFour: null,
+
+  memory: null
+
+};
+
+
+function renderGames() {
+
+  GameCenter.activeGame =
+    "home";
+
+  renderContentHeader(
+    "Play",
+    "Gaming Center"
+  );
+
+  renderContentTabs(
+    [
+      ["featured", "Featured"],
+      ["board", "Board"],
+      ["arcade", "Arcade"],
+      ["puzzle", "Puzzle"]
+    ],
+    "featured",
+    "games"
+  );
+
+  const root =
+    $("#contentBody");
+
+  if (!root) {
+    return;
+  }
+
+  root.innerHTML = `
+    <section class="games-home">
+
+      <div class="games-hero">
+
+        <div>
+
+          <span class="games-kicker">
+            GALAXY GAMING
+          </span>
+
+          <h2>
+            Play directly inside GALAXY
+          </h2>
+
+          <p>
+            Visual games with real boards,
+            pieces, turns and scores.
+          </p>
+
+        </div>
+
+        <div
+          class="games-hero-mark"
+          aria-hidden="true"
+        >
+          ♛
+        </div>
+
+      </div>
+
+
+      <div class="games-grid">
+
+        <button
+          class="game-card game-card-featured"
+          data-game-open="chess"
+        >
+
+          <div class="game-card-visual chess-mini">
+
+            <span>♜</span>
+            <span>♞</span>
+            <span>♝</span>
+            <span>♛</span>
+
+            <span>♙</span>
+            <span>♘</span>
+            <span>♗</span>
+            <span>♕</span>
+
+          </div>
+
+          <div class="game-card-copy">
+
+            <strong>
+              Chess vs GALAXY
+            </strong>
+
+            <span>
+              Play White against GALAXY
+            </span>
+
+          </div>
+
+        </button>
+
+
+        <button
+          class="game-card"
+          data-game-open="tictactoe"
+        >
+
+          <div class="game-card-visual ttt-mini">
+
+            <span>✕</span>
+            <span>○</span>
+            <span>✕</span>
+
+            <span>○</span>
+            <span>✕</span>
+            <span>○</span>
+
+            <span>○</span>
+            <span>✕</span>
+            <span>○</span>
+
+          </div>
+
+          <div class="game-card-copy">
+
+            <strong>
+              Tic-Tac-Toe
+            </strong>
+
+            <span>
+              Fast match against GALAXY
+            </span>
+
+          </div>
+
+        </button>
+
+
+        <button
+          class="game-card"
+          data-game-open="connect4"
+        >
+
+          <div class="game-card-visual connect-mini">
+
+            ${Array.from(
+              { length: 24 },
+              (_, i) => `
+                <span
+                  class="${
+                    [
+                      15,
+                      16,
+                      21,
+                      22,
+                      23
+                    ].includes(i)
+                      ? "filled"
+                      : ""
+                  }"
+                ></span>
+              `
+            ).join("")}
+
+          </div>
+
+          <div class="game-card-copy">
+
+            <strong>
+              Connect Four
+            </strong>
+
+            <span>
+              Drop discs and beat GALAXY
+            </span>
+
+          </div>
+
+        </button>
+
+
+        <button
+          class="game-card"
+          data-game-open="memory"
+        >
+
+          <div class="game-card-visual memory-mini">
+
+            <span>✦</span>
+            <span>?</span>
+            <span>?</span>
+            <span>♞</span>
+
+            <span>?</span>
+            <span>◫</span>
+            <span>?</span>
+            <span>?</span>
+
+          </div>
+
+          <div class="game-card-copy">
+
+            <strong>
+              Memory
+            </strong>
+
+            <span>
+              Match visual pairs
+            </span>
+
+          </div>
+
+        </button>
+
+      </div>
+
+    </section>
+  `;
+
+}
+
+
+function gameBackButton() {
+
+  return `
+    <button
+      class="text-action game-back"
+      data-game-back
+    >
+      ← Gaming Center
+    </button>
+  `;
+
+}
+
+
+/* =========================================================
+   CHESS
+   ========================================================= */
+
+const CHESS_PIECES = {
+
+  wr: "♖",
+  wn: "♘",
+  wb: "♗",
+  wq: "♕",
+  wk: "♔",
+  wp: "♙",
+
+  br: "♜",
+  bn: "♞",
+  bb: "♝",
+  bq: "♛",
+  bk: "♚",
+  bp: "♟"
+
+};
+
+
+function initialChessBoard() {
+
+  return [
+
+    [
+      "br",
+      "bn",
+      "bb",
+      "bq",
+      "bk",
+      "bb",
+      "bn",
+      "br"
+    ],
+
+    [
+      "bp",
+      "bp",
+      "bp",
+      "bp",
+      "bp",
+      "bp",
+      "bp",
+      "bp"
+    ],
+
+    [
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null
+    ],
+
+    [
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null
+    ],
+
+    [
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null
+    ],
+
+    [
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null
+    ],
+
+    [
+      "wp",
+      "wp",
+      "wp",
+      "wp",
+      "wp",
+      "wp",
+      "wp",
+      "wp"
+    ],
+
+    [
+      "wr",
+      "wn",
+      "wb",
+      "wq",
+      "wk",
+      "wb",
+      "wn",
+      "wr"
+    ]
+
+  ];
+
+}
+
+
+function resetChess() {
+
+  GameCenter.chess = {
+
+    board:
+      initialChessBoard(),
+
+    selected:
+      null,
+
+    legal:
+      [],
+
+    turn:
+      "w",
+
+    status:
+      "Your turn",
+
+    gameOver:
+      false,
+
+    moveHistory:
+      []
+
+  };
+
+}
+
+
+function chessColor(piece) {
+
+  return piece
+    ? piece[0]
+    : null;
+
+}
+
+
+function chessType(piece) {
+
+  return piece
+    ? piece[1]
+    : null;
+
+}
+
+
+function inBoard(r, c) {
+
+  return (
+    r >= 0 &&
+    r < 8 &&
+    c >= 0 &&
+    c < 8
+  );
+
+}
+
+
+function chessMovesFor(
+  board,
+  r,
+  c
+) {
+
+  const piece =
+    board[r][c];
+
+  if (!piece) {
+    return [];
+  }
+
+  const color =
+    chessColor(piece);
+
+  const type =
+    chessType(piece);
+
+  const enemy =
+    color === "w"
+      ? "b"
+      : "w";
+
+  const moves = [];
+
+
+  const pushIf = (
+    nr,
+    nc
+  ) => {
+
+    if (
+      !inBoard(
+        nr,
+        nc
+      )
+    ) {
+      return false;
+    }
+
+    const target =
+      board[nr][nc];
+
+    if (!target) {
+
+      moves.push([
+        nr,
+        nc
+      ]);
+
+      return true;
+    }
+
+    if (
+      chessColor(target) ===
+      enemy
+    ) {
+
+      moves.push([
+        nr,
+        nc
+      ]);
+
+    }
+
+    return false;
+
+  };
+
+
+  const slide =
+    directions => {
+
+      for (
+        const [
+          dr,
+          dc
+        ]
+        of directions
+      ) {
+
+        let nr =
+          r + dr;
+
+        let nc =
+          c + dc;
+
+        while (
+          inBoard(
+            nr,
+            nc
+          )
+        ) {
+
+          const target =
+            board[nr][nc];
+
+          if (!target) {
+
+            moves.push([
+              nr,
+              nc
+            ]);
+
+          } else {
+
+            if (
+              chessColor(target) ===
+              enemy
+            ) {
+
+              moves.push([
+                nr,
+                nc
+              ]);
+
+            }
+
+            break;
+
+          }
+
+          nr += dr;
+
+          nc += dc;
+
+        }
+
+      }
+
+    };
+
+
   if (
-    mode ===
-    "work"
+    type === "p"
   ) {
 
-    renderWorkDocument();
+    const direction =
+      color === "w"
+        ? -1
+        : 1;
+
+    const startRow =
+      color === "w"
+        ? 6
+        : 1;
+
+
+    if (
+      inBoard(
+        r + direction,
+        c
+      ) &&
+      !board[
+        r + direction
+      ][c]
+    ) {
+
+      moves.push([
+        r + direction,
+        c
+      ]);
+
+
+      if (
+        r === startRow &&
+        !board[
+          r + 2 * direction
+        ][c]
+      ) {
+
+        moves.push([
+          r + 2 * direction,
+          c
+        ]);
+
+      }
+
+    }
+
+
+    for (
+      const dc
+      of [-1, 1]
+    ) {
+
+      const nr =
+        r + direction;
+
+      const nc =
+        c + dc;
+
+      if (
+        inBoard(
+          nr,
+          nc
+        ) &&
+        board[nr][nc] &&
+        chessColor(
+          board[nr][nc]
+        ) === enemy
+      ) {
+
+        moves.push([
+          nr,
+          nc
+        ]);
+
+      }
+
+    }
+
+  } else if (
+    type === "r"
+  ) {
+
+    slide([
+      [1, 0],
+      [-1, 0],
+      [0, 1],
+      [0, -1]
+    ]);
+
+  } else if (
+    type === "b"
+  ) {
+
+    slide([
+      [1, 1],
+      [1, -1],
+      [-1, 1],
+      [-1, -1]
+    ]);
+
+  } else if (
+    type === "q"
+  ) {
+
+    slide([
+      [1, 0],
+      [-1, 0],
+      [0, 1],
+      [0, -1],
+      [1, 1],
+      [1, -1],
+      [-1, 1],
+      [-1, -1]
+    ]);
+
+  } else if (
+    type === "n"
+  ) {
+
+    for (
+      const [
+        dr,
+        dc
+      ]
+      of [
+        [2, 1],
+        [2, -1],
+        [-2, 1],
+        [-2, -1],
+        [1, 2],
+        [1, -2],
+        [-1, 2],
+        [-1, -2]
+      ]
+    ) {
+
+      pushIf(
+        r + dr,
+        c + dc
+      );
+
+    }
+
+  } else if (
+    type === "k"
+  ) {
+
+    for (
+      const [
+        dr,
+        dc
+      ]
+      of [
+        [1, 0],
+        [-1, 0],
+        [0, 1],
+        [0, -1],
+        [1, 1],
+        [1, -1],
+        [-1, 1],
+        [-1, -1]
+      ]
+    ) {
+
+      pushIf(
+        r + dr,
+        c + dc
+      );
+
+    }
+
+  }
+
+  return moves;
+
+}
+
+
+function chessSquareName(
+  r,
+  c
+) {
+
+  return `${
+    "abcdefgh"[c]
+  }${8 - r}`;
+
+}
+
+
+function renderChess() {
+
+  GameCenter.activeGame =
+    "chess";
+
+  if (!GameCenter.chess) {
+    resetChess();
+  }
+
+  renderContentHeader(
+    "Games",
+    "Chess vs GALAXY"
+  );
+
+  const tabs =
+    $("#contentTabs");
+
+  if (tabs) {
+    tabs.innerHTML = "";
+  }
+
+  const game =
+    GameCenter.chess;
+
+  const root =
+    $("#contentBody");
+
+  if (!root) {
+    return;
+  }
+
+  root.innerHTML = `
+    <section
+      class="game-shell chess-shell"
+    >
+
+      <div class="game-topline">
+
+        ${gameBackButton()}
+
+        <div
+          class="game-status ${
+            game.gameOver
+              ? "game-over"
+              : ""
+          }"
+        >
+          ${escapeHTML(game.status)}
+        </div>
+
+        <button
+          class="text-action"
+          data-chess-reset
+        >
+          ↻ New game
+        </button>
+
+      </div>
+
+
+      <div class="chess-layout">
+
+        <div class="chess-board-wrap">
+
+          <div
+            class="chess-board"
+            role="grid"
+            aria-label="Chess board"
+          >
+
+            ${game.board
+              .map(
+                (row, r) =>
+                  row
+                    .map(
+                      (piece, c) => {
+
+                        const selected =
+                          game.selected &&
+                          game.selected[0] === r &&
+                          game.selected[1] === c;
+
+                        const legal =
+                          game.legal.some(
+                            (
+                              [
+                                lr,
+                                lc
+                              ]
+                            ) =>
+                              lr === r &&
+                              lc === c
+                          );
+
+                        const dark =
+                          (
+                            r + c
+                          ) %
+                          2 ===
+                          1;
+
+                        return `
+                          <button
+                            class="
+                              chess-square
+                              ${
+                                dark
+                                  ? "dark"
+                                  : "light"
+                              }
+                              ${
+                                selected
+                                  ? "selected"
+                                  : ""
+                              }
+                              ${
+                                legal
+                                  ? "legal"
+                                  : ""
+                              }
+                            "
+                            data-chess-square="${r},${c}"
+                            aria-label="${
+                              chessSquareName(
+                                r,
+                                c
+                              )
+                            } ${
+                              piece
+                                ? CHESS_PIECES[
+                                    piece
+                                  ]
+                                : "empty"
+                            }"
+                          >
+
+                            ${
+                              piece
+
+                                ? `
+                                  <span
+                                    class="
+                                      chess-piece
+                                      ${
+                                        piece[0] ===
+                                        "w"
+                                          ? "white-piece"
+                                          : "black-piece"
+                                      }
+                                    "
+                                  >
+                                    ${
+                                      CHESS_PIECES[
+                                        piece
+                                      ]
+                                    }
+                                  </span>
+                                `
+
+                                : ""
+                            }
+
+                            ${
+                              legal
+                                ? `
+                                  <span
+                                    class="legal-dot"
+                                  ></span>
+                                `
+                                : ""
+                            }
+
+                          </button>
+                        `;
+
+                      }
+                    )
+                    .join("")
+              )
+              .join("")}
+
+          </div>
+
+
+          <div class="chess-files">
+
+            ${"abcdefgh"
+              .split("")
+              .map(
+                letter => `
+                  <span>
+                    ${letter}
+                  </span>
+                `
+              )
+              .join("")}
+
+          </div>
+
+        </div>
+
+
+        <aside class="game-side-panel">
+
+          <div
+            class="player-card active-player"
+          >
+
+            <span class="player-avatar">
+              H
+            </span>
+
+            <div>
+
+              <strong>
+                You
+              </strong>
+
+              <span>
+                White
+              </span>
+
+            </div>
+
+          </div>
+
+
+          <div class="player-card">
+
+            <span
+              class="player-avatar galaxy-avatar"
+            >
+              ✦
+            </span>
+
+            <div>
+
+              <strong>
+                GALAXY
+              </strong>
+
+              <span>
+                Black
+              </span>
+
+            </div>
+
+          </div>
+
+
+          <div class="move-history">
+
+            <strong>
+              Moves
+            </strong>
+
+            <div class="move-history-list">
+
+              ${
+                game.moveHistory.length
+
+                  ? game.moveHistory
+                      .map(
+                        (move, index) => `
+                          <span>
+                            ${
+                              index + 1
+                            }.
+                            ${
+                              escapeHTML(move)
+                            }
+                          </span>
+                        `
+                      )
+                      .join("")
+
+                  : `
+                    <span>
+                      No moves yet
+                    </span>
+                  `
+              }
+
+            </div>
+
+          </div>
+
+
+          <p class="game-note">
+            Click one of your white pieces,
+            then click a highlighted square.
+          </p>
+
+        </aside>
+
+      </div>
+
+    </section>
+  `;
+
+}
+
+
+function chessMove(
+  fromR,
+  fromC,
+  toR,
+  toC,
+  actor
+) {
+
+  const game =
+    GameCenter.chess;
+
+  if (
+    !game ||
+    game.gameOver
+  ) {
+    return;
+  }
+
+  const piece =
+    game.board[
+      fromR
+    ][fromC];
+
+  const captured =
+    game.board[
+      toR
+    ][toC];
+
+  game.board[
+    toR
+  ][toC] =
+    piece;
+
+  game.board[
+    fromR
+  ][fromC] =
+    null;
+
+
+  if (
+    piece === "wp" &&
+    toR === 0
+  ) {
+
+    game.board[
+      toR
+    ][toC] =
+      "wq";
+
+  }
+
+
+  if (
+    piece === "bp" &&
+    toR === 7
+  ) {
+
+    game.board[
+      toR
+    ][toC] =
+      "bq";
+
+  }
+
+
+  game.moveHistory.push(
+    `${
+      actor === "w"
+        ? "You"
+        : "GALAXY"
+    }: ${
+      chessSquareName(
+        fromR,
+        fromC
+      )
+    } → ${
+      chessSquareName(
+        toR,
+        toC
+      )
+    }`
+  );
+
+
+  if (
+    captured === "bk"
+  ) {
+
+    game.gameOver = true;
+
+    game.status =
+      "You win — Black king captured";
+
+    return;
+
+  }
+
+
+  if (
+    captured === "wk"
+  ) {
+
+    game.gameOver = true;
+
+    game.status =
+      "GALAXY wins — White king captured";
+
+    return;
+
+  }
+
+
+  game.turn =
+    actor === "w"
+      ? "b"
+      : "w";
+
+  game.status =
+    game.turn === "w"
+      ? "Your turn"
+      : "GALAXY is thinking…";
+
+}
+
+
+function handleChessSquare(
+  r,
+  c
+) {
+
+  const game =
+    GameCenter.chess;
+
+  if (
+    !game ||
+    game.gameOver ||
+    game.turn !== "w"
+  ) {
+    return;
+  }
+
+  const piece =
+    game.board[r][c];
+
+
+  if (!game.selected) {
+
+    if (
+      piece &&
+      chessColor(piece) ===
+      "w"
+    ) {
+
+      game.selected = [
+        r,
+        c
+      ];
+
+      game.legal =
+        chessMovesFor(
+          game.board,
+          r,
+          c
+        );
+
+      renderChess();
+
+    }
+
+    return;
+
+  }
+
+
+  const [
+    selectedR,
+    selectedC
+  ] =
+    game.selected;
+
+
+  const isLegal =
+    game.legal.some(
+      (
+        [
+          legalR,
+          legalC
+        ]
+      ) =>
+        legalR === r &&
+        legalC === c
+    );
+
+
+  if (isLegal) {
+
+    chessMove(
+      selectedR,
+      selectedC,
+      r,
+      c,
+      "w"
+    );
+
+    game.selected = null;
+
+    game.legal = [];
+
+    renderChess();
+
+
+    if (!game.gameOver) {
+
+      setTimeout(
+        galaxyChessMove,
+        420
+      );
+
+    }
+
+    return;
+
+  }
+
+
+  if (
+    piece &&
+    chessColor(piece) ===
+    "w"
+  ) {
+
+    game.selected = [
+      r,
+      c
+    ];
+
+    game.legal =
+      chessMovesFor(
+        game.board,
+        r,
+        c
+      );
+
+  } else {
+
+    game.selected = null;
+
+    game.legal = [];
+
+  }
+
+  renderChess();
+
+}
+
+
+function galaxyChessMove() {
+
+  const game =
+    GameCenter.chess;
+
+  if (
+    !game ||
+    game.gameOver ||
+    game.turn !== "b"
+  ) {
+    return;
+  }
+
+  const options = [];
+
+
+  for (
+    let r = 0;
+    r < 8;
+    r++
+  ) {
+
+    for (
+      let c = 0;
+      c < 8;
+      c++
+    ) {
+
+      const piece =
+        game.board[r][c];
+
+      if (
+        piece &&
+        chessColor(piece) ===
+        "b"
+      ) {
+
+        for (
+          const [
+            targetR,
+            targetC
+          ]
+          of chessMovesFor(
+            game.board,
+            r,
+            c
+          )
+        ) {
+
+          options.push([
+            r,
+            c,
+            targetR,
+            targetC
+          ]);
+
+        }
+
+      }
+
+    }
+
+  }
+
+
+  if (!options.length) {
+
+    game.gameOver = true;
+
+    game.status =
+      "You win — GALAXY has no moves";
+
+    renderChess();
+
+    return;
+
+  }
+
+
+  const captures =
+    options.filter(
+      (
+        [
+          ,
+          ,
+          targetR,
+          targetC
+        ]
+      ) =>
+        game.board[
+          targetR
+        ][targetC]
+    );
+
+
+  const pool =
+    captures.length
+      ? captures
+      : options;
+
+
+  const [
+    r,
+    c,
+    targetR,
+    targetC
+  ] =
+    pool[
+      Math.floor(
+        Math.random() *
+        pool.length
+      )
+    ];
+
+
+  chessMove(
+    r,
+    c,
+    targetR,
+    targetC,
+    "b"
+  );
+
+  renderChess();
+
+}
+
+
+/* =========================================================
+   TIC TAC TOE
+   ========================================================= */
+
+function resetTicTacToe() {
+
+  GameCenter.ticTacToe = {
+
+    board:
+      Array(9).fill(""),
+
+    turn:
+      "X",
+
+    status:
+      "Your turn",
+
+    gameOver:
+      false
+
+  };
+
+}
+
+
+function tttWinner(board) {
+
+  const lines = [
+
+    [0, 1, 2],
+
+    [3, 4, 5],
+
+    [6, 7, 8],
+
+    [0, 3, 6],
+
+    [1, 4, 7],
+
+    [2, 5, 8],
+
+    [0, 4, 8],
+
+    [2, 4, 6]
+
+  ];
+
+
+  for (
+    const [
+      a,
+      b,
+      c
+    ]
+    of lines
+  ) {
+
+    if (
+      board[a] &&
+      board[a] === board[b] &&
+      board[a] === board[c]
+    ) {
+
+      return board[a];
+
+    }
+
+  }
+
+
+  return board.every(Boolean)
+    ? "draw"
+    : null;
+
+}
+
+
+function renderTicTacToe() {
+
+  GameCenter.activeGame =
+    "tictactoe";
+
+  if (!GameCenter.ticTacToe) {
+    resetTicTacToe();
+  }
+
+
+  renderContentHeader(
+    "Games",
+    "Tic-Tac-Toe"
+  );
+
+
+  const tabs =
+    $("#contentTabs");
+
+  if (tabs) {
+    tabs.innerHTML = "";
+  }
+
+
+  const game =
+    GameCenter.ticTacToe;
+
+
+  const root =
+    $("#contentBody");
+
+  if (!root) {
+    return;
+  }
+
+
+  root.innerHTML = `
+    <section
+      class="game-shell small-game-shell"
+    >
+
+      <div class="game-topline">
+
+        ${gameBackButton()}
+
+        <div class="game-status">
+          ${escapeHTML(game.status)}
+        </div>
+
+        <button
+          class="text-action"
+          data-ttt-reset
+        >
+          ↻ New game
+        </button>
+
+      </div>
+
+
+      <div class="ttt-board">
+
+        ${game.board
+          .map(
+            (value, index) => `
+              <button
+                class="
+                  ttt-cell
+                  ${
+                    value
+                      ? "filled"
+                      : ""
+                  }
+                "
+                data-ttt-cell="${index}"
+              >
+
+                ${
+                  value === "X"
+                    ? "✕"
+                    : value === "O"
+                      ? "○"
+                      : ""
+                }
+
+              </button>
+            `
+          )
+          .join("")}
+
+      </div>
+
+    </section>
+  `;
+
+}
+
+
+function handleTttCell(index) {
+
+  const game =
+    GameCenter.ticTacToe;
+
+  if (
+    !game ||
+    game.gameOver ||
+    game.turn !== "X" ||
+    game.board[index]
+  ) {
+    return;
+  }
+
+
+  game.board[index] =
+    "X";
+
+
+  let winner =
+    tttWinner(game.board);
+
+
+  if (winner) {
+
+    game.gameOver = true;
+
+    game.status =
+      winner === "draw"
+        ? "Draw"
+        : "You win";
+
+    renderTicTacToe();
+
+    return;
+
+  }
+
+
+  game.turn =
+    "O";
+
+  game.status =
+    "GALAXY is thinking…";
+
+  renderTicTacToe();
+
+
+  setTimeout(
+    () => {
+
+      const empty =
+        game.board
+          .map(
+            (value, index) =>
+              value
+                ? null
+                : index
+          )
+          .filter(
+            value =>
+              value !== null
+          );
+
+
+      if (!empty.length) {
+        return;
+      }
+
+
+      const choice =
+        empty[
+          Math.floor(
+            Math.random() *
+            empty.length
+          )
+        ];
+
+
+      game.board[choice] =
+        "O";
+
+
+      winner =
+        tttWinner(
+          game.board
+        );
+
+
+      if (winner) {
+
+        game.gameOver = true;
+
+        game.status =
+          winner === "draw"
+            ? "Draw"
+            : "GALAXY wins";
+
+      } else {
+
+        game.turn =
+          "X";
+
+        game.status =
+          "Your turn";
+
+      }
+
+
+      renderTicTacToe();
+
+    },
+    350
+  );
+
+}
+
+
+/* =========================================================
+   CONNECT FOUR
+   ========================================================= */
+
+function resetConnectFour() {
+
+  GameCenter.connectFour = {
+
+    board:
+      Array.from(
+        { length: 6 },
+        () =>
+          Array(7).fill("")
+      ),
+
+    turn:
+      "R",
+
+    status:
+      "Your turn",
+
+    gameOver:
+      false
+
+  };
+
+}
+
+
+function inBoardConnect(
+  r,
+  c
+) {
+
+  return (
+    r >= 0 &&
+    r < 6 &&
+    c >= 0 &&
+    c < 7
+  );
+
+}
+
+
+function connectWinner(board) {
+
+  for (
+    let r = 0;
+    r < 6;
+    r++
+  ) {
+
+    for (
+      let c = 0;
+      c < 7;
+      c++
+    ) {
+
+      const piece =
+        board[r][c];
+
+      if (!piece) {
+        continue;
+      }
+
+
+      for (
+        const [
+          dr,
+          dc
+        ]
+        of [
+          [0, 1],
+          [1, 0],
+          [1, 1],
+          [1, -1]
+        ]
+      ) {
+
+        let ok = true;
+
+
+        for (
+          let k = 1;
+          k < 4;
+          k++
+        ) {
+
+          const nr =
+            r +
+            dr * k;
+
+          const nc =
+            c +
+            dc * k;
+
+
+          if (
+            !inBoardConnect(
+              nr,
+              nc
+            ) ||
+            board[nr][nc] !==
+            piece
+          ) {
+
+            ok = false;
+
+            break;
+
+          }
+
+        }
+
+
+        if (ok) {
+          return piece;
+        }
+
+      }
+
+    }
+
+  }
+
+  return null;
+
+}
+
+
+function dropConnect(
+  board,
+  column,
+  piece
+) {
+
+  for (
+    let r = 5;
+    r >= 0;
+    r--
+  ) {
+
+    if (
+      !board[r][column]
+    ) {
+
+      board[r][column] =
+        piece;
+
+      return r;
+
+    }
+
+  }
+
+  return -1;
+
+}
+
+
+function renderConnectFour() {
+
+  GameCenter.activeGame =
+    "connect4";
+
+  if (!GameCenter.connectFour) {
+    resetConnectFour();
+  }
+
+
+  renderContentHeader(
+    "Games",
+    "Connect Four"
+  );
+
+
+  const tabs =
+    $("#contentTabs");
+
+  if (tabs) {
+    tabs.innerHTML = "";
+  }
+
+
+  const game =
+    GameCenter.connectFour;
+
+
+  const root =
+    $("#contentBody");
+
+  if (!root) {
+    return;
+  }
+
+
+  root.innerHTML = `
+    <section
+      class="game-shell connect-shell"
+    >
+
+      <div class="game-topline">
+
+        ${gameBackButton()}
+
+        <div class="game-status">
+          ${escapeHTML(game.status)}
+        </div>
+
+        <button
+          class="text-action"
+          data-connect-reset
+        >
+          ↻ New game
+        </button>
+
+      </div>
+
+
+      <div class="connect-columns">
+
+        ${Array.from(
+          { length: 7 },
+          (_, column) => `
+            <button
+              data-connect-column="${column}"
+              aria-label="Drop in column ${column + 1}"
+            >
+              ↓
+            </button>
+          `
+        ).join("")}
+
+      </div>
+
+
+      <div class="connect-board">
+
+        ${game.board
+          .map(
+            row =>
+              row
+                .map(
+                  cell => `
+                    <div class="connect-cell">
+
+                      <span
+                        class="
+                          connect-disc
+                          ${
+                            cell === "R"
+                              ? "player"
+                              : cell === "Y"
+                                ? "galaxy"
+                                : ""
+                          }
+                        "
+                      ></span>
+
+                    </div>
+                  `
+                )
+                .join("")
+          )
+          .join("")}
+
+      </div>
+
+
+      <div class="connect-legend">
+
+        <span>
+
+          <i
+            class="legend-disc player"
+          ></i>
+
+          You
+
+        </span>
+
+        <span>
+
+          <i
+            class="legend-disc galaxy"
+          ></i>
+
+          GALAXY
+
+        </span>
+
+      </div>
+
+    </section>
+  `;
+
+}
+
+
+function handleConnectColumn(
+  column
+) {
+
+  const game =
+    GameCenter.connectFour;
+
+  if (
+    !game ||
+    game.gameOver ||
+    game.turn !== "R"
+  ) {
+    return;
+  }
+
+
+  if (
+    dropConnect(
+      game.board,
+      column,
+      "R"
+    ) <
+    0
+  ) {
+    return;
+  }
+
+
+  let winner =
+    connectWinner(
+      game.board
+    );
+
+
+  if (winner) {
+
+    game.gameOver =
+      true;
+
+    game.status =
+      "You win";
+
+    renderConnectFour();
+
+    return;
+
+  }
+
+
+  game.turn =
+    "Y";
+
+  game.status =
+    "GALAXY is thinking…";
+
+  renderConnectFour();
+
+
+  setTimeout(
+    () => {
+
+      const openColumns = [];
+
+
+      for (
+        let c = 0;
+        c < 7;
+        c++
+      ) {
+
+        if (
+          !game.board[0][c]
+        ) {
+
+          openColumns.push(c);
+
+        }
+
+      }
+
+
+      if (!openColumns.length) {
+
+        game.gameOver =
+          true;
+
+        game.status =
+          "Draw";
+
+        renderConnectFour();
+
+        return;
+
+      }
+
+
+      const chosenColumn =
+        openColumns[
+          Math.floor(
+            Math.random() *
+            openColumns.length
+          )
+        ];
+
+
+      dropConnect(
+        game.board,
+        chosenColumn,
+        "Y"
+      );
+
+
+      winner =
+        connectWinner(
+          game.board
+        );
+
+
+      if (winner) {
+
+        game.gameOver =
+          true;
+
+        game.status =
+          "GALAXY wins";
+
+      } else {
+
+        game.turn =
+          "R";
+
+        game.status =
+          "Your turn";
+
+      }
+
+
+      renderConnectFour();
+
+    },
+    350
+  );
+
+}
+
+
+/* =========================================================
+   MEMORY
+   ========================================================= */
+
+function resetMemory() {
+
+  const values = [
+    "♛",
+    "♞",
+    "✦",
+    "◫",
+    "⌘",
+    "♜",
+    "◇",
+    "◉"
+  ];
+
+
+  const cards = [
+    ...values,
+    ...values
+  ]
+    .map(
+      (value, index) => ({
+        id: index,
+        value,
+        revealed: false,
+        matched: false
+      })
+    )
+    .sort(
+      () =>
+        Math.random() -
+        0.5
+    );
+
+
+  GameCenter.memory = {
+
+    cards,
+
+    first:
+      null,
+
+    locked:
+      false,
+
+    moves:
+      0,
+
+    matches:
+      0,
+
+    status:
+      "Find all matching pairs"
+
+  };
+
+}
+
+
+function renderMemory() {
+
+  GameCenter.activeGame =
+    "memory";
+
+  if (!GameCenter.memory) {
+    resetMemory();
+  }
+
+
+  renderContentHeader(
+    "Games",
+    "Memory"
+  );
+
+
+  const tabs =
+    $("#contentTabs");
+
+  if (tabs) {
+    tabs.innerHTML = "";
+  }
+
+
+  const game =
+    GameCenter.memory;
+
+
+  const root =
+    $("#contentBody");
+
+  if (!root) {
+    return;
+  }
+
+
+  root.innerHTML = `
+    <section
+      class="game-shell memory-shell"
+    >
+
+      <div class="game-topline">
+
+        ${gameBackButton()}
+
+        <div class="game-status">
+          ${escapeHTML(game.status)}
+          ·
+          ${game.moves}
+          moves
+        </div>
+
+        <button
+          class="text-action"
+          data-memory-reset
+        >
+          ↻ New game
+        </button>
+
+      </div>
+
+
+      <div class="memory-board">
+
+        ${game.cards
+          .map(
+            (card, index) => `
+              <button
+                class="
+                  memory-card
+                  ${
+                    card.revealed ||
+                    card.matched
+                      ? "revealed"
+                      : ""
+                  }
+                  ${
+                    card.matched
+                      ? "matched"
+                      : ""
+                  }
+                "
+                data-memory-card="${index}"
+              >
+
+                <span class="memory-card-back">
+                  ✦
+                </span>
+
+                <span class="memory-card-front">
+                  ${escapeHTML(card.value)}
+                </span>
+
+              </button>
+            `
+          )
+          .join("")}
+
+      </div>
+
+    </section>
+  `;
+
+}
+
+
+function handleMemoryCard(index) {
+
+  const game =
+    GameCenter.memory;
+
+  if (
+    !game ||
+    game.locked
+  ) {
+    return;
+  }
+
+
+  const card =
+    game.cards[index];
+
+
+  if (
+    !card ||
+    card.revealed ||
+    card.matched
+  ) {
+    return;
+  }
+
+
+  card.revealed =
+    true;
+
+
+  if (
+    game.first ===
+    null
+  ) {
+
+    game.first =
+      index;
+
+    renderMemory();
+
+    return;
+
+  }
+
+
+  game.moves++;
+
+
+  const first =
+    game.cards[
+      game.first
+    ];
+
+
+  if (
+    first.value ===
+    card.value
+  ) {
+
+    first.matched =
+      true;
+
+    card.matched =
+      true;
+
+    game.matches++;
+
+    game.first =
+      null;
+
+
+    game.status =
+      game.matches === 8
+        ? "Perfect — all pairs matched!"
+        : "Match found";
+
+
+    renderMemory();
+
+    return;
+
+  }
+
+
+  const previous =
+    game.first;
+
+
+  game.first =
+    null;
+
+  game.locked =
+    true;
+
+  game.status =
+    "Try again";
+
+
+  renderMemory();
+
+
+  setTimeout(
+    () => {
+
+      game.cards[
+        previous
+      ].revealed =
+        false;
+
+
+      game.cards[
+        index
+      ].revealed =
+        false;
+
+
+      game.locked =
+        false;
+
+
+      game.status =
+        "Find all matching pairs";
+
+
+      renderMemory();
+
+    },
+    650
+  );
+
+}
+
+
+function openGame(name) {
+
+  if (
+    name === "chess"
+  ) {
+
+    renderChess();
+
+  } else if (
+    name === "tictactoe"
+  ) {
+
+    renderTicTacToe();
+
+  } else if (
+    name === "connect4"
+  ) {
+
+    renderConnectFour();
+
+  } else if (
+    name === "memory"
+  ) {
+
+    renderMemory();
 
   }
 
@@ -5995,13 +8012,7 @@ function renderTools() {
 
       ${tools
         .map(
-          (
-            [
-              icon,
-              name,
-              action
-            ]
-          ) => `
+          ([icon, name, action]) => `
           <button
             class="resource-card"
             data-tool-action="${action}"
@@ -6062,8 +8073,6 @@ function openWorkspaceView(view) {
       "active-view"
     );
 
-  $("[data-view]");
-
   $$(".nav-row, .menu-row")
     .forEach(
       item =>
@@ -6100,14 +8109,15 @@ function openWorkspaceView(view) {
     gpts:
       renderAgents,
 
+    games:
+      renderGames,
+
     tools:
       renderTools
 
   };
 
-  routes[
-    view
-  ]?.();
+  routes[view]?.();
 
 }
 
@@ -6127,8 +8137,8 @@ function searchEverything(query) {
     return [];
   }
 
-  const results =
-    [];
+  const results = [];
+
 
   Galaxy.state.chats.forEach(
     chat => {
@@ -6170,6 +8180,7 @@ function searchEverything(query) {
     }
   );
 
+
   Galaxy.state.projects
     .forEach(
       project => {
@@ -6200,6 +8211,7 @@ function searchEverything(query) {
 
       }
     );
+
 
   Galaxy.state.packs
     .forEach(
@@ -6239,6 +8251,7 @@ function searchEverything(query) {
       }
     );
 
+
   Galaxy.state.library
     .forEach(
       item => {
@@ -6276,6 +8289,7 @@ function searchEverything(query) {
       }
     );
 
+
   Galaxy.state.agents
     .forEach(
       agent => {
@@ -6306,6 +8320,7 @@ function searchEverything(query) {
 
       }
     );
+
 
   return results.slice(
     0,
@@ -6373,6 +8388,17 @@ const COMMANDS = [
       () =>
         openWorkspaceView(
           "packs"
+        )
+  },
+
+  {
+    name:
+      "Gaming Center",
+
+    run:
+      () =>
+        openWorkspaceView(
+          "games"
         )
   },
 
@@ -6501,8 +8527,7 @@ const COMMANDS = [
 
 
 function openCommandPalette(
-  mode =
-    "command"
+  mode = "command"
 ) {
 
   const root =
@@ -6580,15 +8605,16 @@ function renderCommandResults(
     return;
   }
 
+
   if (
-    mode ===
-    "search"
+    mode === "search"
   ) {
 
     const results =
       searchEverything(
         query
       );
+
 
     root.innerHTML =
       query
@@ -6634,10 +8660,13 @@ function renderCommandResults(
         `;
 
     return;
+
   }
+
 
   const q =
     query.toLowerCase();
+
 
   root.innerHTML =
     COMMANDS
@@ -6688,9 +8717,9 @@ function openSearchResult(
 
   closeOverlay();
 
+
   if (
-    type ===
-    "chat"
+    type === "chat"
   ) {
 
     Galaxy.state.currentChatId =
@@ -6707,11 +8736,12 @@ function openSearchResult(
     renderRecentChats();
 
     return;
+
   }
 
+
   if (
-    type ===
-    "project"
+    type === "project"
   ) {
 
     openWorkspaceView(
@@ -6719,11 +8749,12 @@ function openSearchResult(
     );
 
     return;
+
   }
 
+
   if (
-    type ===
-    "pack"
+    type === "pack"
   ) {
 
     openWorkspaceView(
@@ -6732,18 +8763,17 @@ function openSearchResult(
 
     setTimeout(
       () =>
-        openPack(
-          id
-        ),
+        openPack(id),
       0
     );
 
     return;
+
   }
 
+
   if (
-    type ===
-    "library"
+    type === "library"
   ) {
 
     openWorkspaceView(
@@ -6752,18 +8782,17 @@ function openSearchResult(
 
     setTimeout(
       () =>
-        previewLibraryItem(
-          id
-        ),
+        previewLibraryItem(id),
       0
     );
 
     return;
+
   }
 
+
   if (
-    type ===
-    "agent"
+    type === "agent"
   ) {
 
     openWorkspaceView(
@@ -6880,11 +8909,12 @@ function startVoiceRecording() {
 
   renderVoiceState();
 
+
   recognition.onresult =
     event => {
 
-      let transcript =
-        "";
+      let transcript = "";
+
 
       for (
         let i =
@@ -6899,26 +8929,26 @@ function startVoiceRecording() {
         transcript +=
           event.results[
             i
-          ][0]
-            .transcript;
+          ][0].transcript;
 
       }
 
+
       const input =
         $("#promptInput");
+
 
       if (input) {
 
         input.value =
           transcript;
 
-        autoResizeTextarea(
-          input
-        );
+        autoResizeTextarea(input);
 
       }
 
     };
+
 
   recognition.onerror =
     event => {
@@ -6935,6 +8965,7 @@ function startVoiceRecording() {
 
     };
 
+
   recognition.onend =
     () => {
 
@@ -6944,6 +8975,7 @@ function startVoiceRecording() {
       renderVoiceState();
 
     };
+
 
   recognition.start();
 
@@ -6998,8 +9030,7 @@ function showToolActivity(text) {
     return;
   }
 
-  root.hidden =
-    false;
+  root.hidden = false;
 
   const label =
     $("#toolActivityText");
@@ -7018,8 +9049,7 @@ function hideToolActivity() {
     $("#toolActivity");
 
   if (root) {
-    root.hidden =
-      true;
+    root.hidden = true;
   }
 
 }
@@ -7045,15 +9075,13 @@ function updateSendButtonState() {
   );
 
   button.textContent =
-    Galaxy.state.generation
-      .active
+    Galaxy.state.generation.active
       ? "■"
       : "↑";
 
   button.setAttribute(
     "aria-label",
-    Galaxy.state.generation
-      .active
+    Galaxy.state.generation.active
       ? "Stop"
       : "Send"
   );
@@ -7084,34 +9112,42 @@ function stopGeneration() {
    REAL AI BACKEND
    ========================================================= */
 
-async function 
-   async function fetchAIResponse(
+async function fetchAIResponse(
   prompt,
   extra = {}
 ) {
+
   const provider =
     $("#aiProvider")?.value ||
     "openai";
+
 
   const endpoint =
     provider === "gemini"
       ? "/api/gemini"
       : "/api/chat";
 
+
   const response =
     await fetch(
       endpoint,
       {
-        method: "POST",
+
+        method:
+          "POST",
 
         headers: {
+
           "Content-Type":
             "application/json"
+
         },
 
         body:
           JSON.stringify({
-            message: prompt,
+
+            message:
+              prompt,
 
             provider,
 
@@ -7129,134 +9165,54 @@ async function
                 ?.slice(-20)
                 .map(
                   item => ({
+
                     role:
                       item.role,
 
                     content:
                       item.text
+
                   })
                 ) ||
               []
+
           }),
 
         signal:
           Galaxy.state.generation
             .controller
             ?.signal
+
       }
     );
 
+
   let data;
 
+
   try {
+
     data =
       await response.json();
+
   } catch {
+
     throw new Error(
       "GALAXY received an invalid response."
     );
+
   }
 
+
   if (!response.ok) {
+
     throw new Error(
       data.error ||
       `AI request failed (${response.status})`
     );
-  }
-
-  return (
-    data.reply ||
-    data.message ||
-    data.output ||
-    data.text ||
-    "No response received."
-  );
-}
-  prompt,
-  extra = {}
-) {
-
-  const response =
-    await fetch(
-      "/api/chat",
-      {
-
-        method:
-          "POST",
-
-        headers: {
-          "Content-Type":
-            "application/json"
-        },
-
-        body:
-          JSON.stringify({
-
-            message:
-              prompt,
-
-            webSearch:
-              Galaxy.state.webSearchState ===
-              "ready",
-
-            mode:
-              extra.mode ||
-              Galaxy.state.mode,
-
-            history:
-              getCurrentChat()
-                ?.messages
-                ?.slice(
-                  -20
-                )
-                .map(
-                  item => ({
-                    role:
-                      item.role,
-
-                    content:
-                      item.text
-                  })
-                ) ||
-              []
-
-          }),
-
-        signal:
-          Galaxy.state.generation
-            .controller
-            ?.signal
-
-      }
-    );
-
-  if (
-    !response.ok
-  ) {
-
-    let message =
-      `AI request failed (${response.status})`;
-
-    try {
-
-      const data =
-        await response.json();
-
-      message =
-        data.error ||
-        data.message ||
-        message;
-
-    } catch {}
-
-    throw new Error(
-      message
-    );
 
   }
 
-  const data =
-    await response.json();
 
   return (
     data.reply ||
@@ -7280,14 +9236,18 @@ async function generateAssistantReply(
   const chat =
     ensureCurrentChat();
 
+
   Galaxy.state.generation.active =
     true;
+
 
   Galaxy.state.generation.stopped =
     false;
 
+
   Galaxy.state.generation.controller =
     new AbortController();
+
 
   const message = {
 
@@ -7297,8 +9257,7 @@ async function generateAssistantReply(
     role:
       "assistant",
 
-    text:
-      "",
+    text: "",
 
     createdAt:
       now(),
@@ -7308,16 +9267,19 @@ async function generateAssistantReply(
 
   };
 
+
   Galaxy.state.generation.messageId =
     message.id;
 
-  chat.messages.push(
-    message
-  );
+
+  chat.messages.push(message);
+
 
   renderChat();
 
+
   updateSendButtonState();
+
 
   showToolActivity(
     Galaxy.state.webSearchState ===
@@ -7326,12 +9288,14 @@ async function generateAssistantReply(
       : "Thinking…"
   );
 
+
   try {
 
     const fullText =
       await fetchAIResponse(
         prompt
       );
+
 
     if (
       !Galaxy.state.settings
@@ -7347,9 +9311,8 @@ async function generateAssistantReply(
         fullText.match(
           /.{1,12}/gs
         ) ||
-        [
-          fullText
-        ];
+        [fullText];
+
 
       for (
         const chunk
@@ -7363,13 +9326,17 @@ async function generateAssistantReply(
           break;
         }
 
+
         message.text +=
           chunk;
+
 
         message.updatedAt =
           now();
 
+
         renderChat();
+
 
         await sleep(
           Galaxy.state.settings
@@ -7380,8 +9347,10 @@ async function generateAssistantReply(
 
     }
 
+
     chat.updatedAt =
       now();
+
 
     persistAll();
 
@@ -7397,14 +9366,9 @@ I couldn't reach the GALAXY AI backend.
 
 ${error.message}
 
-Make sure your Vercel route **/api/chat** is deployed and returns JSON like:
-
-\`\`\`json
-{
-  "reply": "Hello"
-}
-\`\`\`
+Make sure your selected Vercel AI route is deployed: **/api/chat** for OpenAI or **/api/gemini** for Gemini.
 `.trim();
+
 
       handleError(
         error,
@@ -7418,14 +9382,19 @@ Make sure your Vercel route **/api/chat** is deployed and returns JSON like:
     Galaxy.state.generation.active =
       false;
 
+
     Galaxy.state.generation.controller =
       null;
 
+
     hideToolActivity();
+
 
     updateSendButtonState();
 
+
     renderChat();
+
 
     persistAll();
 
@@ -7449,16 +9418,19 @@ async function sendMessage() {
     return;
   }
 
+
   const input =
     $("#promptInput");
+
 
   if (!input) {
     return;
   }
 
+
   const text =
-    input.value
-      .trim();
+    input.value.trim();
+
 
   if (
     !text &&
@@ -7468,12 +9440,15 @@ async function sendMessage() {
     return;
   }
 
+
   const chat =
     ensureCurrentChat();
+
 
   const messageText =
     text ||
     describeAttachments();
+
 
   chat.messages.push({
 
@@ -7494,6 +9469,7 @@ async function sendMessage() {
 
   });
 
+
   if (
     chat.title ===
     "New conversation"
@@ -7507,30 +9483,35 @@ async function sendMessage() {
 
   }
 
+
   chat.updatedAt =
     now();
 
-  input.value =
-    "";
 
-  autoResizeTextarea(
-    input
-  );
+  input.value = "";
 
-  DB.remove(
-    "draft"
-  );
+
+  autoResizeTextarea(input);
+
+
+  DB.remove("draft");
+
 
   Galaxy.state.attachments =
     [];
 
+
   renderAttachments();
+
 
   persistAll();
 
+
   renderRecentChats();
 
+
   renderChat();
+
 
   await generateAssistantReply(
     messageText
@@ -7553,8 +9534,7 @@ function toggleSidebar() {
   }
 
   if (
-    window.innerWidth <=
-    900
+    window.innerWidth <= 900
   ) {
 
     app.classList.toggle(
@@ -7578,11 +9558,10 @@ function toggleSidebar() {
 
 function shareWorkspace() {
 
-  if (
-    navigator.share
-  ) {
+  if (navigator.share) {
 
     navigator.share({
+
       title:
         "GALAXY AI",
 
@@ -7591,6 +9570,7 @@ function shareWorkspace() {
 
       url:
         location.href
+
     })
     .catch(
       () => {}
@@ -7608,7 +9588,7 @@ function shareWorkspace() {
 
 
 /* =========================================================
-   TOOLS
+   JSON VIEWER
    ========================================================= */
 
 function openJSONViewer() {
@@ -7643,6 +9623,7 @@ function openJSONViewer() {
     `
 
   });
+
 
   setTimeout(
     () => {
@@ -7682,6 +9663,10 @@ function openJSONViewer() {
 
 }
 
+
+/* =========================================================
+   DIFF VIEWER
+   ========================================================= */
 
 function openDiffViewer() {
 
@@ -7725,6 +9710,7 @@ function openDiffViewer() {
 
   });
 
+
   setTimeout(
     () => {
 
@@ -7738,15 +9724,16 @@ function openDiffViewer() {
               ?.value ||
             "";
 
+
           const right =
             $("#diffRight")
               ?.value ||
             "";
 
+
           $("#diffOutput")
             .innerHTML =
-            left ===
-            right
+            left === right
 
               ? `
                 <div class="empty-panel">
@@ -7790,6 +9777,10 @@ function openDiffViewer() {
 }
 
 
+/* =========================================================
+   SCRATCHPAD
+   ========================================================= */
+
 function openScratchpad() {
 
   openModal({
@@ -7811,6 +9802,7 @@ function openScratchpad() {
     `
 
   });
+
 
   setTimeout(
     () => {
@@ -7838,8 +9830,7 @@ function openScratchpad() {
 function handleToolAction(action) {
 
   if (
-    action ===
-    "command"
+    action === "command"
   ) {
 
     openCommandPalette();
@@ -7908,23 +9899,27 @@ function openContextMenu(
 
   closeContextMenu();
 
+
   const menu =
     document.createElement(
       "div"
     );
 
+
   menu.className =
     "context-menu";
+
 
   menu.style.left =
     `${x}px`;
 
+
   menu.style.top =
     `${y}px`;
 
+
   if (
-    type ===
-    "chat"
+    type === "chat"
   ) {
 
     const chat =
@@ -7933,9 +9928,11 @@ function openContextMenu(
           item.id === id
       );
 
+
     if (!chat) {
       return;
     }
+
 
     menu.innerHTML = `
       <button
@@ -7944,7 +9941,9 @@ function openContextMenu(
         data-context-id="${id}"
       >
         ✎
-        <span>Rename</span>
+        <span>
+          Rename
+        </span>
       </button>
 
       <button
@@ -7983,7 +9982,9 @@ function openContextMenu(
         data-context-id="${id}"
       >
         ↗
-        <span>Export</span>
+        <span>
+          Export
+        </span>
       </button>
 
       <button
@@ -7992,15 +9993,17 @@ function openContextMenu(
         data-context-id="${id}"
       >
         ×
-        <span>Delete</span>
+        <span>
+          Delete
+        </span>
       </button>
     `;
 
   }
 
+
   if (
-    type ===
-    "project"
+    type === "project"
   ) {
 
     menu.innerHTML = `
@@ -8010,7 +10013,9 @@ function openContextMenu(
         data-context-id="${id}"
       >
         ✎
-        <span>Edit</span>
+        <span>
+          Edit
+        </span>
       </button>
 
       <button
@@ -8019,11 +10024,14 @@ function openContextMenu(
         data-context-id="${id}"
       >
         ×
-        <span>Delete</span>
+        <span>
+          Delete
+        </span>
       </button>
     `;
 
   }
+
 
   document.body.appendChild(
     menu
@@ -8039,68 +10047,55 @@ function handleContextAction(
 
   closeContextMenu();
 
+
   if (
     action ===
     "rename-chat"
   ) {
 
-    renameChat(
-      id
-    );
+    renameChat(id);
 
   } else if (
     action ===
     "pin-chat"
   ) {
 
-    togglePinChat(
-      id
-    );
+    togglePinChat(id);
 
   } else if (
     action ===
     "archive-chat"
   ) {
 
-    toggleArchiveChat(
-      id
-    );
+    toggleArchiveChat(id);
 
   } else if (
     action ===
     "export-chat"
   ) {
 
-    exportConversation(
-      id
-    );
+    exportConversation(id);
 
   } else if (
     action ===
     "delete-chat"
   ) {
 
-    deleteChat(
-      id
-    );
+    deleteChat(id);
 
   } else if (
     action ===
     "edit-project"
   ) {
 
-    editProject(
-      id
-    );
+    editProject(id);
 
   } else if (
     action ===
     "delete-project"
   ) {
 
-    deleteProject(
-      id
-    );
+    deleteProject(id);
 
   }
 
@@ -8117,29 +10112,23 @@ function handleContentTab(
 ) {
 
   if (
-    group ===
-    "library"
+    group === "library"
   ) {
 
-    renderLibrary(
-      tab
-    );
+    renderLibrary(tab);
 
   } else if (
-    group ===
-    "packs"
+    group === "packs"
   ) {
 
-    renderPacks(
-      tab
-    );
+    renderPacks(tab);
 
   }
+
 
   $$(".flat-tab")
     .forEach(
       button =>
-
         button.classList.toggle(
           "active",
           button.dataset.contentTab ===
@@ -8165,8 +10154,7 @@ function bindFileInputs() {
         event.target.files
       );
 
-      event.target.value =
-        "";
+      event.target.value = "";
 
     }
   );
@@ -8181,6 +10169,7 @@ function bindFileInputs() {
         event.target.files
       );
 
+
       Array.from(
         event.target.files ||
         []
@@ -8188,6 +10177,7 @@ function bindFileInputs() {
         .forEach(
           addLibraryFile
         );
+
 
       event.target.value =
         "";
@@ -8205,6 +10195,7 @@ function bindFileInputs() {
         event.target.files
       );
 
+
       Array.from(
         event.target.files ||
         []
@@ -8212,6 +10203,7 @@ function bindFileInputs() {
         .forEach(
           addLibraryFile
         );
+
 
       event.target.value =
         "";
@@ -8233,6 +10225,7 @@ function bindFileInputs() {
           addLibraryFile
         );
 
+
       event.target.value =
         "";
 
@@ -8246,17 +10239,15 @@ function bindFileInputs() {
     event => {
 
       const file =
-        event.target.files?.[
-          0
-        ];
+        event.target.files?.[0];
+
 
       if (file) {
 
-        importConversation(
-          file
-        );
+        importConversation(file);
 
       }
+
 
       event.target.value =
         "";
@@ -8278,160 +10269,251 @@ function handleClick(event) {
       "[data-action]"
     )?.dataset.action;
 
+
   const view =
     event.target.closest(
       "[data-view]"
     )?.dataset.view;
+
 
   const chatOpen =
     event.target.closest(
       "[data-chat-open]"
     )?.dataset.chatOpen;
 
+
   const contextOpen =
     event.target.closest(
       "[data-context-open]"
     );
+
 
   const contextAction =
     event.target.closest(
       "[data-context-action]"
     );
 
+
   const contentTab =
     event.target.closest(
       "[data-content-tab]"
     );
+
 
   const searchResult =
     event.target.closest(
       "[data-search-result]"
     );
 
+
   const command =
     event.target.closest(
       "[data-command-name]"
     );
+
 
   const toolAction =
     event.target.closest(
       "[data-tool-action]"
     )?.dataset.toolAction;
 
+
   const copyCode =
     event.target.closest(
       "[data-copy-code]"
     )?.dataset.copyCode;
+
 
   const copyMessage =
     event.target.closest(
       "[data-copy-message]"
     )?.dataset.copyMessage;
 
+
   const editMessageId =
     event.target.closest(
       "[data-edit-message]"
     )?.dataset.editMessage;
+
 
   const retryMessageId =
     event.target.closest(
       "[data-retry-message]"
     )?.dataset.retryMessage;
 
+
   const readMessageId =
     event.target.closest(
       "[data-read-message]"
     )?.dataset.readMessage;
+
 
   const branchMessageId =
     event.target.closest(
       "[data-branch-message]"
     )?.dataset.branchMessage;
 
+
   const removeAttachmentId =
     event.target.closest(
       "[data-remove-attachment]"
     )?.dataset.removeAttachment;
+
 
   const previewLibraryId =
     event.target.closest(
       "[data-preview-library]"
     )?.dataset.previewLibrary;
 
+
   const favoriteId =
     event.target.closest(
       "[data-library-favorite]"
     )?.dataset.libraryFavorite;
+
 
   const deleteLibraryId =
     event.target.closest(
       "[data-delete-library]"
     )?.dataset.deleteLibrary;
 
+
   const editProjectId =
     event.target.closest(
       "[data-edit-project]"
     )?.dataset.editProject;
+
 
   const toggleScheduledId =
     event.target.closest(
       "[data-toggle-scheduled]"
     )?.dataset.toggleScheduled;
 
+
   const deleteScheduledId =
     event.target.closest(
       "[data-delete-scheduled]"
     )?.dataset.deleteScheduled;
+
 
   const pluginInstallId =
     event.target.closest(
       "[data-plugin-install]"
     )?.dataset.pluginInstall;
 
+
   const pluginConnectId =
     event.target.closest(
       "[data-plugin-connect]"
     )?.dataset.pluginConnect;
+
 
   const editAgentId =
     event.target.closest(
       "[data-edit-agent]"
     )?.dataset.editAgent;
 
+
   const openSiteId =
     event.target.closest(
       "[data-open-site]"
     )?.dataset.openSite;
+
 
   const siteTab =
     event.target.closest(
       "[data-site-tab]"
     )?.dataset.siteTab;
 
+
   const openPackId =
     event.target.closest(
       "[data-open-pack]"
     )?.dataset.openPack;
+
 
   const packInstallId =
     event.target.closest(
       "[data-pack-install-toggle]"
     )?.dataset.packInstallToggle;
 
+
   const packItem =
     event.target.closest(
       "[data-pack-item]"
     )?.dataset.packItem;
+
 
   const promptId =
     event.target.closest(
       "[data-use-prompt]"
     )?.dataset.usePrompt;
 
+
   const workView =
     event.target.closest(
       "[data-work-view]"
     )?.dataset.workView;
+
+
+  const gameOpen =
+    event.target.closest(
+      "[data-game-open]"
+    )?.dataset.gameOpen;
+
+
+  const gameBack =
+    event.target.closest(
+      "[data-game-back]"
+    );
+
+
+  const chessSquare =
+    event.target.closest(
+      "[data-chess-square]"
+    )?.dataset.chessSquare;
+
+
+  const tttCell =
+    event.target.closest(
+      "[data-ttt-cell]"
+    )?.dataset.tttCell;
+
+
+  const connectColumn =
+    event.target.closest(
+      "[data-connect-column]"
+    )?.dataset.connectColumn;
+
+
+  const memoryCard =
+    event.target.closest(
+      "[data-memory-card]"
+    )?.dataset.memoryCard;
+
+
+  const chessReset =
+    event.target.closest(
+      "[data-chess-reset]"
+    );
+
+
+  const tttReset =
+    event.target.closest(
+      "[data-ttt-reset]"
+    );
+
+
+  const connectReset =
+    event.target.closest(
+      "[data-connect-reset]"
+    );
+
+
+  const memoryReset =
+    event.target.closest(
+      "[data-memory-reset]"
+    );
 
 
   if (
@@ -8449,9 +10531,7 @@ function handleClick(event) {
 
   if (view) {
 
-    openWorkspaceView(
-      view
-    );
+    openWorkspaceView(view);
 
   }
 
@@ -8463,9 +10543,7 @@ function handleClick(event) {
 
     persistAll();
 
-    switchMode(
-      "chat"
-    );
+    switchMode("chat");
 
     renderRecentChats();
 
@@ -8577,130 +10655,94 @@ function handleClick(event) {
         );
 
     if (message) {
-
-      copyText(
-        message.text
-      );
-
+      copyText(message.text);
     }
 
   }
 
 
   if (editMessageId) {
-
-    editMessage(
-      editMessageId
-    );
-
+    editMessage(editMessageId);
   }
 
 
   if (retryMessageId) {
-
-    retryMessage(
-      retryMessageId
-    );
-
+    retryMessage(retryMessageId);
   }
 
 
   if (readMessageId) {
-
-    readAloud(
-      readMessageId
-    );
-
+    readAloud(readMessageId);
   }
 
 
   if (branchMessageId) {
-
     branchConversation(
       branchMessageId
     );
-
   }
 
 
   if (removeAttachmentId) {
-
     removeAttachment(
       removeAttachmentId
     );
-
   }
 
 
   if (previewLibraryId) {
-
     previewLibraryItem(
       previewLibraryId
     );
-
   }
 
 
   if (favoriteId) {
-
     toggleLibraryFavorite(
       favoriteId
     );
-
   }
 
 
   if (deleteLibraryId) {
-
     deleteLibraryItem(
       deleteLibraryId
     );
-
   }
 
 
   if (editProjectId) {
-
     editProject(
       editProjectId
     );
-
   }
 
 
   if (toggleScheduledId) {
-
     toggleScheduledTask(
       toggleScheduledId
     );
-
   }
 
 
   if (deleteScheduledId) {
-
     deleteScheduledTask(
       deleteScheduledId
     );
-
   }
 
 
   if (pluginInstallId) {
-
     togglePluginInstall(
       pluginInstallId
     );
-
   }
 
 
   if (pluginConnectId) {
-
     togglePluginConnection(
       pluginConnectId
     );
-
   }
 
 
@@ -8714,57 +10756,39 @@ function handleClick(event) {
       );
 
     if (agent) {
-
-      openAgentEditor(
-        agent
-      );
-
+      openAgentEditor(agent);
     }
 
   }
 
 
   if (openSiteId) {
-
-    openSiteEditor(
-      openSiteId
-    );
-
+    openSiteEditor(openSiteId);
   }
 
 
   if (siteTab) {
-
     switchSiteEditorTab(
       siteTab
     );
-
   }
 
 
   if (openPackId) {
-
-    openPack(
-      openPackId
-    );
-
+    openPack(openPackId);
   }
 
 
   if (packInstallId) {
-
     togglePackInstall(
       packInstallId
     );
-
   }
 
 
   if (packItem) {
 
-    switchMode(
-      "chat"
-    );
+    switchMode("chat");
 
     const input =
       $("#promptInput");
@@ -8774,9 +10798,7 @@ function handleClick(event) {
       input.value =
         packItem;
 
-      autoResizeTextarea(
-        input
-      );
+      autoResizeTextarea(input);
 
       input.focus();
 
@@ -8786,11 +10808,9 @@ function handleClick(event) {
 
 
   if (promptId) {
-
     usePromptTemplate(
       promptId
     );
-
   }
 
 
@@ -8814,34 +10834,126 @@ function handleClick(event) {
   }
 
 
+  if (gameOpen) {
+
+    openGame(gameOpen);
+
+  }
+
+
+  if (gameBack) {
+
+    renderGames();
+
+  }
+
+
+  if (chessSquare) {
+
+    const [r, c] =
+      chessSquare
+        .split(",")
+        .map(Number);
+
+    handleChessSquare(
+      r,
+      c
+    );
+
+  }
+
+
+  if (
+    tttCell !== undefined
+  ) {
+
+    handleTttCell(
+      Number(tttCell)
+    );
+
+  }
+
+
+  if (
+    connectColumn !== undefined
+  ) {
+
+    handleConnectColumn(
+      Number(connectColumn)
+    );
+
+  }
+
+
+  if (
+    memoryCard !== undefined
+  ) {
+
+    handleMemoryCard(
+      Number(memoryCard)
+    );
+
+  }
+
+
+  if (chessReset) {
+
+    resetChess();
+
+    renderChess();
+
+  }
+
+
+  if (tttReset) {
+
+    resetTicTacToe();
+
+    renderTicTacToe();
+
+  }
+
+
+  if (connectReset) {
+
+    resetConnectFour();
+
+    renderConnectFour();
+
+  }
+
+
+  if (memoryReset) {
+
+    resetMemory();
+
+    renderMemory();
+
+  }
+
+
   if (action) {
 
     if (
-      action ===
-      "home"
+      action === "home"
     ) {
 
-      switchMode(
-        "chat"
-      );
+      switchMode("chat");
 
     } else if (
-      action ===
-      "new-chat"
+      action === "new-chat"
     ) {
 
       newChat();
 
     } else if (
-      action ===
-      "search"
+      action === "search"
     ) {
 
       openSearch();
 
     } else if (
-      action ===
-      "command"
+      action === "command"
     ) {
 
       openCommandPalette();
@@ -8867,32 +10979,28 @@ function handleClick(event) {
       }
 
     } else if (
-      action ===
-      "attach"
+      action === "attach"
     ) {
 
       $("#fileInput")
         ?.click();
 
     } else if (
-      action ===
-      "image"
+      action === "image"
     ) {
 
       $("#imageInput")
         ?.click();
 
     } else if (
-      action ===
-      "video"
+      action === "video"
     ) {
 
       $("#videoInput")
         ?.click();
 
     } else if (
-      action ===
-      "voice"
+      action === "voice"
     ) {
 
       toggleVoiceRecording();
@@ -8905,8 +11013,7 @@ function handleClick(event) {
       toggleWebSearch();
 
     } else if (
-      action ===
-      "send"
+      action === "send"
     ) {
 
       sendMessage();
@@ -8919,8 +11026,7 @@ function handleClick(event) {
       sendWorkMessage();
 
     } else if (
-      action ===
-      "focus"
+      action === "focus"
     ) {
 
       toggleFocusMode();
@@ -8940,8 +11046,7 @@ function handleClick(event) {
       openSettings();
 
     } else if (
-      action ===
-      "share"
+      action === "share"
     ) {
 
       shareWorkspace();
@@ -9251,9 +11356,11 @@ function bindEvents() {
         return;
       }
 
+
       const mod =
         event.ctrlKey ||
         event.metaKey;
+
 
       if (
         event.key ===
@@ -9288,8 +11395,7 @@ function bindEvents() {
 
       } else if (
         mod &&
-        event.key ===
-        "."
+        event.key === "."
       ) {
 
         event.preventDefault();
@@ -9298,8 +11404,7 @@ function bindEvents() {
 
       } else if (
         mod &&
-        event.key ===
-        "/"
+        event.key === "/"
       ) {
 
         event.preventDefault();
@@ -9308,27 +11413,21 @@ function bindEvents() {
 
       } else if (
         event.altKey &&
-        event.key ===
-        "1"
+        event.key === "1"
       ) {
 
         event.preventDefault();
 
-        switchMode(
-          "chat"
-        );
+        switchMode("chat");
 
       } else if (
         event.altKey &&
-        event.key ===
-        "2"
+        event.key === "2"
       ) {
 
         event.preventDefault();
 
-        switchMode(
-          "work"
-        );
+        switchMode("work");
 
       }
 
@@ -9484,6 +11583,7 @@ function initGalaxy() {
 
   applyTheme();
 
+
   if (
     Galaxy.state.currentChatId &&
     !Galaxy.state.chats.some(
@@ -9498,17 +11598,17 @@ function initGalaxy() {
 
   }
 
+
   if (
     !Galaxy.state.currentChatId &&
     Galaxy.state.chats.length
   ) {
 
     Galaxy.state.currentChatId =
-      Galaxy.state.chats[
-        0
-      ].id;
+      Galaxy.state.chats[0].id;
 
   }
+
 
   const draft =
     DB.get(
@@ -9516,37 +11616,44 @@ function initGalaxy() {
       ""
     );
 
+
   const input =
     $("#promptInput");
+
 
   if (input) {
 
     input.value =
       draft;
 
-    autoResizeTextarea(
-      input
-    );
+    autoResizeTextarea(input);
 
   }
 
+
   renderRecentChats();
+
 
   renderChat();
 
+
   renderWebSearchState();
+
 
   renderVoiceState();
 
+
   updateNotificationIndicator();
+
 
   updateSendButtonState();
 
+
   bindEvents();
 
-  switchMode(
-    "chat"
-  );
+
+  switchMode("chat");
+
 
   console.log(
     `GALAXY AI ${Galaxy.version} ready`
@@ -9564,8 +11671,7 @@ if (
     "DOMContentLoaded",
     initGalaxy,
     {
-      once:
-        true
+      once: true
     }
   );
 
