@@ -1,917 +1,1151 @@
 "use strict";
 
 /* =========================================================
-   GALAXY AI
-   COMPLETE FRONT-END APPLICATION CONTROLLER
+   GALAXY AI — COMPLETE FRONT-END CONTROLLER
+   Clean replacement script
    ========================================================= */
 
-/* =========================================================
-   SECTION 01 — DOM HELPERS
-   ========================================================= */
+const $ = (selector, root = document) =>
+  root.querySelector(selector);
 
-const $ = (selector, root = document) => {
-  return root.querySelector(selector);
+const $$ = (selector, root = document) =>
+  Array.from(
+    root.querySelectorAll(selector)
+  );
+
+const on = (
+  target,
+  type,
+  handler,
+  options
+) => {
+  if (target) {
+    target.addEventListener(
+      type,
+      handler,
+      options
+    );
+  }
 };
 
-const $$ = (selector, root = document) => {
-  return Array.from(root.querySelectorAll(selector));
-};
-
-const on = (target, type, handler, options) => {
-  if (!target) return;
-  target.addEventListener(type, handler, options);
-};
-
-const sleep = ms => {
-  return new Promise(resolve => setTimeout(resolve, ms));
-};
-
-const clamp = (value, min, max) => {
-  return Math.min(Math.max(value, min), max);
-};
-
-const now = () => {
-  return Date.now();
-};
-
-const uid = prefix => {
-  return `${prefix}_${Date.now().toString(36)}_${Math.random()
+const uid = prefix =>
+  `${prefix}_${Date.now().toString(36)}_${Math.random()
     .toString(36)
-    .slice(2, 10)}`;
-};
+    .slice(2, 9)}`;
 
-const escapeHTML = value => {
-  return String(value).replace(
+const now = () =>
+  Date.now();
+
+const sleep = ms =>
+  new Promise(resolve =>
+    setTimeout(
+      resolve,
+      ms
+    )
+  );
+
+const escapeHTML = value =>
+  String(
+    value ?? ""
+  ).replace(
     /[&<>"']/g,
-    character =>
+    ch =>
       ({
         "&": "&amp;",
         "<": "&lt;",
         ">": "&gt;",
         '"': "&quot;",
         "'": "&#039;"
-      })[character]
+      })[ch]
   );
-};
 
-const formatBytes = bytes => {
-  if (!Number.isFinite(bytes)) return "0 B";
-  if (bytes < 1024) return `${bytes} B`;
-
-  const units = ["KB", "MB", "GB", "TB"];
-  let value = bytes / 1024;
-  let unitIndex = 0;
-
-  while (value >= 1024 && unitIndex < units.length - 1) {
-    value /= 1024;
-    unitIndex++;
-  }
-
-  return `${value.toFixed(value >= 10 ? 0 : 1)} ${units[unitIndex]}`;
-};
-
-const formatDate = timestamp => {
-  try {
-    return new Intl.DateTimeFormat(undefined, {
-      month: "short",
-      day: "numeric",
-      year: "numeric"
-    }).format(new Date(timestamp));
-  } catch {
-    return "";
-  }
-};
-
-const formatTime = timestamp => {
-  try {
-    return new Intl.DateTimeFormat(undefined, {
-      hour: "2-digit",
-      minute: "2-digit"
-    }).format(new Date(timestamp));
-  } catch {
-    return "";
-  }
-};
 
 /* =========================================================
-   SECTION 02 — LOCAL DATABASE HELPERS
+   LOCAL DATABASE
    ========================================================= */
 
 const DB = {
-  prefix: "galaxy.ai.",
+
+  prefix:
+    "galaxy.ai.",
 
   key(name) {
     return `${this.prefix}${name}`;
   },
 
-  get(name, fallback = null) {
+  get(
+    name,
+    fallback = null
+  ) {
+
     try {
-      const raw = localStorage.getItem(this.key(name));
 
-      if (raw === null) {
-        return fallback;
-      }
+      const raw =
+        localStorage.getItem(
+          this.key(name)
+        );
 
-      return JSON.parse(raw);
+      return raw === null
+        ? fallback
+        : JSON.parse(raw);
+
     } catch (error) {
-      console.error("GALAXY DB GET ERROR:", name, error);
+
+      console.error(
+        "GALAXY DB GET ERROR",
+        name,
+        error
+      );
+
       return fallback;
     }
+
   },
 
-  set(name, value) {
+  set(
+    name,
+    value
+  ) {
+
     try {
-      localStorage.setItem(this.key(name), JSON.stringify(value));
+
+      localStorage.setItem(
+        this.key(name),
+        JSON.stringify(value)
+      );
+
       return true;
+
     } catch (error) {
-      console.error("GALAXY DB SET ERROR:", name, error);
+
+      console.error(
+        "GALAXY DB SET ERROR",
+        name,
+        error
+      );
+
       return false;
     }
+
   },
 
   remove(name) {
+
     try {
-      localStorage.removeItem(this.key(name));
-      return true;
+
+      localStorage.removeItem(
+        this.key(name)
+      );
+
     } catch (error) {
-      console.error("GALAXY DB REMOVE ERROR:", name, error);
-      return false;
+
+      console.error(
+        "GALAXY DB REMOVE ERROR",
+        name,
+        error
+      );
+
     }
+
   },
 
   clear() {
-    try {
-      Object.keys(localStorage)
-        .filter(key => key.startsWith(this.prefix))
-        .forEach(key => localStorage.removeItem(key));
 
-      return true;
-    } catch (error) {
-      console.error("GALAXY DB CLEAR ERROR:", error);
-      return false;
-    }
-  },
+    Object.keys(
+      localStorage
+    )
+      .filter(
+        key =>
+          key.startsWith(
+            this.prefix
+          )
+      )
+      .forEach(
+        key =>
+          localStorage.removeItem(
+            key
+          )
+      );
 
-  backup() {
-    const data = {};
-
-    Object.keys(localStorage)
-      .filter(key => key.startsWith(this.prefix))
-      .forEach(key => {
-        data[key] = localStorage.getItem(key);
-      });
-
-    return data;
   }
+
 };
 
+
 /* =========================================================
-   SECTION 03 — DEFAULT SETTINGS
+   SETTINGS
    ========================================================= */
 
 const DEFAULT_SETTINGS = {
-  theme: "dark",
-  accent: "violet",
-  compactSidebar: false,
-  focusMode: false,
-  enterToSend: true,
-  autosave: true,
-  autosaveDelay: 350,
-  sound: false,
-  reducedMotion: false,
-  showTimestamps: false,
-  autoTitleChats: true,
-  rememberChats: true,
-  streaming: true,
-  streamSpeed: 14,
-  webSearchDefault: false,
-  voiceLanguage: "en-US",
-  notifications: true,
-  previewFiles: true,
-  confirmDeletes: true
+
+  theme:
+    "dark",
+
+  accent:
+    "violet",
+
+  focusMode:
+    false,
+
+  enterToSend:
+    true,
+
+  autosave:
+    true,
+
+  autosaveDelay:
+    300,
+
+  streaming:
+    true,
+
+  streamSpeed:
+    10,
+
+  showTimestamps:
+    false,
+
+  voiceLanguage:
+    "en-US",
+
+  confirmDeletes:
+    true,
+
+  webSearchDefault:
+    false
+
 };
 
-/* =========================================================
-   SECTION 04 — APPLICATION STATE
-   ========================================================= */
-
-const Galaxy = {
-  version: "3.0.0",
-
-  state: {
-    mode: "chat",
-    view: "chat",
-
-    sidebarOpen: true,
-
-    settings: {
-      ...DEFAULT_SETTINGS,
-      ...DB.get("settings", {})
-    },
-
-    chats: DB.get("chats", []),
-
-    currentChatId: DB.get("currentChatId", null),
-
-    projects: DB.get("projects", []),
-
-    library: DB.get("library", []),
-
-    packs: DB.get("packs", []),
-
-    scheduled: DB.get("scheduled", []),
-
-    plugins: DB.get("plugins", []),
-
-    agents: DB.get("agents", []),
-
-    sites: DB.get("sites", []),
-
-    images: DB.get("images", []),
-
-    prompts: DB.get("prompts", []),
-
-    notifications: DB.get("notifications", []),
-
-    attachments: [],
-
-    activeSearch: "",
-
-    activeSearchFilter: "all",
-
-    activeLibraryFilter: "all",
-
-    activePackFilter: "all",
-
-    activeProjectId: null,
-
-    activeSiteId: null,
-
-    activeAgentId: null,
-
-    activeWorkDocumentId: null,
-
-    webSearchState: "off",
-
-    voiceState: "idle",
-
-    voiceRecognition: null,
-
-    generation: {
-      active: false,
-      stopped: false,
-      controller: null,
-      messageId: null
-    },
-
-    dragCounter: 0,
-
-    contextTarget: null,
-
-    workDocuments: DB.get("workDocuments", [])
-  }
-};
 
 /* =========================================================
-   SECTION 05 — DEFAULT PACKS
+   PACKS
    ========================================================= */
 
 const DEFAULT_PACKS = [
+
   {
-    id: "pack_prompt_master",
-    name: "Ultimate Prompt Pack",
-    category: "prompt",
-    icon: "✦",
-    description: "Advanced prompts for research, writing, planning and analysis.",
-    tags: ["prompt", "productivity", "research"],
-    installed: true,
-    featured: true,
+    id:
+      "pack_prompt",
+
+    name:
+      "Ultimate Prompt Pack",
+
+    category:
+      "prompt",
+
+    icon:
+      "✦",
+
+    description:
+      "Research, writing, analysis and planning prompts.",
+
+    installed:
+      true,
+
+    featured:
+      true,
+
     items: [
-      "Deep Research Prompt",
-      "Executive Summary Prompt",
-      "Business Strategy Prompt",
-      "Critical Thinking Prompt",
-      "Decision Matrix Prompt",
-      "Learning Tutor Prompt",
-      "Idea Expansion Prompt",
-      "Professional Rewrite Prompt",
-      "Comparison Analysis Prompt",
+      "Deep Research",
+      "Executive Summary",
+      "Critical Thinking",
+      "Decision Matrix",
+      "Professional Rewrite",
+      "Comparison Analysis",
       "Step-by-Step Planner"
     ]
   },
 
+
   {
-    id: "pack_website_builder",
-    name: "Website Builder Pack",
-    category: "website",
-    icon: "⌘",
-    description: "Prompts, structures and workflows for creating modern websites.",
-    tags: ["website", "code", "design"],
-    installed: true,
-    featured: true,
+    id:
+      "pack_sites",
+
+    name:
+      "Website Builder Pack",
+
+    category:
+      "website",
+
+    icon:
+      "⌘",
+
+    description:
+      "Modern website creation workflows.",
+
+    installed:
+      true,
+
+    featured:
+      true,
+
     items: [
-      "Landing Page Builder",
-      "Portfolio Builder",
-      "Business Website Builder",
-      "SaaS Website Builder",
-      "Dashboard Builder",
-      "Documentation Builder",
-      "Responsive Layout Prompt",
-      "Accessibility Review Prompt",
-      "SEO Page Prompt",
-      "UI Improvement Prompt"
+      "Landing Page",
+      "Portfolio",
+      "Business Site",
+      "SaaS Site",
+      "Dashboard",
+      "Docs Site",
+      "SEO Review",
+      "Accessibility Review"
     ]
   },
 
+
   {
-    id: "pack_creator",
-    name: "Creator Power Pack",
-    category: "creator",
-    icon: "◫",
-    description: "Content creation workflows for posts, videos and campaigns.",
-    tags: ["creator", "video", "social"],
-    installed: true,
-    featured: true,
+    id:
+      "pack_creator",
+
+    name:
+      "Creator Power Pack",
+
+    category:
+      "creator",
+
+    icon:
+      "◫",
+
+    description:
+      "Content, video and campaign workflows.",
+
+    installed:
+      true,
+
+    featured:
+      true,
+
     items: [
       "YouTube Script",
       "Short Video Script",
-      "Instagram Caption",
-      "Content Calendar",
       "Hook Generator",
-      "Thumbnail Idea Generator",
-      "Video Storyboard",
-      "Voiceover Script",
-      "Viral Rewrite",
+      "Storyboard",
+      "Voiceover",
       "Campaign Generator"
     ]
   },
 
+
   {
-    id: "pack_productivity",
-    name: "Productivity Pack",
-    category: "productivity",
-    icon: "✓",
-    description: "Organize tasks, meetings, goals and schedules.",
-    tags: ["productivity", "planning"],
-    installed: true,
-    featured: false,
+    id:
+      "pack_productivity",
+
+    name:
+      "Productivity Pack",
+
+    category:
+      "productivity",
+
+    icon:
+      "✓",
+
+    description:
+      "Tasks, goals, meetings and planning.",
+
+    installed:
+      true,
+
+    featured:
+      false,
+
     items: [
       "Daily Planner",
       "Weekly Planner",
       "Meeting Summary",
-      "Action Item Extractor",
       "Priority Matrix",
       "Goal Breakdown",
-      "Time Block Planner",
-      "Project Checklist",
-      "Risk Register",
-      "Decision Log"
+      "Risk Register"
     ]
   },
 
+
   {
-    id: "pack_research",
-    name: "Research Intelligence Pack",
-    category: "research",
-    icon: "⌕",
-    description: "Advanced research, comparison and evidence workflows.",
-    tags: ["research", "analysis"],
-    installed: true,
-    featured: true,
+    id:
+      "pack_research",
+
+    name:
+      "Research Intelligence Pack",
+
+    category:
+      "research",
+
+    icon:
+      "⌕",
+
+    description:
+      "Advanced research and evidence workflows.",
+
+    installed:
+      true,
+
+    featured:
+      true,
+
     items: [
       "Research Question Builder",
-      "Source Comparison",
       "Evidence Table",
       "Fact Verification",
       "Timeline Builder",
       "Market Research",
-      "Competitor Research",
-      "Paper Summarizer",
-      "Claim Analyzer",
-      "Research Report"
+      "Competitor Research"
     ]
   },
 
-  {
-    id: "pack_business",
-    name: "Business Strategy Pack",
-    category: "business",
-    icon: "▱",
-    description: "Professional strategy, planning and management workflows.",
-    tags: ["business", "strategy"],
-    installed: true,
-    featured: false,
-    items: [
-      "SWOT Analysis",
-      "Market Entry Plan",
-      "Business Model",
-      "Pricing Strategy",
-      "Growth Strategy",
-      "Customer Persona",
-      "Sales Plan",
-      "Operations Plan",
-      "Risk Analysis",
-      "Executive Memo"
-    ]
-  },
 
   {
-    id: "pack_coding",
-    name: "Developer Pack",
-    category: "developer",
-    icon: "</>",
-    description: "Coding, debugging and software architecture workflows.",
-    tags: ["code", "developer"],
-    installed: true,
-    featured: true,
+    id:
+      "pack_developer",
+
+    name:
+      "Developer Pack",
+
+    category:
+      "developer",
+
+    icon:
+      "</>",
+
+    description:
+      "Coding, debugging and architecture workflows.",
+
+    installed:
+      true,
+
+    featured:
+      true,
+
     items: [
       "Code Generator",
       "Bug Finder",
-      "Code Reviewer",
-      "Refactor Assistant",
-      "API Designer",
-      "Database Designer",
-      "System Architect",
-      "Security Review",
-      "Performance Review",
-      "Test Generator"
+      "Code Review",
+      "Refactor",
+      "API Design",
+      "Database Design",
+      "System Architecture"
     ]
   },
 
+
   {
-    id: "pack_design",
-    name: "Design System Pack",
-    category: "design",
-    icon: "◇",
-    description: "UI systems, product design and visual direction.",
-    tags: ["design", "ui", "ux"],
-    installed: true,
-    featured: false,
+    id:
+      "pack_design",
+
+    name:
+      "Design System Pack",
+
+    category:
+      "design",
+
+    icon:
+      "◇",
+
+    description:
+      "UI systems, visual direction and UX review.",
+
+    installed:
+      true,
+
+    featured:
+      false,
+
     items: [
-      "Design System Generator",
       "UI Audit",
       "UX Review",
       "Color System",
-      "Typography System",
-      "Spacing System",
-      "Component Planner",
-      "Mobile UI Planner",
-      "Dashboard Designer",
-      "Accessibility Audit"
+      "Typography",
+      "Spacing",
+      "Component Planner"
     ]
   },
 
+
   {
-    id: "pack_video",
-    name: "Video Creator Pack",
-    category: "video",
-    icon: "▷",
-    description: "Video ideas, scenes, scripts and production plans.",
-    tags: ["video", "creator"],
-    installed: true,
-    featured: false,
+    id:
+      "pack_video",
+
+    name:
+      "Video Creator Pack",
+
+    category:
+      "video",
+
+    icon:
+      "▷",
+
+    description:
+      "Video ideas, scenes, scripts and production plans.",
+
+    installed:
+      true,
+
+    featured:
+      false,
+
     items: [
       "30 Second Video",
-      "60 Second Video",
       "Scene Generator",
       "Shot List",
       "Character Prompt",
       "Camera Prompt",
-      "Lighting Prompt",
-      "Voiceover Generator",
-      "Video Caption",
-      "Video Title Generator"
+      "Lighting Prompt"
     ]
   },
 
+
   {
-    id: "pack_startup",
-    name: "Startup Launch Pack",
-    category: "startup",
-    icon: "↗",
-    description: "Launch ideas, validate products and prepare go-to-market plans.",
-    tags: ["startup", "business"],
-    installed: true,
-    featured: true,
+    id:
+      "pack_startup",
+
+    name:
+      "Startup Launch Pack",
+
+    category:
+      "startup",
+
+    icon:
+      "↗",
+
+    description:
+      "Validate ideas and prepare go-to-market plans.",
+
+    installed:
+      true,
+
+    featured:
+      true,
+
     items: [
       "Idea Validator",
-      "Problem Statement",
       "MVP Planner",
       "Feature Prioritizer",
       "Launch Checklist",
-      "Pitch Deck Outline",
-      "Investor Q&A",
-      "Go-To-Market Plan",
-      "User Interview Guide",
-      "Growth Experiment"
+      "Pitch Outline",
+      "Go-To-Market Plan"
     ]
   },
 
+
   {
-    id: "pack_data",
-    name: "Data Analysis Pack",
-    category: "data",
-    icon: "▦",
-    description: "Analyze tables, trends, metrics and structured data.",
-    tags: ["data", "analysis"],
-    installed: true,
-    featured: false,
+    id:
+      "pack_data",
+
+    name:
+      "Data Analysis Pack",
+
+    category:
+      "data",
+
+    icon:
+      "▦",
+
+    description:
+      "Analyze metrics, tables and structured data.",
+
+    installed:
+      true,
+
+    featured:
+      false,
+
     items: [
       "Dataset Summary",
       "Trend Detection",
       "Anomaly Detection",
-      "Metric Explanation",
       "KPI Builder",
-      "Dashboard Planner",
       "Forecast Prompt",
-      "CSV Analyzer",
-      "Data Cleaning Plan",
-      "Insight Generator"
-    ]
-  },
-
-  {
-    id: "pack_learning",
-    name: "Learning Pack",
-    category: "education",
-    icon: "◎",
-    description: "Tutoring, quizzes, explanations and study workflows.",
-    tags: ["education", "study"],
-    installed: true,
-    featured: false,
-    items: [
-      "Teach Me Simply",
-      "Quiz Me",
-      "Flashcard Generator",
-      "Study Plan",
-      "Exam Revision",
-      "Explain Like I'm 10",
-      "Step-by-Step Math",
-      "Vocabulary Trainer",
-      "Practice Questions",
-      "Concept Comparison"
+      "CSV Analyzer"
     ]
   }
+
 ];
 
+
 /* =========================================================
-   SECTION 06 — DEFAULT PROMPT TEMPLATES
+   PROMPT TEMPLATES
    ========================================================= */
 
 const DEFAULT_PROMPTS = [
+
   {
-    id: "prompt_build_site",
-    title: "Build a modern website",
-    category: "website",
+    id:
+      "p_site",
+
+    title:
+      "Build a modern website",
+
+    category:
+      "website",
+
     prompt:
       "Build a modern responsive website with excellent typography, spacing, accessibility and mobile behavior."
   },
 
   {
-    id: "prompt_research",
-    title: "Deep research",
-    category: "research",
+    id:
+      "p_research",
+
+    title:
+      "Deep research",
+
+    category:
+      "research",
+
     prompt:
       "Research this topic deeply. Separate facts, assumptions, uncertainties, risks and conclusions."
   },
 
   {
-    id: "prompt_project",
-    title: "Project planner",
-    category: "project",
+    id:
+      "p_project",
+
+    title:
+      "Project planner",
+
+    category:
+      "project",
+
     prompt:
       "Create a structured project plan with scope, milestones, tasks, owners, risks and next actions."
   },
 
   {
-    id: "prompt_improve",
-    title: "Improve my idea",
-    category: "creative",
+    id:
+      "p_improve",
+
+    title:
+      "Improve my idea",
+
+    category:
+      "creative",
+
     prompt:
       "Analyze this idea, identify weaknesses and propose a much stronger version."
   },
 
   {
-    id: "prompt_compare",
-    title: "Compare options",
-    category: "analysis",
+    id:
+      "p_compare",
+
+    title:
+      "Compare options",
+
+    category:
+      "analysis",
+
     prompt:
       "Compare these options across cost, quality, risk, usability, scalability and long-term value."
   },
 
   {
-    id: "prompt_video",
-    title: "Video creator",
-    category: "video",
+    id:
+      "p_video",
+
+    title:
+      "Video creator",
+
+    category:
+      "video",
+
     prompt:
       "Create a complete short-video plan with hook, scenes, dialogue, camera instructions and ending."
   },
 
   {
-    id: "prompt_code",
-    title: "Code builder",
-    category: "developer",
+    id:
+      "p_code",
+
+    title:
+      "Code builder",
+
+    category:
+      "developer",
+
     prompt:
       "Build production-quality code for this requirement. Keep the architecture clean and explain important tradeoffs."
-  },
-
-  {
-    id: "prompt_debug",
-    title: "Debug code",
-    category: "developer",
-    prompt:
-      "Find the problem in this code, explain the root cause and provide a corrected version."
   }
+
 ];
 
+
 /* =========================================================
-   SECTION 07 — DEFAULT PLUGINS
+   PLUGINS
    ========================================================= */
 
 const DEFAULT_PLUGINS = [
+
   {
-    id: "plugin_mail",
-    name: "Mail",
-    description: "Search messages and draft replies.",
-    icon: "✉",
-    installed: false,
-    connected: false
+    id:
+      "plugin_mail",
+
+    name:
+      "Mail",
+
+    description:
+      "Search messages and draft replies.",
+
+    icon:
+      "✉",
+
+    installed:
+      false,
+
+    connected:
+      false
   },
 
   {
-    id: "plugin_calendar",
-    name: "Calendar",
-    description: "Find events and manage meetings.",
-    icon: "◷",
-    installed: false,
-    connected: false
+    id:
+      "plugin_calendar",
+
+    name:
+      "Calendar",
+
+    description:
+      "Find events and manage meetings.",
+
+    icon:
+      "◷",
+
+    installed:
+      false,
+
+    connected:
+      false
   },
 
   {
-    id: "plugin_drive",
-    name: "Drive",
-    description: "Find and work with cloud files.",
-    icon: "▱",
-    installed: false,
-    connected: false
+    id:
+      "plugin_drive",
+
+    name:
+      "Drive",
+
+    description:
+      "Find and work with cloud files.",
+
+    icon:
+      "▱",
+
+    installed:
+      false,
+
+    connected:
+      false
   },
 
   {
-    id: "plugin_github",
-    name: "GitHub",
-    description: "Explore repositories and development workflows.",
-    icon: "⌘",
-    installed: false,
-    connected: false
+    id:
+      "plugin_github",
+
+    name:
+      "GitHub",
+
+    description:
+      "Repositories and development workflows.",
+
+    icon:
+      "⌘",
+
+    installed:
+      false,
+
+    connected:
+      false
   },
 
   {
-    id: "plugin_slack",
-    name: "Slack",
-    description: "Search team conversations and channels.",
-    icon: "#",
-    installed: false,
-    connected: false
+    id:
+      "plugin_slack",
+
+    name:
+      "Slack",
+
+    description:
+      "Search channels and team conversations.",
+
+    icon:
+      "#",
+
+    installed:
+      false,
+
+    connected:
+      false
   }
+
 ];
 
+
 /* =========================================================
-   SECTION 08 — INITIAL DATA SEEDING
+   APPLICATION STATE
    ========================================================= */
 
-function seedGalaxyData() {
-  if (!Galaxy.state.packs.length) {
-    Galaxy.state.packs = structuredClone(DEFAULT_PACKS);
-    DB.set("packs", Galaxy.state.packs);
+const Galaxy = {
+
+  version:
+    "4.0.0",
+
+  state: {
+
+    mode:
+      "chat",
+
+    view:
+      "chat",
+
+    settings: {
+      ...DEFAULT_SETTINGS,
+      ...DB.get(
+        "settings",
+        {}
+      )
+    },
+
+    chats:
+      DB.get(
+        "chats",
+        []
+      ),
+
+    currentChatId:
+      DB.get(
+        "currentChatId",
+        null
+      ),
+
+    projects:
+      DB.get(
+        "projects",
+        []
+      ),
+
+    library:
+      DB.get(
+        "library",
+        []
+      ),
+
+    packs:
+      DB.get(
+        "packs",
+        []
+      ),
+
+    scheduled:
+      DB.get(
+        "scheduled",
+        []
+      ),
+
+    plugins:
+      DB.get(
+        "plugins",
+        []
+      ),
+
+    agents:
+      DB.get(
+        "agents",
+        []
+      ),
+
+    sites:
+      DB.get(
+        "sites",
+        []
+      ),
+
+    images:
+      DB.get(
+        "images",
+        []
+      ),
+
+    prompts:
+      DB.get(
+        "prompts",
+        []
+      ),
+
+    notifications:
+      DB.get(
+        "notifications",
+        []
+      ),
+
+    workDocuments:
+      DB.get(
+        "workDocuments",
+        []
+      ),
+
+    activeWorkDocumentId:
+      DB.get(
+        "activeWorkDocumentId",
+        null
+      ),
+
+    activeSiteId:
+      null,
+
+    activeLibraryFilter:
+      "all",
+
+    activePackFilter:
+      "all",
+
+    activeSearchFilter:
+      "all",
+
+    attachments:
+      [],
+
+    webSearchState:
+      DB.get(
+        "webSearchState",
+        "off"
+      ),
+
+    voiceState:
+      "idle",
+
+    voiceRecognition:
+      null,
+
+    generation: {
+      active:
+        false,
+
+      stopped:
+        false,
+
+      controller:
+        null,
+
+      messageId:
+        null
+    },
+
+    dragCounter:
+      0
+
   }
 
-  if (!Galaxy.state.prompts.length) {
-    Galaxy.state.prompts = structuredClone(DEFAULT_PROMPTS);
-    DB.set("prompts", Galaxy.state.prompts);
-  }
+};
 
-  if (!Galaxy.state.plugins.length) {
-    Galaxy.state.plugins = structuredClone(DEFAULT_PLUGINS);
-    DB.set("plugins", Galaxy.state.plugins);
-  }
-}
 
 /* =========================================================
-   SECTION 09 — PERSISTENCE
+   INITIAL DATA
+   ========================================================= */
+
+function seedData() {
+
+  if (
+    !Galaxy.state.packs.length
+  ) {
+    Galaxy.state.packs =
+      structuredClone(
+        DEFAULT_PACKS
+      );
+  }
+
+  if (
+    !Galaxy.state.prompts.length
+  ) {
+    Galaxy.state.prompts =
+      structuredClone(
+        DEFAULT_PROMPTS
+      );
+  }
+
+  if (
+    !Galaxy.state.plugins.length
+  ) {
+    Galaxy.state.plugins =
+      structuredClone(
+        DEFAULT_PLUGINS
+      );
+  }
+
+  persistAll();
+}
+
+
+/* =========================================================
+   SAVE
    ========================================================= */
 
 function persistAll() {
-  if (Galaxy.state.settings.rememberChats) {
-    DB.set("chats", Galaxy.state.chats);
+
+  DB.set(
+    "settings",
+    Galaxy.state.settings
+  );
+
+  DB.set(
+    "chats",
+    Galaxy.state.chats
+  );
+
+  DB.set(
+    "currentChatId",
+    Galaxy.state.currentChatId
+  );
+
+  DB.set(
+    "projects",
+    Galaxy.state.projects
+  );
+
+  DB.set(
+    "library",
+    Galaxy.state.library
+  );
+
+  DB.set(
+    "packs",
+    Galaxy.state.packs
+  );
+
+  DB.set(
+    "scheduled",
+    Galaxy.state.scheduled
+  );
+
+  DB.set(
+    "plugins",
+    Galaxy.state.plugins
+  );
+
+  DB.set(
+    "agents",
+    Galaxy.state.agents
+  );
+
+  DB.set(
+    "sites",
+    Galaxy.state.sites
+  );
+
+  DB.set(
+    "images",
+    Galaxy.state.images
+  );
+
+  DB.set(
+    "prompts",
+    Galaxy.state.prompts
+  );
+
+  DB.set(
+    "notifications",
+    Galaxy.state.notifications
+  );
+
+  DB.set(
+    "workDocuments",
+    Galaxy.state.workDocuments
+  );
+
+  DB.set(
+    "activeWorkDocumentId",
+    Galaxy.state.activeWorkDocumentId
+  );
+
+  DB.set(
+    "webSearchState",
+    Galaxy.state.webSearchState
+  );
+
+}
+
+
+/* =========================================================
+   TOASTS
+   ========================================================= */
+
+function toast(
+  message,
+  type = "default"
+) {
+
+  const root =
+    $("#toastRoot");
+
+  if (!root) {
+    return;
   }
 
-  DB.set("currentChatId", Galaxy.state.currentChatId);
+  const node =
+    document.createElement(
+      "div"
+    );
 
-  DB.set("settings", Galaxy.state.settings);
+  node.className =
+    `toast toast-${type}`;
 
-  DB.set("projects", Galaxy.state.projects);
+  node.textContent =
+    message;
 
-  DB.set("library", Galaxy.state.library);
+  root.appendChild(
+    node
+  );
 
-  DB.set("packs", Galaxy.state.packs);
+  setTimeout(
+    () =>
+      node.classList.add(
+        "toast-out"
+      ),
+    2200
+  );
 
-  DB.set("scheduled", Galaxy.state.scheduled);
+  setTimeout(
+    () =>
+      node.remove(),
+    2600
+  );
 
-  DB.set("plugins", Galaxy.state.plugins);
-
-  DB.set("agents", Galaxy.state.agents);
-
-  DB.set("sites", Galaxy.state.sites);
-
-  DB.set("images", Galaxy.state.images);
-
-  DB.set("prompts", Galaxy.state.prompts);
-
-  DB.set("notifications", Galaxy.state.notifications);
-
-  DB.set("workDocuments", Galaxy.state.workDocuments);
 }
 
-/* =========================================================
-   SECTION 10 — TOASTS
-   ========================================================= */
-
-function toast(message, type = "default") {
-  const root = $("#toastRoot");
-
-  if (!root) return;
-
-  const toastElement = document.createElement("div");
-
-  toastElement.className = `toast toast-${type}`;
-
-  toastElement.textContent = message;
-
-  root.appendChild(toastElement);
-
-  setTimeout(() => {
-    toastElement.classList.add("toast-out");
-  }, 2200);
-
-  setTimeout(() => {
-    toastElement.remove();
-  }, 2600);
-}
 
 /* =========================================================
-   SECTION 11 — ERROR HANDLING
+   ERRORS
    ========================================================= */
 
-function handleError(error, context = "GALAXY AI") {
-  console.error(`[${context}]`, error);
+function handleError(
+  error,
+  context = "GALAXY AI"
+) {
+
+  console.error(
+    `[${context}]`,
+    error
+  );
 
   toast(
-    error?.message || "Something went wrong.",
+    error?.message ||
+      "Something went wrong.",
     "error"
   );
 
-  addNotification({
-    title: "Error",
-    message:
-      error?.message ||
-      "An unexpected error occurred.",
-    type: "error"
-  });
 }
 
-window.addEventListener("error", event => {
-  handleError(event.error || new Error(event.message), "Window");
-});
-
-window.addEventListener("unhandledrejection", event => {
-  handleError(event.reason, "Promise");
-});
 
 /* =========================================================
-   SECTION 12 — NOTIFICATIONS
+   MODALS
    ========================================================= */
-
-function addNotification({
-  title,
-  message,
-  type = "info"
-}) {
-  const notification = {
-    id: uid("notification"),
-    title,
-    message,
-    type,
-    read: false,
-    createdAt: now()
-  };
-
-  Galaxy.state.notifications.unshift(notification);
-
-  Galaxy.state.notifications =
-    Galaxy.state.notifications.slice(0, 100);
-
-  DB.set("notifications", Galaxy.state.notifications);
-
-  updateNotificationIndicator();
-}
-
-function updateNotificationIndicator() {
-  const unread =
-    Galaxy.state.notifications.filter(
-      notification => !notification.read
-    ).length;
-
-  const button = $('[data-action="notifications"]');
-
-  if (!button) return;
-
-  button.dataset.count = String(unread);
-
-  button.classList.toggle(
-    "has-notifications",
-    unread > 0
-  );
-}
-
-function openNotifications() {
-  Galaxy.state.notifications.forEach(
-    notification => {
-      notification.read = true;
-    }
-  );
-
-  persistAll();
-
-  updateNotificationIndicator();
-
-  const items =
-    Galaxy.state.notifications.length
-      ? Galaxy.state.notifications
-          .map(
-            notification => `
-            <article class="notification-row">
-
-              <div class="notification-icon">
-                ${notification.type === "error" ? "!" : "◔"}
-              </div>
-
-              <div class="notification-copy">
-
-                <strong>
-                  ${escapeHTML(notification.title)}
-                </strong>
-
-                <span>
-                  ${escapeHTML(notification.message)}
-                </span>
-
-                <small>
-                  ${formatDate(notification.createdAt)}
-                  ${formatTime(notification.createdAt)}
-                </small>
-
-              </div>
-
-            </article>
-          `
-          )
-          .join("")
-      : `
-          <div class="empty-panel">
-            No notifications yet.
-          </div>
-        `;
-
-  openModal({
-    title: "Notifications",
-    body: `
-      <div class="notification-list">
-        ${items}
-      </div>
-    `
-  });
-}
-
-/* =========================================================
-   SECTION 13 — MODAL SYSTEM
-   ========================================================= */
-
-function closeOverlay() {
-  const root = $("#overlayRoot");
-
-  if (root) {
-    root.innerHTML = "";
-  }
-}
 
 function openModal({
   title,
   body,
   width = "680px"
 }) {
-  const root = $("#overlayRoot");
 
-  if (!root) return;
+  const root =
+    $("#overlayRoot");
+
+  if (!root) {
+    return;
+  }
 
   root.innerHTML = `
     <div class="overlay">
@@ -947,10 +1181,25 @@ function openModal({
 
     </div>
   `;
+
 }
 
+
+function closeOverlay() {
+
+  const root =
+    $("#overlayRoot");
+
+  if (root) {
+    root.innerHTML =
+      "";
+  }
+
+}
+
+
 /* =========================================================
-   SECTION 14 — CONFIRM DIALOG
+   CONFIRM
    ========================================================= */
 
 function confirmAction({
@@ -959,12 +1208,19 @@ function confirmAction({
   confirmLabel = "Delete",
   onConfirm
 }) {
-  if (!Galaxy.state.settings.confirmDeletes) {
+
+  if (
+    !Galaxy.state.settings
+      .confirmDeletes
+  ) {
+
     onConfirm?.();
+
     return;
   }
 
   openModal({
+
     title,
 
     body: `
@@ -994,147 +1250,436 @@ function confirmAction({
 
       </div>
     `
+
   });
 
-  setTimeout(() => {
-    $("#confirmActionButton")?.addEventListener(
-      "click",
-      () => {
-        closeOverlay();
-        onConfirm?.();
-      }
-    );
-  }, 0);
+  setTimeout(
+    () => {
+
+      on(
+        $("#confirmActionButton"),
+        "click",
+        () => {
+
+          closeOverlay();
+
+          onConfirm?.();
+
+        }
+      );
+
+    },
+    0
+  );
+
 }
 
+
 /* =========================================================
-   SECTION 15 — THEME SYSTEM
+   THEME
    ========================================================= */
 
 function applyTheme() {
-  const settings = Galaxy.state.settings;
 
-  document.body.dataset.theme = settings.theme;
+  const {
+    theme,
+    accent,
+    focusMode
+  } =
+    Galaxy.state.settings;
 
-  document.body.classList.toggle(
-    "light",
-    settings.theme === "light"
-  );
+  document.body
+    .classList
+    .toggle(
+      "light",
+      theme === "light"
+    );
 
-  document.body.classList.toggle(
-    "dark",
-    settings.theme === "dark"
-  );
+  document.body
+    .classList
+    .toggle(
+      "dark",
+      theme === "dark"
+    );
 
-  document.body.classList.toggle(
-    "reduced-motion",
-    settings.reducedMotion
-  );
+  document.body
+    .classList
+    .toggle(
+      "focus-mode",
+      !!focusMode
+    );
 
-  document.documentElement.dataset.accent =
-    settings.accent;
+  document
+    .documentElement
+    .dataset
+    .accent =
+      accent;
+
 }
 
-function setTheme(theme) {
-  Galaxy.state.settings.theme = theme;
+
+function toggleTheme() {
+
+  Galaxy.state.settings.theme =
+    Galaxy.state.settings.theme ===
+    "dark"
+      ? "light"
+      : "dark";
 
   persistAll();
 
   applyTheme();
 
-  toast(`Theme changed to ${theme}`);
 }
 
-function toggleTheme() {
-  setTheme(
-    Galaxy.state.settings.theme === "dark"
-      ? "light"
-      : "dark"
+
+function toggleFocusMode() {
+
+  Galaxy.state.settings.focusMode =
+    !Galaxy.state.settings.focusMode;
+
+  persistAll();
+
+  applyTheme();
+
+  toast(
+    Galaxy.state.settings.focusMode
+      ? "Focus mode on"
+      : "Focus mode off"
   );
+
 }
+
 
 /* =========================================================
-   SECTION 16 — SETTINGS
+   NOTIFICATIONS
    ========================================================= */
 
-function openSettings() {
-  const settings = Galaxy.state.settings;
+function addNotification(
+  title,
+  message,
+  type = "info"
+) {
+
+  Galaxy.state.notifications.unshift({
+    id:
+      uid("notification"),
+
+    title,
+
+    message,
+
+    type,
+
+    read:
+      false,
+
+    createdAt:
+      now()
+  });
+
+  Galaxy.state.notifications =
+    Galaxy.state.notifications.slice(
+      0,
+      100
+    );
+
+  persistAll();
+
+  updateNotificationIndicator();
+
+}
+
+
+function updateNotificationIndicator() {
+
+  const unread =
+    Galaxy.state.notifications
+      .filter(
+        item =>
+          !item.read
+      )
+      .length;
+
+  const button =
+    $('[data-action="notifications"]');
+
+  button?.classList.toggle(
+    "has-notifications",
+    unread > 0
+  );
+
+}
+
+
+function openNotifications() {
+
+  Galaxy.state.notifications
+    .forEach(
+      item =>
+        item.read = true
+    );
+
+  persistAll();
+
+  updateNotificationIndicator();
 
   openModal({
-    title: "Settings",
+
+    title:
+      "Notifications",
+
+    body:
+      Galaxy.state.notifications
+        .length
+
+        ? `
+          <div class="notification-list">
+
+            ${Galaxy.state.notifications
+              .map(
+                item => `
+                <article class="notification-row">
+
+                  <div class="notification-icon">
+                    ${
+                      item.type ===
+                      "error"
+                        ? "!"
+                        : "◔"
+                    }
+                  </div>
+
+                  <div class="notification-copy">
+
+                    <strong>
+                      ${escapeHTML(item.title)}
+                    </strong>
+
+                    <span>
+                      ${escapeHTML(item.message)}
+                    </span>
+
+                  </div>
+
+                </article>
+              `
+              )
+              .join("")}
+
+          </div>
+        `
+
+        : `
+          <div class="empty-panel">
+            No notifications yet.
+          </div>
+        `
+
+  });
+
+}
+
+
+/* =========================================================
+   SETTINGS UI
+   ========================================================= */
+
+function renderSettingToggle(
+  title,
+  key,
+  value
+) {
+
+  return `
+    <div class="setting-row">
+
+      <div>
+        <strong>
+          ${escapeHTML(title)}
+        </strong>
+      </div>
+
+      <button
+        class="toggle-switch ${
+          value
+            ? "active"
+            : ""
+        }"
+        data-setting-toggle="${escapeHTML(key)}"
+        aria-pressed="${String(value)}"
+      >
+        <span></span>
+      </button>
+
+    </div>
+  `;
+
+}
+
+
+function openSettings() {
+
+  const s =
+    Galaxy.state.settings;
+
+  openModal({
+
+    title:
+      "Settings",
 
     body: `
       <div class="settings-list">
 
-        ${renderSettingSelect(
-          "Theme",
-          "theme",
-          settings.theme,
-          [
-            ["dark", "Dark"],
-            ["light", "Light"]
-          ]
-        )}
+        <div class="setting-row">
 
-        ${renderSettingSelect(
-          "Accent",
-          "accent",
-          settings.accent,
-          [
-            ["violet", "Violet"],
-            ["blue", "Blue"],
-            ["green", "Green"],
-            ["orange", "Orange"]
-          ]
-        )}
+          <strong>
+            Theme
+          </strong>
+
+          <select
+            data-setting-select="theme"
+          >
+
+            <option
+              value="dark"
+              ${
+                s.theme ===
+                "dark"
+                  ? "selected"
+                  : ""
+              }
+            >
+              Dark
+            </option>
+
+            <option
+              value="light"
+              ${
+                s.theme ===
+                "light"
+                  ? "selected"
+                  : ""
+              }
+            >
+              Light
+            </option>
+
+          </select>
+
+        </div>
+
+
+        <div class="setting-row">
+
+          <strong>
+            Accent
+          </strong>
+
+          <select
+            data-setting-select="accent"
+          >
+
+            <option
+              value="violet"
+              ${
+                s.accent ===
+                "violet"
+                  ? "selected"
+                  : ""
+              }
+            >
+              Violet
+            </option>
+
+            <option
+              value="blue"
+              ${
+                s.accent ===
+                "blue"
+                  ? "selected"
+                  : ""
+              }
+            >
+              Blue
+            </option>
+
+            <option
+              value="green"
+              ${
+                s.accent ===
+                "green"
+                  ? "selected"
+                  : ""
+              }
+            >
+              Green
+            </option>
+
+            <option
+              value="orange"
+              ${
+                s.accent ===
+                "orange"
+                  ? "selected"
+                  : ""
+              }
+            >
+              Orange
+            </option>
+
+          </select>
+
+        </div>
+
 
         ${renderSettingToggle(
           "Focus mode",
           "focusMode",
-          settings.focusMode
+          s.focusMode
         )}
+
 
         ${renderSettingToggle(
           "Enter to send",
           "enterToSend",
-          settings.enterToSend
+          s.enterToSend
         )}
+
 
         ${renderSettingToggle(
           "Autosave",
           "autosave",
-          settings.autosave
+          s.autosave
         )}
+
 
         ${renderSettingToggle(
           "Streaming responses",
           "streaming",
-          settings.streaming
+          s.streaming
         )}
 
-        ${renderSettingToggle(
-          "Default web search",
-          "webSearchDefault",
-          settings.webSearchDefault
-        )}
 
         ${renderSettingToggle(
           "Show timestamps",
           "showTimestamps",
-          settings.showTimestamps
+          s.showTimestamps
         )}
 
-        ${renderSettingToggle(
-          "Reduced motion",
-          "reducedMotion",
-          settings.reducedMotion
-        )}
 
         <div class="setting-row">
 
           <div>
-            <strong>Reset GALAXY data</strong>
-            <span>Remove locally saved workspace data.</span>
+
+            <strong>
+              Reset GALAXY data
+            </strong>
+
+            <span>
+              Remove locally saved workspace data.
+            </span>
+
           </div>
 
           <button
@@ -1148,130 +1693,69 @@ function openSettings() {
 
       </div>
     `
+
   });
+
 }
 
-function renderSettingToggle(
-  title,
-  key,
-  value
-) {
-  return `
-    <div class="setting-row">
-
-      <div>
-
-        <strong>
-          ${escapeHTML(title)}
-        </strong>
-
-      </div>
-
-      <button
-        class="toggle-switch ${
-          value ? "active" : ""
-        }"
-        data-setting-toggle="${escapeHTML(key)}"
-        aria-pressed="${value}"
-      >
-        <span></span>
-      </button>
-
-    </div>
-  `;
-}
-
-function renderSettingSelect(
-  title,
-  key,
-  value,
-  options
-) {
-  return `
-    <div class="setting-row">
-
-      <strong>
-        ${escapeHTML(title)}
-      </strong>
-
-      <select
-        data-setting-select="${escapeHTML(key)}"
-      >
-
-        ${options
-          .map(
-            ([optionValue, label]) => `
-            <option
-              value="${escapeHTML(optionValue)}"
-              ${
-                optionValue === value
-                  ? "selected"
-                  : ""
-              }
-            >
-              ${escapeHTML(label)}
-            </option>
-          `
-          )
-          .join("")}
-
-      </select>
-
-    </div>
-  `;
-}
 
 /* =========================================================
-   SECTION 17 — CHAT HELPERS
+   CHAT HELPERS
    ========================================================= */
 
 function getCurrentChat() {
+
   return (
-    Galaxy.state.chats.find(
-      chat =>
-        chat.id ===
-        Galaxy.state.currentChatId
-    ) || null
+    Galaxy.state.chats
+      .find(
+        chat =>
+          chat.id ===
+          Galaxy.state.currentChatId
+      ) ||
+    null
   );
+
 }
 
-function ensureCurrentChat() {
-  let chat = getCurrentChat();
 
-  if (!chat) {
-    chat = createChat();
-  }
+function createChat(
+  title =
+    "New conversation"
+) {
 
-  return chat;
-}
-
-function createChat({
-  title = "New conversation",
-  messages = []
-} = {}) {
   const chat = {
-    id: uid("chat"),
+
+    id:
+      uid("chat"),
 
     title,
 
-    messages,
+    messages:
+      [],
 
-    pinned: false,
+    pinned:
+      false,
 
-    archived: false,
+    archived:
+      false,
 
-    createdAt: now(),
+    createdAt:
+      now(),
 
-    updatedAt: now(),
+    updatedAt:
+      now(),
 
-    branchOf: null,
+    branchOf:
+      null
 
-    tags: []
   };
 
-  Galaxy.state.chats.unshift(chat);
+  Galaxy.state.chats.unshift(
+    chat
+  );
 
-  Galaxy.state.currentChatId = chat.id;
+  Galaxy.state.currentChatId =
+    chat.id;
 
   persistAll();
 
@@ -1280,30 +1764,161 @@ function createChat({
   renderChat();
 
   return chat;
+
 }
+
+
+function ensureCurrentChat() {
+
+  return (
+    getCurrentChat() ||
+    createChat()
+  );
+
+}
+
 
 function newChat() {
+
   createChat();
 
-  switchMode("chat");
+  switchMode(
+    "chat"
+  );
 
-  $("#promptInput")?.focus();
+  $("#promptInput")
+    ?.focus();
+
 }
 
+
 /* =========================================================
-   SECTION 18 — CHAT RENAME
+   CHAT LIST
    ========================================================= */
 
-function renameChat(chatId) {
+function sortChats() {
+
+  Galaxy.state.chats.sort(
+    (
+      a,
+      b
+    ) => {
+
+      if (
+        a.pinned !==
+        b.pinned
+      ) {
+
+        return a.pinned
+          ? -1
+          : 1;
+
+      }
+
+      return (
+        b.updatedAt -
+        a.updatedAt
+      );
+
+    }
+  );
+
+}
+
+
+function renderRecentChats() {
+
+  const root =
+    $("#recentChats");
+
+  if (!root) {
+    return;
+  }
+
+  sortChats();
+
+  root.innerHTML =
+    Galaxy.state.chats
+
+      .filter(
+        chat =>
+          !chat.archived
+      )
+
+      .slice(
+        0,
+        40
+      )
+
+      .map(
+        chat => `
+          <div
+            class="recent-chat-row ${
+              chat.id ===
+              Galaxy.state.currentChatId
+                ? "active"
+                : ""
+            }"
+            data-context-type="chat"
+            data-context-id="${chat.id}"
+          >
+
+            <button
+              class="recent-chat"
+              data-chat-open="${chat.id}"
+              title="${escapeHTML(chat.title)}"
+            >
+
+              ${
+                chat.pinned
+                  ? '<span class="pin-dot">•</span>'
+                  : ""
+              }
+
+              <span>
+                ${escapeHTML(chat.title)}
+              </span>
+
+            </button>
+
+            <button
+              class="recent-more"
+              data-context-open="chat"
+              data-context-id="${chat.id}"
+              aria-label="More"
+            >
+              ⋯
+            </button>
+
+          </div>
+        `
+      )
+
+      .join("");
+
+}
+
+
+/* =========================================================
+   RENAME CHAT
+   ========================================================= */
+
+function renameChat(id) {
+
   const chat =
     Galaxy.state.chats.find(
-      item => item.id === chatId
+      item =>
+        item.id === id
     );
 
-  if (!chat) return;
+  if (!chat) {
+    return;
+  }
 
   openModal({
-    title: "Rename chat",
+
+    title:
+      "Rename chat",
 
     body: `
       <div class="form-stack">
@@ -1315,76 +1930,99 @@ function renameChat(chatId) {
         >
 
         <button
-          class="text-action primary"
           id="renameChatSave"
+          class="text-action primary"
         >
           Save
         </button>
 
       </div>
     `
+
   });
 
-  setTimeout(() => {
-    const input = $("#renameChatInput");
+  setTimeout(
+    () => {
 
-    input?.focus();
+      on(
+        $("#renameChatSave"),
+        "click",
+        () => {
 
-    input?.select();
+          const value =
+            $("#renameChatInput")
+              ?.value
+              .trim();
 
-    $("#renameChatSave")?.addEventListener(
-      "click",
-      () => {
-        const value = input.value.trim();
+          if (!value) {
+            return;
+          }
 
-        if (!value) return;
+          chat.title =
+            value;
 
-        chat.title = value;
+          chat.updatedAt =
+            now();
 
-        chat.updatedAt = now();
+          persistAll();
 
-        persistAll();
+          renderRecentChats();
 
-        renderRecentChats();
+          closeOverlay();
 
-        closeOverlay();
+        }
+      );
 
-        toast("Chat renamed");
-      }
-    );
-  }, 0);
+    },
+    0
+  );
+
 }
 
+
 /* =========================================================
-   SECTION 19 — CHAT DELETE
+   DELETE CHAT
    ========================================================= */
 
-function deleteChat(chatId) {
+function deleteChat(id) {
+
   const chat =
     Galaxy.state.chats.find(
-      item => item.id === chatId
+      item =>
+        item.id === id
     );
 
-  if (!chat) return;
+  if (!chat) {
+    return;
+  }
 
   confirmAction({
-    title: "Delete chat",
 
-    message: `Delete “${chat.title}”?`,
+    title:
+      "Delete chat",
+
+    message:
+      `Delete “${chat.title}”?`,
 
     onConfirm() {
+
       Galaxy.state.chats =
         Galaxy.state.chats.filter(
-          item => item.id !== chatId
+          item =>
+            item.id !== id
         );
 
       if (
         Galaxy.state.currentChatId ===
-        chatId
+        id
       ) {
+
         Galaxy.state.currentChatId =
-          Galaxy.state.chats[0]?.id ||
+          Galaxy.state.chats[
+            0
+          ]?.id ||
           null;
+
       }
 
       persistAll();
@@ -1393,114 +2031,135 @@ function deleteChat(chatId) {
 
       renderChat();
 
-      toast("Chat deleted");
     }
+
   });
+
 }
 
+
 /* =========================================================
-   SECTION 20 — CHAT PIN
+   PIN / ARCHIVE
    ========================================================= */
 
-function togglePinChat(chatId) {
+function togglePinChat(id) {
+
   const chat =
     Galaxy.state.chats.find(
-      item => item.id === chatId
+      item =>
+        item.id === id
     );
 
-  if (!chat) return;
+  if (!chat) {
+    return;
+  }
 
-  chat.pinned = !chat.pinned;
+  chat.pinned =
+    !chat.pinned;
 
-  chat.updatedAt = now();
-
-  sortChats();
+  chat.updatedAt =
+    now();
 
   persistAll();
 
   renderRecentChats();
 
-  toast(chat.pinned ? "Chat pinned" : "Chat unpinned");
 }
 
-/* =========================================================
-   SECTION 21 — CHAT ARCHIVE
-   ========================================================= */
 
-function toggleArchiveChat(chatId) {
+function toggleArchiveChat(id) {
+
   const chat =
     Galaxy.state.chats.find(
-      item => item.id === chatId
+      item =>
+        item.id === id
     );
 
-  if (!chat) return;
+  if (!chat) {
+    return;
+  }
 
-  chat.archived = !chat.archived;
+  chat.archived =
+    !chat.archived;
 
-  chat.updatedAt = now();
+  chat.updatedAt =
+    now();
 
   persistAll();
 
   renderRecentChats();
 
-  toast(
-    chat.archived
-      ? "Chat archived"
-      : "Chat restored"
-  );
 }
 
-function sortChats() {
-  Galaxy.state.chats.sort((a, b) => {
-    if (a.pinned !== b.pinned) {
-      return a.pinned ? -1 : 1;
-    }
-
-    return b.updatedAt - a.updatedAt;
-  });
-}
 
 /* =========================================================
-   SECTION 22 — CHAT BRANCHING
+   BRANCH CONVERSATION
    ========================================================= */
 
-function branchConversation(messageId) {
-  const source = getCurrentChat();
+function branchConversation(
+  messageId
+) {
 
-  if (!source) return;
+  const source =
+    getCurrentChat();
+
+  if (!source) {
+    return;
+  }
 
   const index =
-    source.messages.findIndex(
-      message => message.id === messageId
-    );
+    source.messages
+      .findIndex(
+        message =>
+          message.id ===
+          messageId
+      );
 
-  if (index === -1) return;
+  if (
+    index < 0
+  ) {
+    return;
+  }
 
-  const newChat = {
-    id: uid("chat"),
+  const chat = {
 
-    title: `${source.title} — Branch`,
+    id:
+      uid("chat"),
 
-    messages: structuredClone(
-      source.messages.slice(0, index + 1)
-    ),
+    title:
+      `${source.title} — Branch`,
 
-    pinned: false,
+    messages:
+      structuredClone(
+        source.messages.slice(
+          0,
+          index + 1
+        )
+      ),
 
-    archived: false,
+    pinned:
+      false,
 
-    createdAt: now(),
+    archived:
+      false,
 
-    updatedAt: now(),
+    createdAt:
+      now(),
 
-    branchOf: source.id,
+    updatedAt:
+      now(),
 
-    tags: ["branch"]
+    branchOf:
+      source.id
+
   };
 
-  Galaxy.state.chats.unshift(newChat);
+  Galaxy.state.chats.unshift(
+    chat
+  );
 
-  Galaxy.state.currentChatId = newChat.id;
+  Galaxy.state.currentChatId =
+    chat.id;
 
   persistAll();
 
@@ -1508,204 +2167,289 @@ function branchConversation(messageId) {
 
   renderChat();
 
-  toast("Conversation branched");
 }
+
 
 /* =========================================================
-   SECTION 23 — CHAT EXPORT
+   EXPORT / IMPORT
    ========================================================= */
-
-function exportConversation(chatId) {
-  const chat =
-    Galaxy.state.chats.find(
-      item => item.id === chatId
-    );
-
-  if (!chat) return;
-
-  const data = JSON.stringify(
-    {
-      galaxyVersion: Galaxy.version,
-      exportedAt: new Date().toISOString(),
-      chat
-    },
-    null,
-    2
-  );
-
-  downloadText(
-    `${safeFilename(chat.title)}.galaxy.json`,
-    data,
-    "application/json"
-  );
-
-  toast("Conversation exported");
-}
-
-/* =========================================================
-   SECTION 24 — CHAT IMPORT
-   ========================================================= */
-
-function importConversation(file) {
-  const reader = new FileReader();
-
-  reader.onload = () => {
-    try {
-      const parsed =
-        JSON.parse(reader.result);
-
-      const imported =
-        parsed.chat || parsed;
-
-      if (!Array.isArray(imported.messages)) {
-        throw new Error("Invalid GALAXY conversation.");
-      }
-
-      imported.id = uid("chat");
-
-      imported.title =
-        imported.title ||
-        "Imported conversation";
-
-      imported.createdAt = now();
-
-      imported.updatedAt = now();
-
-      Galaxy.state.chats.unshift(imported);
-
-      Galaxy.state.currentChatId =
-        imported.id;
-
-      persistAll();
-
-      renderRecentChats();
-
-      renderChat();
-
-      toast("Conversation imported");
-    } catch (error) {
-      handleError(error, "Import conversation");
-    }
-  };
-
-  reader.readAsText(file);
-}
 
 function safeFilename(value) {
-  return String(value)
-    .replace(/[^\w\- ]+/g, "")
-    .trim()
-    .replace(/\s+/g, "_")
-    .slice(0, 80);
+
+  return (
+    String(value)
+      .replace(
+        /[^\w\- ]+/g,
+        ""
+      )
+      .trim()
+      .replace(
+        /\s+/g,
+        "_"
+      )
+      .slice(
+        0,
+        80
+      ) ||
+    "galaxy"
+  );
+
 }
+
 
 function downloadText(
   filename,
   content,
-  type = "text/plain"
+  type =
+    "text/plain"
 ) {
-  const blob = new Blob([content], {
-    type
-  });
 
-  const url = URL.createObjectURL(blob);
-
-  const anchor =
-    document.createElement("a");
-
-  anchor.href = url;
-
-  anchor.download = filename;
-
-  anchor.click();
-
-  URL.revokeObjectURL(url);
-}
-
-/* =========================================================
-   SECTION 25 — RECENT CHAT RENDER
-   ========================================================= */
-
-function renderRecentChats() {
-  const root = $("#recentChats");
-
-  if (!root) return;
-
-  sortChats();
-
-  const visibleChats =
-    Galaxy.state.chats.filter(
-      chat => !chat.archived
+  const blob =
+    new Blob(
+      [content],
+      {
+        type
+      }
     );
 
-  root.innerHTML = visibleChats
-    .slice(0, 40)
-    .map(
-      chat => `
-        <div
-          class="recent-chat-row ${
-            chat.id === Galaxy.state.currentChatId
-              ? "active"
-              : ""
-          }"
-          data-chat-id="${chat.id}"
-          data-context-type="chat"
-          data-context-id="${chat.id}"
-        >
+  const url =
+    URL.createObjectURL(
+      blob
+    );
 
-          <button
-            class="recent-chat"
-            data-chat-open="${chat.id}"
-            title="${escapeHTML(chat.title)}"
-          >
+  const a =
+    document.createElement(
+      "a"
+    );
 
-            ${
-              chat.pinned
-                ? '<span class="pin-dot">•</span>'
-                : ""
-            }
+  a.href =
+    url;
 
-            <span>
-              ${escapeHTML(chat.title)}
-            </span>
+  a.download =
+    filename;
 
-          </button>
+  a.click();
 
-          <button
-            class="recent-more"
-            data-context-open="chat"
-            data-context-id="${chat.id}"
-            aria-label="More"
-          >
-            ⋯
-          </button>
+  URL.revokeObjectURL(
+    url
+  );
 
-        </div>
-      `
-    )
-    .join("");
 }
 
+
+function exportConversation(id) {
+
+  const chat =
+    Galaxy.state.chats.find(
+      item =>
+        item.id === id
+    );
+
+  if (!chat) {
+    return;
+  }
+
+  downloadText(
+    `${safeFilename(chat.title)}.galaxy.json`,
+    JSON.stringify(
+      {
+        galaxyVersion:
+          Galaxy.version,
+
+        chat
+      },
+      null,
+      2
+    ),
+    "application/json"
+  );
+
+}
+
+
+function importConversation(file) {
+
+  const reader =
+    new FileReader();
+
+  reader.onload =
+    () => {
+
+      try {
+
+        const parsed =
+          JSON.parse(
+            reader.result
+          );
+
+        const imported =
+          parsed.chat ||
+          parsed;
+
+        if (
+          !Array.isArray(
+            imported.messages
+          )
+        ) {
+
+          throw new Error(
+            "Invalid GALAXY conversation."
+          );
+
+        }
+
+        imported.id =
+          uid("chat");
+
+        imported.title =
+          imported.title ||
+          "Imported conversation";
+
+        imported.createdAt =
+          now();
+
+        imported.updatedAt =
+          now();
+
+        Galaxy.state.chats.unshift(
+          imported
+        );
+
+        Galaxy.state.currentChatId =
+          imported.id;
+
+        persistAll();
+
+        renderRecentChats();
+
+        renderChat();
+
+        toast(
+          "Conversation imported"
+        );
+
+      } catch (error) {
+
+        handleError(
+          error,
+          "Import conversation"
+        );
+
+      }
+
+    };
+
+  reader.readAsText(
+    file
+  );
+
+}
+
+
 /* =========================================================
-   SECTION 26 — MARKDOWN RENDERER
+   MARKDOWN RENDERER
+   IMPORTANT: fixes the broken code HTML from old JS
    ========================================================= */
 
 function renderMarkdown(input) {
-  let html = escapeHTML(input);
 
-  html = html.replace(
-    /```([\w-]*)\n([\s\S]*?)```/g,
-    (_, language, code) => {
+  const codeBlocks =
+    [];
+
+  let text =
+    String(
+      input ??
+      ""
+    ).replace(
+      /```([\w-]*)\n([\s\S]*?)```/g,
+      (
+        _,
+        language,
+        code
+      ) => {
+
+        const index =
+          codeBlocks.length;
+
+        codeBlocks.push({
+          language:
+            language ||
+            "code",
+
+          code
+        });
+
+        return `@@GALAXY_CODE_${index}@@`;
+
+      }
+    );
+
+  text =
+    escapeHTML(
+      text
+    );
+
+  text =
+    text
+      .replace(
+        /^### (.+)$/gm,
+        "<h3>$1</h3>"
+      )
+      .replace(
+        /^## (.+)$/gm,
+        "<h2>$1</h2>"
+      )
+      .replace(
+        /^# (.+)$/gm,
+        "<h1>$1</h1>"
+      )
+      .replace(
+        /\*\*(.+?)\*\*/g,
+        "<strong>$1</strong>"
+      )
+      .replace(
+        /\*([^*]+)\*/g,
+        "<em>$1</em>"
+      )
+      .replace(
+        /`([^`\n]+)`/g,
+        '<code class="inline-code">$1</code>'
+      )
+      .replace(
+        /^> (.+)$/gm,
+        "<blockquote>$1</blockquote>"
+      )
+      .replace(
+        /^- (.+)$/gm,
+        '<div class="markdown-list-item">• $1</div>'
+      )
+      .replace(
+        /^\d+\. (.+)$/gm,
+        '<div class="markdown-list-item numbered">$1</div>'
+      )
+      .replace(
+        /\n/g,
+        "<br>"
+      );
+
+  codeBlocks.forEach(
+    (
+      block,
+      index
+    ) => {
+
       const encoded =
-        encodeURIComponent(code);
+        encodeURIComponent(
+          block.code
+        );
 
-      return `
+      const html = `
         <div class="code-block">
 
           <div class="code-head">
 
             <span>
-              ${escapeHTML(language || "code")}
+              ${escapeHTML(block.language)}
             </span>
 
             <button
@@ -1717,113 +2461,40 @@ function renderMarkdown(input) {
 
           </div>
 
-          <pre><code>${code}</code></pre>
+          <pre><code>${escapeHTML(block.code)}</code></pre>
 
         </div>
       `;
+
+      text =
+        text.replace(
+          `@@GALAXY_CODE_${index}@@`,
+          html
+        );
+
     }
   );
 
-  html = html.replace(
-    /`([^`\n]+)`/g,
-    "<code class=\"inline-code\">$1</code>"
-  );
+  return text;
 
-  html = html.replace(
-    /^### (.+)$/gm,
-    "<h3>$1</h3>"
-  );
-
-  html = html.replace(
-    /^## (.+)$/gm,
-    "<h2>$1</h2>"
-  );
-
-  html = html.replace(
-    /^# (.+)$/gm,
-    "<h1>$1</h1>"
-  );
-
-  html = html.replace(
-    /\*\*(.+?)\*\*/g,
-    "<strong>$1</strong>"
-  );
-
-  html = html.replace(
-    /\*(.+?)\*/g,
-    "<em>$1</em>"
-  );
-
-  html = html.replace(
-    /^> (.+)$/gm,
-    "<blockquote>$1</blockquote>"
-  );
-
-  html = html.replace(
-    /^- (.+)$/gm,
-    "<div class=\"markdown-list-item\">• $1</div>"
-  );
-
-  html = html.replace(
-    /^\d+\. (.+)$/gm,
-    "<div class=\"markdown-list-item numbered\">$1</div>"
-  );
-
-  html = html.replace(
-    /\n{2,}/g,
-    "<br><br>"
-  );
-
-  html = html.replace(
-    /\n/g,
-    "<br>"
-  );
-
-  return html;
 }
+
 
 /* =========================================================
-   SECTION 27 — CHAT MESSAGE RENDER
+   MESSAGE RENDERING
    ========================================================= */
 
-function renderChat() {
-  const root = $("#messages");
+function renderMessage(
+  message
+) {
 
-  const empty = $("#emptyState");
-
-  if (!root) return;
-
-  const chat = getCurrentChat();
-
-  const messages = chat?.messages || [];
-
-  if (empty) {
-    empty.style.display =
-      messages.length ? "none" : "";
-  }
-
-  root.innerHTML =
-    messages
-      .map(renderMessage)
-      .join("");
-
-  requestAnimationFrame(() => {
-    const scroller =
-      $("#chatScroller");
-
-    if (scroller) {
-      scroller.scrollTop =
-        scroller.scrollHeight;
-    }
-  });
-}
-
-function renderMessage(message) {
-  const isUser =
-    message.role === "user";
+  const user =
+    message.role ===
+    "user";
 
   const actions =
-    isUser
+    user
+
       ? `
         <div class="message-actions">
 
@@ -1853,6 +2524,7 @@ function renderMessage(message) {
 
         </div>
       `
+
       : `
         <div class="message-actions">
 
@@ -1862,22 +2534,6 @@ function renderMessage(message) {
             title="Copy"
           >
             ⧉
-          </button>
-
-          <button
-            class="message-action"
-            data-like-message="${message.id}"
-            title="Like"
-          >
-            ♡
-          </button>
-
-          <button
-            class="message-action"
-            data-dislike-message="${message.id}"
-            title="Dislike"
-          >
-            ⌄
           </button>
 
           <button
@@ -1907,13 +2563,27 @@ function renderMessage(message) {
         </div>
       `;
 
-  const timestamp =
-    Galaxy.state.settings.showTimestamps
+  const time =
+    Galaxy.state.settings
+      .showTimestamps
+
       ? `
         <time class="message-time">
-          ${formatTime(message.createdAt)}
+          ${new Date(
+            message.createdAt
+          ).toLocaleTimeString(
+            [],
+            {
+              hour:
+                "2-digit",
+
+              minute:
+                "2-digit"
+            }
+          )}
         </time>
       `
+
       : "";
 
   return `
@@ -1926,32 +2596,187 @@ function renderMessage(message) {
         ${renderMarkdown(message.text || "")}
       </div>
 
-      ${timestamp}
+      ${time}
 
       ${actions}
 
     </article>
   `;
+
 }
 
+
+function renderChat() {
+
+  const root =
+    $("#messages");
+
+  const empty =
+    $("#emptyState");
+
+  if (!root) {
+    return;
+  }
+
+  const messages =
+    getCurrentChat()
+      ?.messages ||
+    [];
+
+  if (empty) {
+
+    empty.style.display =
+      messages.length
+        ? "none"
+        : "";
+
+  }
+
+  root.innerHTML =
+    messages
+      .map(
+        renderMessage
+      )
+      .join("");
+
+  requestAnimationFrame(
+    () => {
+
+      const scroller =
+        $("#chatScroller");
+
+      if (scroller) {
+
+        scroller.scrollTop =
+          scroller.scrollHeight;
+
+      }
+
+    }
+  );
+
+}
+
+
 /* =========================================================
-   SECTION 28 — MESSAGE EDITING
+   COPY
    ========================================================= */
 
-function editMessage(messageId) {
-  const chat = getCurrentChat();
+async function copyText(text) {
 
-  if (!chat) return;
+  try {
 
-  const message =
-    chat.messages.find(
-      item => item.id === messageId
+    await navigator
+      .clipboard
+      .writeText(
+        text
+      );
+
+  } catch {
+
+    const area =
+      document.createElement(
+        "textarea"
+      );
+
+    area.value =
+      text;
+
+    document.body.appendChild(
+      area
     );
 
-  if (!message) return;
+    area.select();
+
+    document.execCommand(
+      "copy"
+    );
+
+    area.remove();
+
+  }
+
+  toast(
+    "Copied"
+  );
+
+}
+
+
+/* =========================================================
+   READ ALOUD
+   ========================================================= */
+
+function readAloud(
+  messageId
+) {
+
+  const message =
+    getCurrentChat()
+      ?.messages
+      .find(
+        item =>
+          item.id ===
+          messageId
+      );
+
+  if (
+    !message ||
+    !(
+      "speechSynthesis" in
+      window
+    )
+  ) {
+    return;
+  }
+
+  speechSynthesis.cancel();
+
+  const speech =
+    new SpeechSynthesisUtterance(
+      message.text
+    );
+
+  speech.lang =
+    Galaxy.state.settings
+      .voiceLanguage;
+
+  speechSynthesis.speak(
+    speech
+  );
+
+}
+
+
+/* =========================================================
+   EDIT MESSAGE
+   ========================================================= */
+
+function editMessage(
+  messageId
+) {
+
+  const chat =
+    getCurrentChat();
+
+  const message =
+    chat?.messages.find(
+      item =>
+        item.id ===
+        messageId
+    );
+
+  if (
+    !chat ||
+    !message
+  ) {
+    return;
+  }
 
   openModal({
-    title: "Edit message",
+
+    title:
+      "Edit message",
 
     body: `
       <div class="form-stack">
@@ -1970,993 +2795,401 @@ function editMessage(messageId) {
 
       </div>
     `
+
   });
 
-  setTimeout(() => {
-    $("#saveEditedMessage")?.addEventListener(
-      "click",
-      async () => {
-        const value =
-          $("#editMessageField")
-            ?.value
-            .trim();
+  setTimeout(
+    () => {
 
-        if (!value) return;
+      on(
+        $("#saveEditedMessage"),
+        "click",
+        async () => {
 
-        const index =
-          chat.messages.findIndex(
-            item => item.id === messageId
+          const value =
+            $("#editMessageField")
+              ?.value
+              .trim();
+
+          if (!value) {
+            return;
+          }
+
+          const index =
+            chat.messages
+              .findIndex(
+                item =>
+                  item.id ===
+                  messageId
+              );
+
+          message.text =
+            value;
+
+          message.updatedAt =
+            now();
+
+          chat.messages =
+            chat.messages.slice(
+              0,
+              index + 1
+            );
+
+          persistAll();
+
+          renderChat();
+
+          closeOverlay();
+
+          await generateAssistantReply(
+            value
           );
 
-        message.text = value;
+        }
+      );
 
-        message.updatedAt = now();
+    },
+    0
+  );
 
-        chat.messages =
-          chat.messages.slice(0, index + 1);
-
-        persistAll();
-
-        renderChat();
-
-        closeOverlay();
-
-        await generateAssistantReply(value);
-      }
-    );
-  }, 0);
 }
 
+
 /* =========================================================
-   SECTION 29 — RETRY MESSAGE
+   RETRY
    ========================================================= */
 
-async function retryMessage(messageId) {
-  const chat = getCurrentChat();
+async function retryMessage(
+  messageId
+) {
 
-  if (!chat) return;
+  const chat =
+    getCurrentChat();
+
+  if (!chat) {
+    return;
+  }
 
   const index =
     chat.messages.findIndex(
-      item => item.id === messageId
+      item =>
+        item.id ===
+        messageId
     );
 
-  if (index === -1) return;
+  if (
+    index < 0
+  ) {
+    return;
+  }
 
-  const previousUser =
+  const previous =
     [...chat.messages]
-      .slice(0, index)
+      .slice(
+        0,
+        index
+      )
       .reverse()
       .find(
         item =>
-          item.role === "user"
+          item.role ===
+          "user"
       );
 
-  if (!previousUser) return;
+  if (!previous) {
+    return;
+  }
 
   chat.messages =
-    chat.messages.slice(0, index);
+    chat.messages.slice(
+      0,
+      index
+    );
 
   persistAll();
 
   renderChat();
 
   await generateAssistantReply(
-    previousUser.text
+    previous.text
   );
+
 }
 
-/* =========================================================
-   SECTION 30 — COPY
-   ========================================================= */
-
-async function copyText(text) {
-  try {
-    await navigator.clipboard.writeText(text);
-
-    toast("Copied");
-  } catch {
-    const textarea =
-      document.createElement("textarea");
-
-    textarea.value = text;
-
-    document.body.appendChild(textarea);
-
-    textarea.select();
-
-    document.execCommand("copy");
-
-    textarea.remove();
-
-    toast("Copied");
-  }
-}
 
 /* =========================================================
-   SECTION 31 — VOICE READ ALOUD
+   TEXTAREA
    ========================================================= */
 
-function readAloud(messageId) {
-  const chat = getCurrentChat();
+function autoResizeTextarea(
+  textarea
+) {
 
-  const message =
-    chat?.messages.find(
-      item => item.id === messageId
-    );
-
-  if (!message) return;
-
-  if (!("speechSynthesis" in window)) {
-    toast("Read aloud is not supported.");
+  if (!textarea) {
     return;
   }
 
-  speechSynthesis.cancel();
-
-  const speech =
-    new SpeechSynthesisUtterance(
-      message.text
-    );
-
-  speech.lang =
-    Galaxy.state.settings.voiceLanguage;
-
-  speechSynthesis.speak(speech);
-}
-
-/* =========================================================
-   SECTION 32 — WEB SEARCH STATES
-   ========================================================= */
-
-function toggleWebSearch() {
-  Galaxy.state.webSearchState =
-    Galaxy.state.webSearchState === "off"
-      ? "ready"
-      : "off";
-
-  renderWebSearchState();
-
-  toast(
-    Galaxy.state.webSearchState === "ready"
-      ? "Web search enabled"
-      : "Web search disabled"
-  );
-}
-
-function renderWebSearchState() {
-  const button =
-    $('[data-action="web-search"]');
-
-  if (!button) return;
-
-  button.classList.toggle(
-    "active",
-    Galaxy.state.webSearchState !== "off"
-  );
-
-  button.dataset.state =
-    Galaxy.state.webSearchState;
-}
-
-function setWebSearchState(state) {
-  Galaxy.state.webSearchState =
-    state;
-
-  renderWebSearchState();
-}
-
-/* =========================================================
-   SECTION 33 — VOICE RECORDING
-   ========================================================= */
-
-function toggleVoiceRecording() {
-  if (
-    Galaxy.state.voiceState ===
-    "recording"
-  ) {
-    stopVoiceRecording();
-  } else {
-    startVoiceRecording();
-  }
-}
-
-function startVoiceRecording() {
-  const Recognition =
-    window.SpeechRecognition ||
-    window.webkitSpeechRecognition;
-
-  if (!Recognition) {
-    toast("Voice recognition is not supported.");
-    return;
-  }
-
-  const recognition =
-    new Recognition();
-
-  recognition.lang =
-    Galaxy.state.settings.voiceLanguage;
-
-  recognition.continuous = true;
-
-  recognition.interimResults = true;
-
-  Galaxy.state.voiceRecognition =
-    recognition;
-
-  Galaxy.state.voiceState =
-    "recording";
-
-  renderVoiceState();
-
-  recognition.onresult = event => {
-    let transcript = "";
-
-    for (
-      let i = event.resultIndex;
-      i < event.results.length;
-      i++
-    ) {
-      transcript +=
-        event.results[i][0].transcript;
-    }
-
-    const input = $("#promptInput");
-
-    if (input) {
-      input.value = transcript;
-      autoResizeTextarea(input);
-    }
-  };
-
-  recognition.onerror = event => {
-    Galaxy.state.voiceState =
-      "error";
-
-    renderVoiceState();
-
-    toast(
-      `Voice error: ${event.error}`,
-      "error"
-    );
-  };
-
-  recognition.onend = () => {
-    Galaxy.state.voiceState =
-      "idle";
-
-    renderVoiceState();
-  };
-
-  recognition.start();
-
-  toast("Listening…");
-}
-
-function stopVoiceRecording() {
-  Galaxy.state.voiceRecognition?.stop();
-
-  Galaxy.state.voiceRecognition =
-    null;
-
-  Galaxy.state.voiceState =
-    "idle";
-
-  renderVoiceState();
-
-  toast("Voice recording stopped");
-}
-
-function renderVoiceState() {
-  const button =
-    $('[data-action="voice"]');
-
-  if (!button) return;
-
-  button.dataset.state =
-    Galaxy.state.voiceState;
-
-  button.classList.toggle(
-    "recording",
-    Galaxy.state.voiceState ===
-      "recording"
-  );
-}
-
-/* =========================================================
-   SECTION 34 — STOP GENERATION
-   ========================================================= */
-
-function stopGeneration() {
-  if (!Galaxy.state.generation.active) {
-    return;
-  }
-
-  Galaxy.state.generation.stopped =
-    true;
-
-  Galaxy.state.generation.controller?.abort();
-
-  Galaxy.state.generation.active =
-    false;
-
-  updateSendButtonState();
-
-  toast("Generation stopped");
-}
-
-/* =========================================================
-   SECTION 35 — DEMO AI RESPONSE
-   ========================================================= */
-
-function buildDemoResponse(prompt) {
-  const webNotice =
-    Galaxy.state.webSearchState === "ready"
-      ? "\n\n**Web search:** enabled in the interface. Connect your search backend for live results."
-      : "";
-
-  return `
-## GALAXY AI
-
-I can work with that.
-
-You asked:
-
-> ${prompt}
-
-This GALAXY interface now supports chat history, projects, Packs, media library, scheduling, plugins, GPT agents, sites, images, Work mode, previews, command palette and advanced chat actions.
-
-${webNotice}
-
-\`\`\`javascript
-// Connect your real AI backend here:
-const response = await fetch("/api/chat", {
-  method: "POST",
-  headers: {
-    "Content-Type": "application/json"
-  },
-  body: JSON.stringify({
-    message: prompt
-  })
-});
-\`\`\`
-
-The front end is ready for your real model connection.
-`.trim();
-}
-
-/* =========================================================
-   SECTION 36 — STREAMING RESPONSE
-   ========================================================= */
-
-async function generateAssistantReply(prompt) {
-  const chat = ensureCurrentChat();
-
-  Galaxy.state.generation.active = true;
-
-  Galaxy.state.generation.stopped = false;
-
-  Galaxy.state.generation.controller =
-    new AbortController();
-
-  const assistantMessage = {
-    id: uid("msg"),
-
-    role: "assistant",
-
-    text: "",
-
-    createdAt: now(),
-
-    updatedAt: now()
-  };
-
-  Galaxy.state.generation.messageId =
-    assistantMessage.id;
-
-  chat.messages.push(assistantMessage);
-
-  renderChat();
-
-  updateSendButtonState();
-
-  showToolActivity(
-    Galaxy.state.webSearchState === "ready"
-      ? "Searching and thinking…"
-      : "Thinking…"
-  );
-
-  try {
-    const fullText =
-      buildDemoResponse(prompt);
-
-    if (!Galaxy.state.settings.streaming) {
-      assistantMessage.text =
-        fullText;
-
-      await sleep(250);
-    } else {
-      const chunks =
-        splitStreamingText(fullText);
-
-      for (const chunk of chunks) {
-        if (
-          Galaxy.state.generation.stopped
-        ) {
-          break;
-        }
-
-        assistantMessage.text +=
-          chunk;
-
-        assistantMessage.updatedAt =
-          now();
-
-        renderChat();
-
-        await sleep(
-          Galaxy.state.settings.streamSpeed
-        );
-      }
-    }
-
-    chat.updatedAt = now();
-
-    persistAll();
-  } catch (error) {
-    if (error.name !== "AbortError") {
-      assistantMessage.text +=
-        "\n\nGeneration failed.";
-
-      handleError(
-        error,
-        "Generate response"
-      );
-    }
-  } finally {
-    Galaxy.state.generation.active =
-      false;
-
-    Galaxy.state.generation.controller =
-      null;
-
-    hideToolActivity();
-
-    updateSendButtonState();
-
-    renderChat();
-  }
-}
-
-function splitStreamingText(text) {
-  return text.match(/.{1,10}/gs) || [];
-}
-
-/* =========================================================
-   SECTION 37 — SEND MESSAGE
-   ========================================================= */
-
-async function sendMessage() {
-  if (Galaxy.state.generation.active) {
-    stopGeneration();
-    return;
-  }
-
-  const input = $("#promptInput");
-
-  if (!input) return;
-
-  const text = input.value.trim();
-
-  if (
-    !text &&
-    Galaxy.state.attachments.length === 0
-  ) {
-    return;
-  }
-
-  const chat =
-    ensureCurrentChat();
-
-  const message = {
-    id: uid("msg"),
-
-    role: "user",
-
-    text:
-      text ||
-      describeAttachments(),
-
-    attachments:
-      Galaxy.state.attachments.map(
-        item => ({ ...item })
-      ),
-
-    createdAt: now(),
-
-    updatedAt: now()
-  };
-
-  chat.messages.push(message);
-
-  chat.updatedAt = now();
-
-  if (
-    Galaxy.state.settings.autoTitleChats &&
-    chat.title === "New conversation"
-  ) {
-    chat.title =
-      (text || "File discussion")
-        .slice(0, 48);
-  }
-
-  input.value = "";
-
-  autoResizeTextarea(input);
-
-  DB.remove("draft");
-
-  Galaxy.state.attachments = [];
-
-  renderAttachments();
-
-  persistAll();
-
-  renderRecentChats();
-
-  renderChat();
-
-  await generateAssistantReply(
-    text ||
-    "Analyze the attached content."
-  );
-}
-
-function describeAttachments() {
-  return Galaxy.state.attachments
-    .map(item => `Attached: ${item.name}`)
-    .join("\n");
-}
-
-/* =========================================================
-   SECTION 38 — SEND BUTTON STATE
-   ========================================================= */
-
-function updateSendButtonState() {
-  const button = $("#sendButton");
-
-  if (!button) return;
-
-  if (Galaxy.state.generation.active) {
-    button.textContent = "■";
-
-    button.dataset.action =
-      "stop-generation";
-
-    button.setAttribute(
-      "aria-label",
-      "Stop generation"
-    );
-  } else {
-    button.textContent = "↑";
-
-    button.dataset.action = "send";
-
-    button.setAttribute(
-      "aria-label",
-      "Send"
-    );
-  }
-}
-
-/* =========================================================
-   SECTION 39 — TOOL ACTIVITY DISPLAY
-   ========================================================= */
-
-function showToolActivity(text) {
-  let activity = $("#toolActivity");
-
-  if (!activity) {
-    activity =
-      document.createElement("div");
-
-    activity.id = "toolActivity";
-
-    activity.className =
-      "tool-activity";
-
-    $(".composer-dock")
-      ?.prepend(activity);
-  }
-
-  activity.innerHTML = `
-    <span class="activity-dot"></span>
-    <span>${escapeHTML(text)}</span>
-  `;
-
-  activity.hidden = false;
-}
-
-function hideToolActivity() {
-  const activity =
-    $("#toolActivity");
-
-  if (activity) {
-    activity.hidden = true;
-  }
-}
-
-/* =========================================================
-   SECTION 40 — TEXTAREA AUTOSIZE
-   ========================================================= */
-
-function autoResizeTextarea(textarea) {
-  if (!textarea) return;
-
-  textarea.style.height = "auto";
+  textarea.style.height =
+    "auto";
 
   textarea.style.height =
     `${Math.min(
       textarea.scrollHeight,
-      190
+      180
     )}px`;
+
 }
+
 
 /* =========================================================
-   SECTION 41 — AUTOSAVE
+   ATTACHMENTS
    ========================================================= */
-
-let autosaveTimer = null;
-
-function scheduleAutosave() {
-  if (!Galaxy.state.settings.autosave) {
-    return;
-  }
-
-  clearTimeout(autosaveTimer);
-
-  autosaveTimer = setTimeout(() => {
-    saveDraft();
-  }, Galaxy.state.settings.autosaveDelay);
-}
-
-function saveDraft() {
-  const input = $("#promptInput");
-
-  if (!input) return;
-
-  DB.set("draft", input.value);
-
-  const indicator =
-    $("#draftState");
-
-  if (indicator) {
-    indicator.textContent =
-      input.value
-        ? "Draft autosaved"
-        : "Ready";
-  }
-}
-
-function restoreDraft() {
-  const input = $("#promptInput");
-
-  if (!input) return;
-
-  const draft =
-    DB.get("draft", "");
-
-  input.value = draft;
-
-  autoResizeTextarea(input);
-}
-
-/* =========================================================
-   SECTION 42 — ATTACHMENTS
-   ========================================================= */
-
-function addFiles(files) {
-  const fileArray =
-    Array.from(files || []);
-
-  for (const file of fileArray) {
-    const type =
-      detectFileType(file);
-
-    const item = {
-      id: uid("attachment"),
-
-      name: file.name,
-
-      type,
-
-      mime: file.type,
-
-      size: file.size,
-
-      file,
-
-      createdAt: now(),
-
-      previewUrl:
-        URL.createObjectURL(file)
-    };
-
-    Galaxy.state.attachments.push(item);
-  }
-
-  renderAttachments();
-}
 
 function detectFileType(file) {
-  if (file.type.startsWith("image/")) {
+
+  if (
+    file.type.startsWith(
+      "image/"
+    )
+  ) {
     return "image";
   }
 
-  if (file.type.startsWith("video/")) {
+  if (
+    file.type.startsWith(
+      "video/"
+    )
+  ) {
     return "video";
   }
 
-  if (file.type.startsWith("audio/")) {
-    return "audio";
-  }
-
   return "file";
+
 }
 
-function removeAttachment(id) {
-  const item =
-    Galaxy.state.attachments.find(
-      attachment =>
-        attachment.id === id
-    );
 
-  if (item?.previewUrl) {
-    URL.revokeObjectURL(
-      item.previewUrl
-    );
-  }
+function addFiles(files) {
 
-  Galaxy.state.attachments =
-    Galaxy.state.attachments.filter(
-      attachment =>
-        attachment.id !== id
-    );
+  Array.from(
+    files ||
+    []
+  ).forEach(
+    file => {
+
+      Galaxy.state.attachments.push({
+
+        id:
+          uid("attachment"),
+
+        name:
+          file.name,
+
+        size:
+          file.size,
+
+        mime:
+          file.type,
+
+        type:
+          detectFileType(
+            file
+          ),
+
+        file
+
+      });
+
+    }
+  );
 
   renderAttachments();
+
 }
 
+
+function removeAttachment(id) {
+
+  Galaxy.state.attachments =
+    Galaxy.state.attachments
+      .filter(
+        item =>
+          item.id !==
+          id
+      );
+
+  renderAttachments();
+
+}
+
+
 function renderAttachments() {
+
   const strip =
     $("#attachmentStrip");
 
-  if (!strip) return;
-
-  if (!Galaxy.state.attachments.length) {
-    strip.hidden = true;
-
-    strip.innerHTML = "";
-
+  if (!strip) {
     return;
   }
 
-  strip.hidden = false;
+  if (
+    !Galaxy.state.attachments
+      .length
+  ) {
+
+    strip.hidden =
+      true;
+
+    strip.innerHTML =
+      "";
+
+    return;
+
+  }
+
+  strip.hidden =
+    false;
 
   strip.innerHTML =
     Galaxy.state.attachments
       .map(
-        attachment => `
-        <article
-          class="attachment-chip"
-          data-attachment-id="${attachment.id}"
-        >
+        item => `
+          <div class="attachment-chip">
 
-          ${
-            attachment.type === "image"
-              ? `
-                <img
-                  class="attachment-thumb"
-                  src="${attachment.previewUrl}"
-                  alt=""
-                >
-              `
-              : attachment.type === "video"
-              ? `
-                <span class="attachment-type">
-                  ▷
-                </span>
-              `
-              : `
-                <span class="attachment-type">
-                  ▱
-                </span>
-              `
-          }
+            <span>
+              ${
+                item.type ===
+                "image"
+                  ? "◫"
+                  : item.type ===
+                    "video"
+                    ? "▷"
+                    : "▱"
+              }
+            </span>
 
-          <div class="attachment-copy">
+            <span>
+              ${escapeHTML(item.name)}
+            </span>
 
-            <strong>
-              ${escapeHTML(attachment.name)}
-            </strong>
-
-            <small>
-              ${formatBytes(attachment.size)}
-            </small>
+            <button
+              class="icon-btn"
+              data-remove-attachment="${item.id}"
+              aria-label="Remove"
+            >
+              ×
+            </button>
 
           </div>
-
-          <button
-            class="icon-btn"
-            data-remove-attachment="${attachment.id}"
-          >
-            ×
-          </button>
-
-        </article>
-      `
+        `
       )
       .join("");
+
 }
 
-/* =========================================================
-   SECTION 43 — DRAG AND DROP
-   ========================================================= */
 
-function initializeDragAndDrop() {
-  ["dragenter", "dragover"].forEach(
-    eventName => {
-      document.addEventListener(
-        eventName,
-        event => {
-          event.preventDefault();
+function describeAttachments() {
 
-          Galaxy.state.dragCounter++;
+  return Galaxy.state.attachments
+    .map(
+      item =>
+        `[${item.type}: ${item.name}]`
+    )
+    .join(
+      "\n"
+    );
 
-          document.body.classList.add(
-            "dragging"
-          );
-        }
-      );
-    }
-  );
-
-  document.addEventListener(
-    "dragleave",
-    event => {
-      event.preventDefault();
-
-      Galaxy.state.dragCounter =
-        Math.max(
-          0,
-          Galaxy.state.dragCounter - 1
-        );
-
-      if (
-        Galaxy.state.dragCounter === 0
-      ) {
-        document.body.classList.remove(
-          "dragging"
-        );
-      }
-    }
-  );
-
-  document.addEventListener(
-    "drop",
-    event => {
-      event.preventDefault();
-
-      Galaxy.state.dragCounter = 0;
-
-      document.body.classList.remove(
-        "dragging"
-      );
-
-      if (
-        event.dataTransfer?.files?.length
-      ) {
-        addFiles(
-          event.dataTransfer.files
-        );
-
-        toast(
-          `${event.dataTransfer.files.length} file(s) attached`
-        );
-      }
-    }
-  );
 }
 
+
 /* =========================================================
-   SECTION 44 — LIBRARY MANAGEMENT
+   LIBRARY
    ========================================================= */
 
 function addLibraryFile(file) {
-  const type =
-    detectFileType(file);
+
+  const reader =
+    new FileReader();
 
   const item = {
-    id: uid("library"),
 
-    name: file.name,
+    id:
+      uid("library"),
 
-    type,
+    name:
+      file.name,
 
-    mime: file.type,
-
-    size: file.size,
-
-    createdAt: now(),
-
-    favorite: false,
-
-    tags: [],
-
-    dataUrl: null
-  };
-
-  const reader = new FileReader();
-
-  reader.onload = () => {
-    item.dataUrl =
-      reader.result;
-
-    Galaxy.state.library.unshift(item);
-
-    persistAll();
-
-    renderLibrary();
-
-    toast("Added to Library");
-  };
-
-  reader.onerror = () => {
-    handleError(
-      new Error(
-        "Could not read the selected file."
+    type:
+      detectFileType(
+        file
       ),
-      "Library"
-    );
+
+    mime:
+      file.type,
+
+    size:
+      file.size,
+
+    createdAt:
+      now(),
+
+    favorite:
+      false,
+
+    dataUrl:
+      null
+
   };
 
-  reader.readAsDataURL(file);
-}
+  reader.onload =
+    () => {
 
-function deleteLibraryItem(id) {
-  const item =
-    Galaxy.state.library.find(
-      entry => entry.id === id
-    );
+      item.dataUrl =
+        reader.result;
 
-  if (!item) return;
-
-  confirmAction({
-    title: "Delete library item",
-
-    message: `Delete “${item.name}”?`,
-
-    onConfirm() {
-      Galaxy.state.library =
-        Galaxy.state.library.filter(
-          entry => entry.id !== id
-        );
+      Galaxy.state.library.unshift(
+        item
+      );
 
       persistAll();
 
-      renderLibrary();
+      if (
+        Galaxy.state.view ===
+        "library"
+      ) {
 
-      toast("Library item deleted");
-    }
-  });
+        renderLibrary();
+
+      }
+
+    };
+
+  reader.onerror =
+    () =>
+      handleError(
+        new Error(
+          "Could not read the file."
+        ),
+        "Library"
+      );
+
+  reader.readAsDataURL(
+    file
+  );
+
 }
 
+
 function toggleLibraryFavorite(id) {
+
   const item =
     Galaxy.state.library.find(
-      entry => entry.id === id
+      entry =>
+        entry.id === id
     );
 
-  if (!item) return;
+  if (!item) {
+    return;
+  }
 
   item.favorite =
     !item.favorite;
@@ -2964,265 +3197,359 @@ function toggleLibraryFavorite(id) {
   persistAll();
 
   renderLibrary();
+
 }
 
-function renderLibrary(filter = null) {
-  if (filter) {
-    Galaxy.state.activeLibraryFilter =
-      filter;
+
+function deleteLibraryItem(id) {
+
+  Galaxy.state.library =
+    Galaxy.state.library.filter(
+      item =>
+        item.id !== id
+    );
+
+  persistAll();
+
+  renderLibrary();
+
+}
+
+
+function renderContentHeader(
+  eyebrow,
+  title,
+  actions = ""
+) {
+
+  const eyebrowElement =
+    $("#contentEyebrow");
+
+  const titleElement =
+    $("#contentTitle");
+
+  const actionsElement =
+    $("#contentActions");
+
+  if (eyebrowElement) {
+    eyebrowElement.textContent =
+      eyebrow;
   }
 
-  const filterValue =
-    Galaxy.state.activeLibraryFilter;
+  if (titleElement) {
+    titleElement.textContent =
+      title;
+  }
 
-  const items =
-    Galaxy.state.library.filter(
-      item => {
-        if (
-          filterValue === "all"
-        ) {
-          return true;
-        }
+  if (actionsElement) {
+    actionsElement.innerHTML =
+      actions;
+  }
 
-        if (
-          filterValue === "photos"
-        ) {
-          return item.type === "image";
-        }
+}
 
-        if (
-          filterValue === "videos"
-        ) {
-          return item.type === "video";
-        }
 
-        if (
-          filterValue === "files"
-        ) {
-          return item.type === "file";
-        }
+function renderContentTabs(
+  tabs,
+  active,
+  group
+) {
 
-        if (
-          filterValue === "favorites"
-        ) {
-          return item.favorite;
-        }
+  const root =
+    $("#contentTabs");
 
-        return true;
-      }
-    );
+  if (!root) {
+    return;
+  }
+
+  root.innerHTML =
+    tabs
+      .map(
+        (
+          [
+            value,
+            label
+          ]
+        ) => `
+          <button
+            class="flat-tab ${
+              value ===
+              active
+                ? "active"
+                : ""
+            }"
+            data-content-tab="${escapeHTML(value)}"
+            data-content-group="${escapeHTML(group)}"
+          >
+            ${escapeHTML(label)}
+          </button>
+        `
+      )
+      .join("");
+
+}
+
+
+function renderLibrary(
+  filter =
+    Galaxy.state
+      .activeLibraryFilter
+) {
+
+  Galaxy.state.activeLibraryFilter =
+    filter;
 
   renderContentHeader(
     "Your content",
-    "Library"
+    "Library",
+    `
+      <button
+        class="text-action"
+        data-action="library-upload"
+      >
+        ＋ Add
+      </button>
+    `
   );
 
-  renderContentTabs([
-    ["all", "All"],
-    ["photos", "Photos"],
-    ["videos", "Videos"],
-    ["packs", "Packs"],
-    ["files", "Files"],
-    ["favorites", "Favorites"]
-  ], filterValue, "library");
+  renderContentTabs(
+    [
+      ["all", "All"],
+      ["photos", "Photos"],
+      ["videos", "Videos"],
+      ["files", "Files"],
+      ["favorites", "Favorites"]
+    ],
+    filter,
+    "library"
+  );
 
-  const root = $("#contentBody");
+  const root =
+    $("#contentBody");
 
-  if (!root) return;
-
-  if (!items.length) {
-    root.innerHTML = `
-      <div class="empty-panel">
-
-        <span class="empty-icon">
-          ▣
-        </span>
-
-        <h3>
-          Your Library is empty
-        </h3>
-
-        <p>
-          Upload photos, videos and files from chat.
-        </p>
-
-      </div>
-    `;
-
+  if (!root) {
     return;
   }
 
-  root.innerHTML = `
-    <div class="media-grid">
+  const items =
+    Galaxy.state.library.filter(
+      item =>
 
-      ${items
-        .map(renderLibraryCard)
-        .join("")}
+        filter ===
+        "all" ||
 
-    </div>
-  `;
-}
+        (
+          filter ===
+          "photos" &&
+          item.type ===
+          "image"
+        ) ||
 
-function renderLibraryCard(item) {
-  const preview =
-    item.type === "image"
+        (
+          filter ===
+          "videos" &&
+          item.type ===
+          "video"
+        ) ||
+
+        (
+          filter ===
+          "files" &&
+          item.type ===
+          "file"
+        ) ||
+
+        (
+          filter ===
+          "favorites" &&
+          item.favorite
+        )
+    );
+
+  root.innerHTML =
+    items.length
+
       ? `
-        <img
-          src="${item.dataUrl}"
-          alt="${escapeHTML(item.name)}"
-        >
-      `
-      : item.type === "video"
-      ? `
-        <video
-          src="${item.dataUrl}"
-          muted
-          preload="metadata"
-        ></video>
+        <div class="media-grid">
 
-        <span class="video-overlay">
-          ▷
-        </span>
+          ${items
+            .map(
+              item => `
+              <article class="media-card">
+
+                <button
+                  class="media-preview"
+                  data-preview-library="${item.id}"
+                >
+
+                  ${
+                    item.type ===
+                    "image"
+
+                      ? `
+                        <img
+                          src="${item.dataUrl}"
+                          alt="${escapeHTML(item.name)}"
+                        >
+                      `
+
+                      : item.type ===
+                        "video"
+
+                        ? `
+                          <video
+                            src="${item.dataUrl}"
+                            muted
+                          ></video>
+                        `
+
+                        : `
+                          <div class="file-preview-tile">
+                            ▱
+                          </div>
+                        `
+                  }
+
+                </button>
+
+                <div class="media-meta">
+
+                  <div>
+
+                    <strong>
+                      ${escapeHTML(item.name)}
+                    </strong>
+
+                    <small>
+                      ${item.type}
+                    </small>
+
+                  </div>
+
+                  <button
+                    class="icon-btn ${
+                      item.favorite
+                        ? "active"
+                        : ""
+                    }"
+                    data-library-favorite="${item.id}"
+                  >
+                    ♡
+                  </button>
+
+                  <button
+                    class="icon-btn"
+                    data-delete-library="${item.id}"
+                  >
+                    ×
+                  </button>
+
+                </div>
+
+              </article>
+            `
+            )
+            .join("")}
+
+        </div>
       `
+
       : `
-        <div class="file-placeholder">
-          ▱
+        <div class="empty-panel">
+
+          <span>
+            ▣
+          </span>
+
+          <h3>
+            No items yet
+          </h3>
+
+          <p>
+            Add photos, videos or files.
+          </p>
+
         </div>
       `;
 
-  return `
-    <article
-      class="media-card"
-      data-context-type="library"
-      data-context-id="${item.id}"
-    >
-
-      <button
-        class="media-preview"
-        data-preview-library="${item.id}"
-      >
-        ${preview}
-      </button>
-
-      <div class="media-meta">
-
-        <div>
-
-          <strong>
-            ${escapeHTML(item.name)}
-          </strong>
-
-          <small>
-            ${formatBytes(item.size)}
-          </small>
-
-        </div>
-
-        <button
-          class="icon-btn ${
-            item.favorite ? "active" : ""
-          }"
-          data-library-favorite="${item.id}"
-        >
-          ♡
-        </button>
-
-      </div>
-
-    </article>
-  `;
 }
 
-/* =========================================================
-   SECTION 45 — FILE PREVIEW
-   ========================================================= */
 
 function previewLibraryItem(id) {
+
   const item =
     Galaxy.state.library.find(
-      entry => entry.id === id
+      entry =>
+        entry.id === id
     );
 
-  if (!item) return;
-
-  if (item.type === "image") {
-    previewImage(item);
+  if (!item) {
     return;
   }
 
-  if (item.type === "video") {
-    previewVideo(item);
+  if (
+    item.type ===
+    "image"
+  ) {
+
+    openModal({
+
+      title:
+        item.name,
+
+      width:
+        "1000px",
+
+      body: `
+        <div class="image-preview">
+
+          <img
+            src="${item.dataUrl}"
+            alt="${escapeHTML(item.name)}"
+          >
+
+        </div>
+      `
+
+    });
+
     return;
   }
 
-  previewFile(item);
-}
+  if (
+    item.type ===
+    "video"
+  ) {
 
-function previewImage(item) {
+    openModal({
+
+      title:
+        item.name,
+
+      width:
+        "1000px",
+
+      body: `
+        <div class="video-preview">
+
+          <video
+            src="${item.dataUrl}"
+            controls
+            autoplay
+          ></video>
+
+        </div>
+      `
+
+    });
+
+    return;
+  }
+
   openModal({
-    title: item.name,
 
-    width: "1000px",
-
-    body: `
-      <div class="image-preview">
-
-        <img
-          src="${item.dataUrl}"
-          alt="${escapeHTML(item.name)}"
-        >
-
-      </div>
-
-      <div class="preview-meta">
-
-        <span>
-          ${formatBytes(item.size)}
-        </span>
-
-        <button
-          class="text-action"
-          data-download-library="${item.id}"
-        >
-          Download
-        </button>
-
-      </div>
-    `
-  });
-}
-
-function previewVideo(item) {
-  openModal({
-    title: item.name,
-
-    width: "1000px",
-
-    body: `
-      <div class="video-preview">
-
-        <video
-          src="${item.dataUrl}"
-          controls
-          autoplay
-        ></video>
-
-      </div>
-
-      <div class="preview-meta">
-
-        <span>
-          ${formatBytes(item.size)}
-        </span>
-
-      </div>
-    `
-  });
-}
-
-function previewFile(item) {
-  openModal({
-    title: item.name,
+    title:
+      item.name,
 
     body: `
       <div class="file-preview">
@@ -3239,37 +3566,34 @@ function previewFile(item) {
           ${escapeHTML(item.mime || "File")}
         </p>
 
-        <span>
-          ${formatBytes(item.size)}
-        </span>
-
-        <button
-          class="text-action primary"
-          data-download-library="${item.id}"
-        >
-          Download
-        </button>
-
       </div>
     `
+
   });
+
 }
 
+
 /* =========================================================
-   SECTION 46 — PROJECT CRUD
+   PROJECTS
    ========================================================= */
 
 function createProject() {
+
   openProjectEditor();
+
 }
+
 
 function openProjectEditor(
   project = null
 ) {
+
   const editing =
-    Boolean(project);
+    !!project;
 
   openModal({
+
     title:
       editing
         ? "Edit project"
@@ -3283,6 +3607,7 @@ function openProjectEditor(
 
         <label>
           Name
+
           <input
             class="field"
             name="name"
@@ -3293,20 +3618,24 @@ function openProjectEditor(
             }"
             required
           >
+
         </label>
 
         <label>
           Description
+
           <textarea
             class="field textarea-field"
             name="description"
           >${
             project
               ? escapeHTML(
-                  project.description || ""
+                  project.description ||
+                  ""
                 )
               : ""
           }</textarea>
+
         </label>
 
         <label>
@@ -3328,7 +3657,8 @@ function openProjectEditor(
                 <option
                   value="${status}"
                   ${
-                    project?.status === status
+                    project?.status ===
+                    status
                       ? "selected"
                       : ""
                   }
@@ -3356,115 +3686,151 @@ function openProjectEditor(
 
       </form>
     `
+
   });
 
-  setTimeout(() => {
-    $("#projectForm")?.addEventListener(
-      "submit",
-      event => {
-        event.preventDefault();
+  setTimeout(
+    () => {
 
-        const form =
-          new FormData(event.currentTarget);
+      on(
+        $("#projectForm"),
+        "submit",
+        event => {
 
-        const data = {
-          name:
-            form.get("name").trim(),
+          event.preventDefault();
 
-          description:
-            form.get("description").trim(),
+          const form =
+            new FormData(
+              event.currentTarget
+            );
 
-          status:
-            form.get("status")
-        };
+          const data = {
 
-        if (!data.name) return;
+            name:
+              String(
+                form.get("name") ||
+                ""
+              ).trim(),
 
-        if (editing) {
-          project.name = data.name;
+            description:
+              String(
+                form.get("description") ||
+                ""
+              ).trim(),
 
-          project.description =
-            data.description;
+            status:
+              form.get("status")
 
-          project.status =
-            data.status;
+          };
 
-          project.updatedAt =
-            now();
-        } else {
-          Galaxy.state.projects.unshift({
-            id: uid("project"),
+          if (!data.name) {
+            return;
+          }
 
-            ...data,
+          if (editing) {
 
-            createdAt: now(),
+            Object.assign(
+              project,
+              data,
+              {
+                updatedAt:
+                  now()
+              }
+            );
 
-            updatedAt: now(),
+          } else {
 
-            pinned: false,
+            Galaxy.state.projects.unshift({
 
-            files: [],
+              id:
+                uid("project"),
 
-            chats: []
-          });
+              ...data,
+
+              createdAt:
+                now(),
+
+              updatedAt:
+                now()
+
+            });
+
+          }
+
+          persistAll();
+
+          closeOverlay();
+
+          renderProjects();
+
         }
+      );
 
-        persistAll();
+    },
+    0
+  );
 
-        renderProjects();
-
-        closeOverlay();
-
-        toast(
-          editing
-            ? "Project updated"
-            : "Project created"
-        );
-      }
-    );
-  }, 0);
 }
+
 
 function editProject(id) {
+
   const project =
     Galaxy.state.projects.find(
-      item => item.id === id
+      item =>
+        item.id === id
     );
 
-  if (!project) return;
+  if (project) {
+    openProjectEditor(
+      project
+    );
+  }
 
-  openProjectEditor(project);
 }
 
+
 function deleteProject(id) {
+
   const project =
     Galaxy.state.projects.find(
-      item => item.id === id
+      item =>
+        item.id === id
     );
 
-  if (!project) return;
+  if (!project) {
+    return;
+  }
 
   confirmAction({
-    title: "Delete project",
 
-    message: `Delete “${project.name}”?`,
+    title:
+      "Delete project",
+
+    message:
+      `Delete “${project.name}”?`,
 
     onConfirm() {
+
       Galaxy.state.projects =
         Galaxy.state.projects.filter(
-          item => item.id !== id
+          item =>
+            item.id !== id
         );
 
       persistAll();
 
       renderProjects();
 
-      toast("Project deleted");
     }
+
   });
+
 }
 
+
 function renderProjects() {
+
   renderContentHeader(
     "Workspace",
     "Projects",
@@ -3478,80 +3844,101 @@ function renderProjects() {
     `
   );
 
-  renderContentTabs([
-    ["all", "All"],
-    ["active", "Active"],
-    ["planning", "Planning"],
-    ["complete", "Complete"]
-  ], "all", "projects");
+  renderContentTabs(
+    [
+      ["all", "All"],
+      ["active", "Active"],
+      ["planning", "Planning"],
+      ["complete", "Complete"]
+    ],
+    "all",
+    "projects"
+  );
 
-  const root = $("#contentBody");
+  const root =
+    $("#contentBody");
 
-  if (!root) return;
-
-  if (!Galaxy.state.projects.length) {
-    root.innerHTML = `
-      <div class="empty-panel">
-        <span>▱</span>
-        <h3>No projects yet</h3>
-        <p>Create your first GALAXY project.</p>
-      </div>
-    `;
-
+  if (!root) {
     return;
   }
 
-  root.innerHTML = `
-    <div class="resource-grid">
+  root.innerHTML =
+    Galaxy.state.projects.length
 
-      ${Galaxy.state.projects
-        .map(
-          project => `
-          <article
-            class="resource-card"
-            data-context-type="project"
-            data-context-id="${project.id}"
-          >
+      ? `
+        <div class="resource-grid">
 
-            <div class="resource-icon">
-              ▱
-            </div>
+          ${Galaxy.state.projects
+            .map(
+              project => `
+              <article
+                class="resource-card"
+                data-context-type="project"
+                data-context-id="${project.id}"
+              >
 
-            <div class="resource-copy">
+                <div class="resource-icon">
+                  ▱
+                </div>
 
-              <strong>
-                ${escapeHTML(project.name)}
-              </strong>
+                <div class="resource-copy">
 
-              <span>
-                ${escapeHTML(project.status)}
-              </span>
+                  <strong>
+                    ${escapeHTML(project.name)}
+                  </strong>
 
-            </div>
+                  <span>
+                    ${escapeHTML(project.status)}
+                  </span>
 
-            <button
-              class="icon-btn"
-              data-edit-project="${project.id}"
-            >
-              ⋯
-            </button>
+                </div>
 
-          </article>
-        `
-        )
-        .join("")}
+                <button
+                  class="icon-btn"
+                  data-edit-project="${project.id}"
+                >
+                  ⋯
+                </button>
 
-    </div>
-  `;
+              </article>
+            `
+            )
+            .join("")}
+
+        </div>
+      `
+
+      : `
+        <div class="empty-panel">
+
+          <span>
+            ▱
+          </span>
+
+          <h3>
+            No projects yet
+          </h3>
+
+          <p>
+            Create your first GALAXY project.
+          </p>
+
+        </div>
+      `;
+
 }
 
+
 /* =========================================================
-   SECTION 47 — SCHEDULED TASK UI
+   SCHEDULED TASKS
    ========================================================= */
 
 function createScheduledTask() {
+
   openModal({
-    title: "New scheduled task",
+
+    title:
+      "New scheduled task",
 
     body: `
       <form
@@ -3567,6 +3954,7 @@ function createScheduledTask() {
             name="name"
             required
           >
+
         </label>
 
         <label>
@@ -3577,6 +3965,7 @@ function createScheduledTask() {
             name="prompt"
             required
           ></textarea>
+
         </label>
 
         <label>
@@ -3586,6 +3975,7 @@ function createScheduledTask() {
             class="field"
             name="frequency"
           >
+
             <option value="once">
               Once
             </option>
@@ -3601,6 +3991,7 @@ function createScheduledTask() {
             <option value="monthly">
               Monthly
             </option>
+
           </select>
 
         </label>
@@ -3613,6 +4004,7 @@ function createScheduledTask() {
             type="datetime-local"
             name="datetime"
           >
+
         </label>
 
         <button
@@ -3624,56 +4016,82 @@ function createScheduledTask() {
 
       </form>
     `
+
   });
 
-  setTimeout(() => {
-    $("#scheduleForm")?.addEventListener(
-      "submit",
-      event => {
-        event.preventDefault();
+  setTimeout(
+    () => {
 
-        const form =
-          new FormData(event.currentTarget);
+      on(
+        $("#scheduleForm"),
+        "submit",
+        event => {
 
-        Galaxy.state.scheduled.unshift({
-          id: uid("schedule"),
+          event.preventDefault();
 
-          name:
-            form.get("name").trim(),
+          const form =
+            new FormData(
+              event.currentTarget
+            );
 
-          prompt:
-            form.get("prompt").trim(),
+          Galaxy.state.scheduled.unshift({
 
-          frequency:
-            form.get("frequency"),
+            id:
+              uid("schedule"),
 
-          datetime:
-            form.get("datetime"),
+            name:
+              String(
+                form.get("name") ||
+                ""
+              ).trim(),
 
-          enabled: true,
+            prompt:
+              String(
+                form.get("prompt") ||
+                ""
+              ).trim(),
 
-          createdAt: now()
-        });
+            frequency:
+              form.get("frequency"),
 
-        persistAll();
+            datetime:
+              form.get("datetime"),
 
-        renderScheduled();
+            enabled:
+              true,
 
-        closeOverlay();
+            createdAt:
+              now()
 
-        toast("Task scheduled");
-      }
-    );
-  }, 0);
+          });
+
+          persistAll();
+
+          closeOverlay();
+
+          renderScheduled();
+
+        }
+      );
+
+    },
+    0
+  );
+
 }
 
+
 function toggleScheduledTask(id) {
+
   const task =
     Galaxy.state.scheduled.find(
-      item => item.id === id
+      item =>
+        item.id === id
     );
 
-  if (!task) return;
+  if (!task) {
+    return;
+  }
 
   task.enabled =
     !task.enabled;
@@ -3681,22 +4099,27 @@ function toggleScheduledTask(id) {
   persistAll();
 
   renderScheduled();
+
 }
 
+
 function deleteScheduledTask(id) {
+
   Galaxy.state.scheduled =
     Galaxy.state.scheduled.filter(
-      item => item.id !== id
+      item =>
+        item.id !== id
     );
 
   persistAll();
 
   renderScheduled();
 
-  toast("Scheduled task deleted");
 }
 
+
 function renderScheduled() {
+
   renderContentHeader(
     "Automation",
     "Scheduled",
@@ -3710,18 +4133,26 @@ function renderScheduled() {
     `
   );
 
-  renderContentTabs([
-    ["upcoming", "Upcoming"],
-    ["recurring", "Recurring"],
-    ["completed", "Completed"]
-  ], "upcoming", "scheduled");
+  renderContentTabs(
+    [
+      ["upcoming", "Upcoming"],
+      ["recurring", "Recurring"],
+      ["completed", "Completed"]
+    ],
+    "upcoming",
+    "scheduled"
+  );
 
-  const root = $("#contentBody");
+  const root =
+    $("#contentBody");
 
-  if (!root) return;
+  if (!root) {
+    return;
+  }
 
   root.innerHTML =
     Galaxy.state.scheduled.length
+
       ? `
         <div class="schedule-list">
 
@@ -3742,6 +4173,7 @@ function renderScheduled() {
 
                   <span>
                     ${escapeHTML(task.frequency)}
+
                     ${
                       task.datetime
                         ? ` · ${escapeHTML(task.datetime)}`
@@ -3753,7 +4185,9 @@ function renderScheduled() {
 
                 <button
                   class="toggle-switch ${
-                    task.enabled ? "active" : ""
+                    task.enabled
+                      ? "active"
+                      : ""
                   }"
                   data-toggle-scheduled="${task.id}"
                 >
@@ -3774,56 +4208,75 @@ function renderScheduled() {
 
         </div>
       `
+
       : `
         <div class="empty-panel">
-          <span>◷</span>
-          <h3>No scheduled tasks</h3>
-          <p>Create recurring AI workflows.</p>
+
+          <span>
+            ◷
+          </span>
+
+          <h3>
+            No scheduled tasks
+          </h3>
+
+          <p>
+            Create recurring AI workflows.
+          </p>
+
         </div>
       `;
+
 }
 
+
 /* =========================================================
-   SECTION 48 — PLUGIN MANAGER
+   PLUGINS
    ========================================================= */
 
 function togglePluginInstall(id) {
+
   const plugin =
     Galaxy.state.plugins.find(
-      item => item.id === id
+      item =>
+        item.id === id
     );
 
-  if (!plugin) return;
+  if (!plugin) {
+    return;
+  }
 
   plugin.installed =
     !plugin.installed;
 
-  if (!plugin.installed) {
-    plugin.connected = false;
+  if (
+    !plugin.installed
+  ) {
+    plugin.connected =
+      false;
   }
 
   persistAll();
 
   renderPlugins();
 
-  toast(
-    plugin.installed
-      ? `${plugin.name} installed`
-      : `${plugin.name} removed`
-  );
 }
 
+
 function togglePluginConnection(id) {
+
   const plugin =
     Galaxy.state.plugins.find(
-      item => item.id === id
+      item =>
+        item.id === id
     );
 
-  if (!plugin) return;
-
-  if (!plugin.installed) {
-    plugin.installed = true;
+  if (!plugin) {
+    return;
   }
+
+  plugin.installed =
+    true;
 
   plugin.connected =
     !plugin.connected;
@@ -3832,28 +4285,32 @@ function togglePluginConnection(id) {
 
   renderPlugins();
 
-  toast(
-    plugin.connected
-      ? `${plugin.name} connected`
-      : `${plugin.name} disconnected`
-  );
 }
 
+
 function renderPlugins() {
+
   renderContentHeader(
     "Connections",
     "Plugins"
   );
 
-  renderContentTabs([
-    ["installed", "Installed"],
-    ["discover", "Discover"],
-    ["permissions", "Permissions"]
-  ], "discover", "plugins");
+  renderContentTabs(
+    [
+      ["installed", "Installed"],
+      ["discover", "Discover"],
+      ["permissions", "Permissions"]
+    ],
+    "discover",
+    "plugins"
+  );
 
-  const root = $("#contentBody");
+  const root =
+    $("#contentBody");
 
-  if (!root) return;
+  if (!root) {
+    return;
+  }
 
   root.innerHTML = `
     <div class="resource-grid">
@@ -3894,6 +4351,7 @@ function renderPlugins() {
 
               ${
                 plugin.installed
+
                   ? `
                     <button
                       class="text-action"
@@ -3906,6 +4364,7 @@ function renderPlugins() {
                       }
                     </button>
                   `
+
                   : ""
               }
 
@@ -3918,18 +4377,27 @@ function renderPlugins() {
 
     </div>
   `;
+
 }
 
+
 /* =========================================================
-   SECTION 49 — GPT / AGENT CREATOR
+   GPT / AGENT CREATOR
    ========================================================= */
 
 function createAgent() {
+
   openAgentEditor();
+
 }
 
-function openAgentEditor(agent = null) {
+
+function openAgentEditor(
+  agent = null
+) {
+
   openModal({
+
     title:
       agent
         ? "Edit GPT"
@@ -3954,6 +4422,7 @@ function openAgentEditor(agent = null) {
             }"
             required
           >
+
         </label>
 
         <label>
@@ -3965,9 +4434,13 @@ function openAgentEditor(agent = null) {
             required
           >${
             agent
-              ? escapeHTML(agent.instructions)
+              ? escapeHTML(
+                  agent.instructions ||
+                  ""
+                )
               : ""
           }</textarea>
+
         </label>
 
         <label>
@@ -3998,47 +4471,6 @@ function openAgentEditor(agent = null) {
 
         </label>
 
-        <label>
-          Capabilities
-
-          <div class="checkbox-list">
-
-            <label>
-              <input
-                type="checkbox"
-                name="web"
-              >
-              Web search
-            </label>
-
-            <label>
-              <input
-                type="checkbox"
-                name="images"
-              >
-              Images
-            </label>
-
-            <label>
-              <input
-                type="checkbox"
-                name="files"
-              >
-              Files
-            </label>
-
-            <label>
-              <input
-                type="checkbox"
-                name="code"
-              >
-              Code
-            </label>
-
-          </div>
-
-        </label>
-
         <button
           class="text-action primary"
           type="submit"
@@ -4052,85 +4484,91 @@ function openAgentEditor(agent = null) {
 
       </form>
     `
+
   });
 
-  setTimeout(() => {
-    $("#agentForm")?.addEventListener(
-      "submit",
-      event => {
-        event.preventDefault();
+  setTimeout(
+    () => {
 
-        const form =
-          new FormData(event.currentTarget);
+      on(
+        $("#agentForm"),
+        "submit",
+        event => {
 
-        const data = {
-          name:
-            form.get("name").trim(),
+          event.preventDefault();
 
-          instructions:
-            form.get("instructions").trim(),
+          const form =
+            new FormData(
+              event.currentTarget
+            );
 
-          personality:
-            form.get("personality"),
+          const data = {
 
-          capabilities: {
-            web: form.has("web"),
-            images: form.has("images"),
-            files: form.has("files"),
-            code: form.has("code")
+            name:
+              String(
+                form.get("name") ||
+                ""
+              ).trim(),
+
+            instructions:
+              String(
+                form.get("instructions") ||
+                ""
+              ).trim(),
+
+            personality:
+              form.get("personality")
+
+          };
+
+          if (agent) {
+
+            Object.assign(
+              agent,
+              data,
+              {
+                updatedAt:
+                  now()
+              }
+            );
+
+          } else {
+
+            Galaxy.state.agents.unshift({
+
+              id:
+                uid("agent"),
+
+              ...data,
+
+              createdAt:
+                now(),
+
+              updatedAt:
+                now()
+
+            });
+
           }
-        };
 
-        if (agent) {
-          Object.assign(
-            agent,
-            data,
-            {
-              updatedAt: now()
-            }
-          );
-        } else {
-          Galaxy.state.agents.unshift({
-            id: uid("agent"),
+          persistAll();
 
-            ...data,
+          closeOverlay();
 
-            createdAt: now(),
+          renderAgents();
 
-            updatedAt: now()
-          });
         }
+      );
 
-        persistAll();
+    },
+    0
+  );
 
-        renderAgents();
-
-        closeOverlay();
-
-        toast(
-          agent
-            ? "GPT updated"
-            : "GPT created"
-        );
-      }
-    );
-  }, 0);
 }
 
-function deleteAgent(id) {
-  Galaxy.state.agents =
-    Galaxy.state.agents.filter(
-      item => item.id !== id
-    );
-
-  persistAll();
-
-  renderAgents();
-
-  toast("GPT deleted");
-}
 
 function renderAgents() {
+
   renderContentHeader(
     "Agents",
     "GPTs",
@@ -4144,18 +4582,26 @@ function renderAgents() {
     `
   );
 
-  renderContentTabs([
-    ["mine", "Mine"],
-    ["favorites", "Favorites"],
-    ["explore", "Explore"]
-  ], "mine", "gpts");
+  renderContentTabs(
+    [
+      ["mine", "Mine"],
+      ["favorites", "Favorites"],
+      ["explore", "Explore"]
+    ],
+    "mine",
+    "gpts"
+  );
 
-  const root = $("#contentBody");
+  const root =
+    $("#contentBody");
 
-  if (!root) return;
+  if (!root) {
+    return;
+  }
 
   root.innerHTML =
     Galaxy.state.agents.length
+
       ? `
         <div class="resource-grid">
 
@@ -4194,24 +4640,41 @@ function renderAgents() {
 
         </div>
       `
+
       : `
         <div class="empty-panel">
-          <span>✧</span>
-          <h3>Create your first GPT</h3>
-          <p>Build specialized GALAXY agents.</p>
+
+          <span>
+            ✧
+          </span>
+
+          <h3>
+            Create your first GPT
+          </h3>
+
+          <p>
+            Build specialized GALAXY agents.
+          </p>
+
         </div>
       `;
+
 }
 
+
 /* =========================================================
-   SECTION 50 — SITES WORKSPACE
+   SITES
    ========================================================= */
 
 function createSite() {
-  const site = {
-    id: uid("site"),
 
-    name: "Untitled Site",
+  const site = {
+
+    id:
+      uid("site"),
+
+    name:
+      "Untitled Site",
 
     html:
       "<h1>GALAXY Site</h1><p>Start building here.</p>",
@@ -4219,34 +4682,50 @@ function createSite() {
     css:
       "body { font-family: system-ui; padding: 40px; }",
 
-    js: "",
+    js:
+      "",
 
-    status: "draft",
+    status:
+      "draft",
 
-    createdAt: now(),
+    createdAt:
+      now(),
 
-    updatedAt: now()
+    updatedAt:
+      now()
+
   };
 
-  Galaxy.state.sites.unshift(site);
+  Galaxy.state.sites.unshift(
+    site
+  );
 
   Galaxy.state.activeSiteId =
     site.id;
 
   persistAll();
 
-  openSiteEditor(site.id);
+  openSiteEditor(
+    site.id
+  );
+
 }
 
+
 function openSiteEditor(id) {
+
   const site =
     Galaxy.state.sites.find(
-      item => item.id === id
+      item =>
+        item.id === id
     );
 
-  if (!site) return;
+  if (!site) {
+    return;
+  }
 
-  Galaxy.state.activeSiteId = id;
+  Galaxy.state.activeSiteId =
+    id;
 
   renderContentHeader(
     "Build",
@@ -4268,7 +4747,12 @@ function openSiteEditor(id) {
     `
   );
 
-  const root = $("#contentBody");
+  const root =
+    $("#contentBody");
+
+  if (!root) {
+    return;
+  }
 
   root.innerHTML = `
     <div class="site-editor">
@@ -4306,9 +4790,12 @@ function openSiteEditor(id) {
 
     </div>
   `;
+
 }
 
+
 function saveActiveSite() {
+
   const site =
     Galaxy.state.sites.find(
       item =>
@@ -4319,22 +4806,83 @@ function saveActiveSite() {
   const editor =
     $("#siteEditor");
 
-  if (!site || !editor) return;
+  if (
+    !site ||
+    !editor
+  ) {
+    return;
+  }
 
-  const language =
-    editor.dataset.language;
-
-  site[language] =
+  site[
+    editor.dataset.language
+  ] =
     editor.value;
 
-  site.updatedAt = now();
+  site.updatedAt =
+    now();
 
   persistAll();
 
-  toast("Site saved");
+  toast(
+    "Site saved"
+  );
+
 }
 
+
+function switchSiteEditorTab(
+  language
+) {
+
+  const site =
+    Galaxy.state.sites.find(
+      item =>
+        item.id ===
+        Galaxy.state.activeSiteId
+    );
+
+  const editor =
+    $("#siteEditor");
+
+  if (
+    !site ||
+    !editor
+  ) {
+    return;
+  }
+
+  site[
+    editor.dataset.language
+  ] =
+    editor.value;
+
+  editor.dataset.language =
+    language;
+
+  editor.value =
+    site[
+      language
+    ] ||
+    "";
+
+  $$(".editor-tab")
+    .forEach(
+      tab =>
+
+        tab.classList.toggle(
+          "active",
+          tab.dataset.siteTab ===
+            language
+        )
+    );
+
+  persistAll();
+
+}
+
+
 function previewActiveSite() {
+
   saveActiveSite();
 
   const site =
@@ -4344,29 +4892,43 @@ function previewActiveSite() {
         Galaxy.state.activeSiteId
     );
 
-  if (!site) return;
+  if (!site) {
+    return;
+  }
 
   const source = `
     <!DOCTYPE html>
+
     <html>
-    <head>
-      <style>
-        ${site.css}
-      </style>
-    </head>
-    <body>
-      ${site.html}
-      <script>
-        ${site.js}
-      <\/script>
-    </body>
+
+      <head>
+
+        <style>
+          ${site.css}
+        </style>
+
+      </head>
+
+      <body>
+
+        ${site.html}
+
+        <script>
+          ${site.js}
+        <\/script>
+
+      </body>
+
     </html>
   `;
 
   openModal({
-    title: site.name,
 
-    width: "1100px",
+    title:
+      site.name,
+
+    width:
+      "1100px",
 
     body: `
       <iframe
@@ -4374,19 +4936,29 @@ function previewActiveSite() {
         id="sitePreviewFrame"
       ></iframe>
     `
+
   });
 
-  setTimeout(() => {
-    const frame =
-      $("#sitePreviewFrame");
+  setTimeout(
+    () => {
 
-    if (frame) {
-      frame.srcdoc = source;
-    }
-  }, 0);
+      const frame =
+        $("#sitePreviewFrame");
+
+      if (frame) {
+        frame.srcdoc =
+          source;
+      }
+
+    },
+    0
+  );
+
 }
 
+
 function renderSites() {
+
   renderContentHeader(
     "Build",
     "Sites",
@@ -4400,16 +4972,26 @@ function renderSites() {
     `
   );
 
-  renderContentTabs([
-    ["drafts", "Drafts"],
-    ["published", "Published"],
-    ["templates", "Templates"]
-  ], "drafts", "sites");
+  renderContentTabs(
+    [
+      ["drafts", "Drafts"],
+      ["published", "Published"],
+      ["templates", "Templates"]
+    ],
+    "drafts",
+    "sites"
+  );
 
-  const root = $("#contentBody");
+  const root =
+    $("#contentBody");
+
+  if (!root) {
+    return;
+  }
 
   root.innerHTML =
     Galaxy.state.sites.length
+
       ? `
         <div class="resource-grid">
 
@@ -4448,22 +5030,38 @@ function renderSites() {
 
         </div>
       `
+
       : `
         <div class="empty-panel">
-          <span>⌘</span>
-          <h3>No sites yet</h3>
-          <p>Create a website in GALAXY Work.</p>
+
+          <span>
+            ⌘
+          </span>
+
+          <h3>
+            No sites yet
+          </h3>
+
+          <p>
+            Create a website in GALAXY Work.
+          </p>
+
         </div>
       `;
+
 }
 
+
 /* =========================================================
-   SECTION 51 — IMAGE WORKSPACE
+   IMAGES
    ========================================================= */
 
 function createImageConcept() {
+
   openModal({
-    title: "Create image",
+
+    title:
+      "Create image",
 
     body: `
       <form
@@ -4477,7 +5075,6 @@ function createImageConcept() {
           <textarea
             class="field textarea-field"
             name="prompt"
-            placeholder="A futuristic city at sunset..."
             required
           ></textarea>
 
@@ -4516,13 +5113,17 @@ function createImageConcept() {
 
       </form>
     `
+
   });
 
-  setTimeout(() => {
-    $("#imageConceptForm")
-      ?.addEventListener(
+  setTimeout(
+    () => {
+
+      on(
+        $("#imageConceptForm"),
         "submit",
         event => {
+
           event.preventDefault();
 
           const form =
@@ -4531,17 +5132,25 @@ function createImageConcept() {
             );
 
           Galaxy.state.images.unshift({
-            id: uid("image"),
+
+            id:
+              uid("image"),
 
             prompt:
-              form.get("prompt").trim(),
+              String(
+                form.get("prompt") ||
+                ""
+              ).trim(),
 
             ratio:
               form.get("ratio"),
 
-            status: "concept",
+            status:
+              "concept",
 
-            createdAt: now()
+            createdAt:
+              now()
+
           });
 
           persistAll();
@@ -4550,15 +5159,18 @@ function createImageConcept() {
 
           renderImages();
 
-          toast(
-            "Image concept saved. Connect your image API to render it."
-          );
         }
       );
-  }, 0);
+
+    },
+    0
+  );
+
 }
 
+
 function renderImages() {
+
   renderContentHeader(
     "Create",
     "Images",
@@ -4572,16 +5184,26 @@ function renderImages() {
     `
   );
 
-  renderContentTabs([
-    ["recent", "Recent"],
-    ["collections", "Collections"],
-    ["references", "References"]
-  ], "recent", "images");
+  renderContentTabs(
+    [
+      ["recent", "Recent"],
+      ["collections", "Collections"],
+      ["references", "References"]
+    ],
+    "recent",
+    "images"
+  );
 
-  const root = $("#contentBody");
+  const root =
+    $("#contentBody");
+
+  if (!root) {
+    return;
+  }
 
   root.innerHTML =
     Galaxy.state.images.length
+
       ? `
         <div class="image-concept-grid">
 
@@ -4596,7 +5218,10 @@ function renderImages() {
 
                 <strong>
                   ${escapeHTML(
-                    image.prompt.slice(0, 60)
+                    image.prompt.slice(
+                      0,
+                      80
+                    )
                   )}
                 </strong>
 
@@ -4611,88 +5236,124 @@ function renderImages() {
 
         </div>
       `
+
       : `
         <div class="empty-panel">
-          <span>◫</span>
-          <h3>Create images</h3>
-          <p>Generate concepts and connect an image model later.</p>
+
+          <span>
+            ◫
+          </span>
+
+          <h3>
+            Create images
+          </h3>
+
+          <p>
+            Image generation is ready for a connected backend.
+          </p>
+
         </div>
       `;
+
 }
 
+
 /* =========================================================
-   SECTION 52 — PACKS SYSTEM
+   PACKS SYSTEM
    ========================================================= */
 
 function installPack(id) {
+
   const pack =
     Galaxy.state.packs.find(
-      item => item.id === id
+      item =>
+        item.id === id
     );
 
-  if (!pack) return;
-
-  pack.installed = true;
-
-  persistAll();
-
-  renderPacks();
-
-  toast(`${pack.name} installed`);
-}
-
-function removePack(id) {
-  const pack =
-    Galaxy.state.packs.find(
-      item => item.id === id
-    );
-
-  if (!pack) return;
-
-  pack.installed = false;
-
-  persistAll();
-
-  renderPacks();
-
-  toast(`${pack.name} removed`);
-}
-
-function usePackItem(
-  packId,
-  itemName
-) {
-  const pack =
-    Galaxy.state.packs.find(
-      item => item.id === packId
-    );
-
-  if (!pack) return;
-
-  const input =
-    $("#promptInput");
-
-  switchMode("chat");
-
-  if (input) {
-    input.value =
-      `Use the ${itemName} workflow from the ${pack.name}.\n\n`;
-
-    autoResizeTextarea(input);
-
-    input.focus();
+  if (!pack) {
+    return;
   }
 
-  toast(`${itemName} loaded`);
+  pack.installed =
+    true;
+
+  persistAll();
+
+  renderPacks(
+    Galaxy.state
+      .activePackFilter
+  );
+
 }
 
-function openPack(id) {
+
+function removePack(id) {
+
   const pack =
     Galaxy.state.packs.find(
-      item => item.id === id
+      item =>
+        item.id === id
     );
 
-  if (!pack) return;
+  if (!pack) {
+    return;
+  }
+
+  pack.installed =
+    false;
+
+  persistAll();
+
+  renderPacks(
+    Galaxy.state
+      .activePackFilter
+  );
+
+}
+
+
+function togglePackInstall(id) {
+
+  const pack =
+    Galaxy.state.packs.find(
+      item =>
+        item.id === id
+    );
+
+  if (!pack) {
+    return;
+  }
+
+  if (
+    pack.installed
+  ) {
+
+    removePack(
+      id
+    );
+
+  } else {
+
+    installPack(
+      id
+    );
+
+  }
+
+}
+
+
+function openPack(id) {
+
+  const pack =
+    Galaxy.state.packs.find(
+      item =>
+        item.id === id
+    );
+
+  if (!pack) {
+    return;
+  }
 
   renderContentHeader(
     "Pack",
@@ -4711,80 +5372,52 @@ function openPack(id) {
     `
   );
 
-  const root = $("#contentBody");
+  const root =
+    $("#contentBody");
+
+  if (!root) {
+    return;
+  }
 
   root.innerHTML = `
-    <div class="pack-detail">
+    <div class="pack-workflow-list">
 
-      <div class="pack-hero">
+      ${pack.items
+        .map(
+          item => `
+          <button
+            class="pack-workflow-row"
+            data-pack-item="${escapeHTML(item)}"
+          >
 
-        <span class="pack-large-icon">
-          ${pack.icon}
-        </span>
+            <span class="pack-workflow-icon">
+              ✦
+            </span>
 
-        <div>
+            <span>
+              ${escapeHTML(item)}
+            </span>
 
-          <h2>
-            ${escapeHTML(pack.name)}
-          </h2>
+            <span class="resource-arrow">
+              ›
+            </span>
 
-          <p>
-            ${escapeHTML(pack.description)}
-          </p>
-
-          <div class="pack-tags">
-
-            ${pack.tags
-              .map(
-                tag => `
-                <span>
-                  ${escapeHTML(tag)}
-                </span>
-              `
-              )
-              .join("")}
-
-          </div>
-
-        </div>
-
-      </div>
-
-      <div class="pack-workflow-list">
-
-        ${pack.items
-          .map(
-            item => `
-            <button
-              class="pack-workflow"
-              data-use-pack="${pack.id}"
-              data-pack-item="${escapeHTML(item)}"
-            >
-
-              <span class="pack-workflow-icon">
-                ✦
-              </span>
-
-              <span>
-                ${escapeHTML(item)}
-              </span>
-
-              <span class="resource-arrow">
-                ›
-              </span>
-
-            </button>
-          `
-          )
-          .join("")}
-
-      </div>
+          </button>
+        `
+        )
+        .join("")}
 
     </div>
   `;
+
 }
 
-function renderPacks(filter = "all") {
+
+function renderPacks(
+  filter =
+    "all"
+) {
+
   Galaxy.state.activePackFilter =
     filter;
 
@@ -4793,36 +5426,39 @@ function renderPacks(filter = "all") {
     "Packs"
   );
 
-  const categories = [
-    ["all", "All"],
-    ["prompt", "Prompts"],
-    ["website", "Websites"],
-    ["creator", "Creator"],
-    ["productivity", "Productivity"],
-    ["research", "Research"],
-    ["business", "Business"],
-    ["developer", "Developer"],
-    ["design", "Design"],
-    ["video", "Video"],
-    ["startup", "Startup"],
-    ["data", "Data"],
-    ["education", "Learning"]
-  ];
-
   renderContentTabs(
-    categories,
+    [
+      ["all", "All"],
+      ["prompt", "Prompts"],
+      ["website", "Websites"],
+      ["creator", "Creator"],
+      ["productivity", "Productivity"],
+      ["research", "Research"],
+      ["developer", "Developer"],
+      ["design", "Design"],
+      ["video", "Video"],
+      ["startup", "Startup"],
+      ["data", "Data"]
+    ],
     filter,
     "packs"
   );
 
+  const root =
+    $("#contentBody");
+
+  if (!root) {
+    return;
+  }
+
   const packs =
     Galaxy.state.packs.filter(
       pack =>
-        filter === "all" ||
-        pack.category === filter
+        filter ===
+        "all" ||
+        pack.category ===
+        filter
     );
-
-  const root = $("#contentBody");
 
   root.innerHTML = `
     <div class="packs-grid">
@@ -4897,15 +5533,20 @@ function renderPacks(filter = "all") {
 
     </div>
   `;
+
 }
 
+
 /* =========================================================
-   SECTION 53 — PROMPT TEMPLATES
+   PROMPT TEMPLATES
    ========================================================= */
 
 function openPromptTemplates() {
+
   openModal({
-    title: "Prompt templates",
+
+    title:
+      "Prompt templates",
 
     body: `
       <div class="prompt-template-list">
@@ -4941,127 +5582,113 @@ function openPromptTemplates() {
 
       </div>
     `
+
   });
+
 }
 
+
 function usePromptTemplate(id) {
+
   const prompt =
     Galaxy.state.prompts.find(
-      item => item.id === id
+      item =>
+        item.id === id
     );
 
-  if (!prompt) return;
+  if (!prompt) {
+    return;
+  }
 
   closeOverlay();
 
-  switchMode("chat");
+  switchMode(
+    "chat"
+  );
 
   const input =
     $("#promptInput");
 
+  if (!input) {
+    return;
+  }
+
   input.value =
     `${prompt.prompt}\n\n`;
 
-  autoResizeTextarea(input);
+  autoResizeTextarea(
+    input
+  );
 
   input.focus();
+
 }
+
 
 /* =========================================================
-   SECTION 54 — WORK MODE EDITOR
+   WORK MODE
    ========================================================= */
 
-function switchMode(mode) {
-  Galaxy.state.mode = mode;
-
-  Galaxy.state.view = mode;
-
-  $$(".mode-tab").forEach(tab => {
-    const active =
-      tab.dataset.mode === mode;
-
-    tab.classList.toggle(
-      "active",
-      active
-    );
-
-    tab.setAttribute(
-      "aria-selected",
-      String(active)
-    );
-  });
-
-  $("#chatView")
-    ?.classList.toggle(
-      "active-view",
-      mode === "chat"
-    );
-
-  $("#workView")
-    ?.classList.toggle(
-      "active-view",
-      mode === "work"
-    );
-
-  $("#contentView")
-    ?.classList.remove(
-      "active-view"
-    );
-
-  if (mode === "work") {
-    ensureWorkDocument();
-
-    renderWorkDocument();
-  }
-}
-
 function ensureWorkDocument() {
-  let document =
+
+  let doc =
     Galaxy.state.workDocuments.find(
       item =>
         item.id ===
-        Galaxy.state.activeWorkDocumentId
+        Galaxy.state
+          .activeWorkDocumentId
     );
 
-  if (!document) {
-    document = {
-      id: uid("work"),
+  if (!doc) {
 
-      title: "Untitled Work",
+    doc = {
 
-      type: "document",
+      id:
+        uid("work"),
+
+      title:
+        "Untitled Work",
 
       content:
         "# GALAXY Work\n\nStart creating here.",
 
-      createdAt: now(),
+      createdAt:
+        now(),
 
-      updatedAt: now()
+      updatedAt:
+        now()
+
     };
 
     Galaxy.state.workDocuments.unshift(
-      document
+      doc
     );
 
     Galaxy.state.activeWorkDocumentId =
-      document.id;
+      doc.id;
 
     persistAll();
+
   }
 
-  return document;
+  return doc;
+
 }
 
+
 function renderWorkDocument() {
-  const document =
+
+  const doc =
     ensureWorkDocument();
 
-  const preview =
+  const root =
     $("#previewSurface");
 
-  if (!preview) return;
+  if (!root) {
+    return;
+  }
 
-  preview.innerHTML = `
+  root.innerHTML = `
     <div class="work-editor-shell">
 
       <div class="work-editor-toolbar">
@@ -5069,7 +5696,7 @@ function renderWorkDocument() {
         <input
           id="workDocumentTitle"
           class="work-title-input"
-          value="${escapeHTML(document.title)}"
+          value="${escapeHTML(doc.title)}"
         >
 
         <div>
@@ -5095,7 +5722,7 @@ function renderWorkDocument() {
       <textarea
         id="workDocumentEditor"
         class="work-document-editor"
-      >${escapeHTML(document.content)}</textarea>
+      >${escapeHTML(doc.content)}</textarea>
 
     </div>
   `;
@@ -5103,310 +5730,787 @@ function renderWorkDocument() {
   on(
     $("#workDocumentEditor"),
     "input",
-    () => {
-      document.content =
-        $("#workDocumentEditor").value;
+    event => {
 
-      document.updatedAt =
+      doc.content =
+        event.target.value;
+
+      doc.updatedAt =
         now();
 
       persistAll();
+
     }
   );
 
   on(
     $("#workDocumentTitle"),
     "input",
-    () => {
-      document.title =
-        $("#workDocumentTitle").value;
+    event => {
 
-      document.updatedAt =
+      doc.title =
+        event.target.value;
+
+      doc.updatedAt =
         now();
 
       persistAll();
+
     }
   );
+
 }
+
 
 function previewWorkDocument() {
-  const document =
+
+  const doc =
     ensureWorkDocument();
 
-  const preview =
+  const root =
     $("#previewSurface");
 
-  preview.innerHTML = `
-    <article class="work-document-preview">
-      ${renderMarkdown(document.content)}
-    </article>
-  `;
+  if (root) {
+
+    root.innerHTML = `
+      <article class="work-document-preview">
+        ${renderMarkdown(doc.content)}
+      </article>
+    `;
+
+  }
+
 }
 
-/* =========================================================
-   SECTION 55 — WORK CHAT
-   ========================================================= */
 
 async function sendWorkMessage() {
+
   const input =
     $("#workPrompt");
 
   const root =
     $("#workMessages");
 
-  if (!input || !root) return;
+  const text =
+    input?.value
+      .trim();
 
-  const value =
-    input.value.trim();
+  if (
+    !input ||
+    !root ||
+    !text
+  ) {
+    return;
+  }
 
-  if (!value) return;
+  input.value =
+    "";
 
   root.insertAdjacentHTML(
     "beforeend",
     `
       <article class="message user">
+
         <div class="bubble">
-          ${escapeHTML(value)}
+          ${escapeHTML(text)}
         </div>
+
       </article>
     `
   );
 
-  input.value = "";
+  try {
 
-  await sleep(250);
+    const reply =
+      await fetchAIResponse(
+        text,
+        {
+          mode:
+            "work"
+        }
+      );
 
-  root.insertAdjacentHTML(
-    "beforeend",
-    `
-      <article class="message assistant">
-        <div class="bubble">
-          I can modify the Work document once your real AI backend is connected.
-        </div>
-      </article>
-    `
-  );
+    root.insertAdjacentHTML(
+      "beforeend",
+      `
+        <article class="message assistant">
 
-  root.scrollTop =
-    root.scrollHeight;
+          <div class="bubble">
+            ${renderMarkdown(reply)}
+          </div>
+
+        </article>
+      `
+    );
+
+  } catch (error) {
+
+    root.insertAdjacentHTML(
+      "beforeend",
+      `
+        <article class="message assistant">
+
+          <div class="bubble">
+            ${escapeHTML(error.message)}
+          </div>
+
+        </article>
+      `
+    );
+
+  }
+
 }
+
+
+function switchMode(mode) {
+
+  Galaxy.state.mode =
+    mode;
+
+  Galaxy.state.view =
+    mode;
+
+  $$(".mode-tab")
+    .forEach(
+      tab => {
+
+        const active =
+          tab.dataset.mode ===
+          mode;
+
+        tab.classList.toggle(
+          "active",
+          active
+        );
+
+        tab.setAttribute(
+          "aria-selected",
+          String(active)
+        );
+
+      }
+    );
+
+  $("#chatView")
+    ?.classList.toggle(
+      "active-view",
+      mode === "chat"
+    );
+
+  $("#workView")
+    ?.classList.toggle(
+      "active-view",
+      mode === "work"
+    );
+
+  $("#contentView")
+    ?.classList.remove(
+      "active-view"
+    );
+
+  if (
+    mode ===
+    "work"
+  ) {
+
+    renderWorkDocument();
+
+  }
+
+}
+
 
 /* =========================================================
-   SECTION 56 — SEARCH SYSTEM
+   TOOLS
    ========================================================= */
 
-function openSearch() {
-  openCommandPalette({
-    mode: "search"
-  });
+function renderTools() {
+
+  renderContentHeader(
+    "Power",
+    "Tools"
+  );
+
+  renderContentTabs(
+    [
+      ["all", "All"],
+      ["developer", "Developer"],
+      ["creative", "Creative"],
+      ["utilities", "Utilities"]
+    ],
+    "all",
+    "tools"
+  );
+
+  const root =
+    $("#contentBody");
+
+  if (!root) {
+    return;
+  }
+
+  const tools = [
+
+    [
+      "⌘",
+      "Command Palette",
+      "command"
+    ],
+
+    [
+      "✦",
+      "Prompt Templates",
+      "prompt-templates"
+    ],
+
+    [
+      "{}",
+      "JSON Viewer",
+      "json-viewer"
+    ],
+
+    [
+      "⇄",
+      "Diff Viewer",
+      "diff-viewer"
+    ],
+
+    [
+      "▦",
+      "Scratchpad",
+      "scratchpad"
+    ],
+
+    [
+      "◌",
+      "Focus Mode",
+      "focus"
+    ]
+
+  ];
+
+  root.innerHTML = `
+    <div class="resource-grid">
+
+      ${tools
+        .map(
+          (
+            [
+              icon,
+              name,
+              action
+            ]
+          ) => `
+          <button
+            class="resource-card"
+            data-tool-action="${action}"
+          >
+
+            <div class="resource-icon">
+              ${icon}
+            </div>
+
+            <div class="resource-copy">
+
+              <strong>
+                ${escapeHTML(name)}
+              </strong>
+
+              <span>
+                Open tool
+              </span>
+
+            </div>
+
+            <span class="resource-arrow">
+              ›
+            </span>
+
+          </button>
+        `
+        )
+        .join("")}
+
+    </div>
+  `;
+
 }
 
+
+/* =========================================================
+   VIEW ROUTER
+   ========================================================= */
+
+function openWorkspaceView(view) {
+
+  Galaxy.state.view =
+    view;
+
+  $("#chatView")
+    ?.classList.remove(
+      "active-view"
+    );
+
+  $("#workView")
+    ?.classList.remove(
+      "active-view"
+    );
+
+  $("#contentView")
+    ?.classList.add(
+      "active-view"
+    );
+
+  $("[data-view]");
+
+  $$(".nav-row, .menu-row")
+    .forEach(
+      item =>
+        item.classList.toggle(
+          "active",
+          item.dataset.view ===
+            view
+        )
+    );
+
+  const routes = {
+
+    projects:
+      renderProjects,
+
+    library:
+      renderLibrary,
+
+    scheduled:
+      renderScheduled,
+
+    plugins:
+      renderPlugins,
+
+    packs:
+      renderPacks,
+
+    images:
+      renderImages,
+
+    sites:
+      renderSites,
+
+    gpts:
+      renderAgents,
+
+    tools:
+      renderTools
+
+  };
+
+  routes[
+    view
+  ]?.();
+
+}
+
+
+/* =========================================================
+   SEARCH
+   ========================================================= */
+
 function searchEverything(query) {
+
   const q =
-    query.trim().toLowerCase();
+    query
+      .trim()
+      .toLowerCase();
 
   if (!q) {
     return [];
   }
 
-  const results = [];
+  const results =
+    [];
 
-  Galaxy.state.chats.forEach(chat => {
-    if (
-      chat.title
-        .toLowerCase()
-        .includes(q) ||
-      chat.messages.some(message =>
-        message.text
-          .toLowerCase()
-          .includes(q)
-      )
-    ) {
-      results.push({
-        type: "chat",
-        id: chat.id,
-        title: chat.title,
-        icon: "◌"
-      });
-    }
-  });
+  Galaxy.state.chats.forEach(
+    chat => {
 
-  Galaxy.state.projects.forEach(
-    project => {
       if (
-        project.name
+        chat.title
           .toLowerCase()
-          .includes(q)
+          .includes(q) ||
+
+        chat.messages
+          .some(
+            message =>
+              String(
+                message.text
+              )
+                .toLowerCase()
+                .includes(q)
+          )
       ) {
+
         results.push({
-          type: "project",
-          id: project.id,
-          title: project.name,
-          icon: "▱"
+
+          type:
+            "chat",
+
+          id:
+            chat.id,
+
+          title:
+            chat.title,
+
+          icon:
+            "◌"
+
         });
+
       }
+
     }
   );
 
-  Galaxy.state.packs.forEach(pack => {
-    if (
-      pack.name
-        .toLowerCase()
-        .includes(q) ||
-      pack.items.some(item =>
-        item
-          .toLowerCase()
-          .includes(q)
-      )
-    ) {
-      results.push({
-        type: "pack",
-        id: pack.id,
-        title: pack.name,
-        icon: pack.icon
-      });
-    }
-  });
+  Galaxy.state.projects
+    .forEach(
+      project => {
 
-  Galaxy.state.library.forEach(item => {
-    if (
-      item.name
-        .toLowerCase()
-        .includes(q)
-    ) {
-      results.push({
-        type: "library",
-        id: item.id,
-        title: item.name,
-        icon:
-          item.type === "image"
-            ? "◫"
-            : item.type === "video"
-            ? "▷"
-            : "▱"
-      });
-    }
-  });
+        if (
+          project.name
+            .toLowerCase()
+            .includes(q)
+        ) {
 
-  Galaxy.state.agents.forEach(agent => {
-    if (
-      agent.name
-        .toLowerCase()
-        .includes(q)
-    ) {
-      results.push({
-        type: "agent",
-        id: agent.id,
-        title: agent.name,
-        icon: "✧"
-      });
-    }
-  });
+          results.push({
 
-  return results.slice(0, 80);
+            type:
+              "project",
+
+            id:
+              project.id,
+
+            title:
+              project.name,
+
+            icon:
+              "▱"
+
+          });
+
+        }
+
+      }
+    );
+
+  Galaxy.state.packs
+    .forEach(
+      pack => {
+
+        if (
+          pack.name
+            .toLowerCase()
+            .includes(q) ||
+
+          pack.items.some(
+            item =>
+              item
+                .toLowerCase()
+                .includes(q)
+          )
+        ) {
+
+          results.push({
+
+            type:
+              "pack",
+
+            id:
+              pack.id,
+
+            title:
+              pack.name,
+
+            icon:
+              pack.icon
+
+          });
+
+        }
+
+      }
+    );
+
+  Galaxy.state.library
+    .forEach(
+      item => {
+
+        if (
+          item.name
+            .toLowerCase()
+            .includes(q)
+        ) {
+
+          results.push({
+
+            type:
+              "library",
+
+            id:
+              item.id,
+
+            title:
+              item.name,
+
+            icon:
+              item.type ===
+              "image"
+                ? "◫"
+                : item.type ===
+                  "video"
+                  ? "▷"
+                  : "▱"
+
+          });
+
+        }
+
+      }
+    );
+
+  Galaxy.state.agents
+    .forEach(
+      agent => {
+
+        if (
+          agent.name
+            .toLowerCase()
+            .includes(q)
+        ) {
+
+          results.push({
+
+            type:
+              "agent",
+
+            id:
+              agent.id,
+
+            title:
+              agent.name,
+
+            icon:
+              "✧"
+
+          });
+
+        }
+
+      }
+    );
+
+  return results.slice(
+    0,
+    80
+  );
+
 }
 
+
 /* =========================================================
-   SECTION 57 — COMMAND PALETTE
+   COMMAND PALETTE
    ========================================================= */
 
 const COMMANDS = [
+
   {
-    name: "New chat",
-    shortcut: "Ctrl N",
-    run: newChat
+    name:
+      "New chat",
+
+    shortcut:
+      "Ctrl N",
+
+    run:
+      newChat
   },
 
   {
-    name: "Search",
-    shortcut: "Ctrl K",
-    run: openSearch
+    name:
+      "Search",
+
+    shortcut:
+      "Ctrl K",
+
+    run:
+      openSearch
   },
 
   {
-    name: "Projects",
-    run: () => openWorkspaceView("projects")
+    name:
+      "Projects",
+
+    run:
+      () =>
+        openWorkspaceView(
+          "projects"
+        )
   },
 
   {
-    name: "Library",
-    run: () => openWorkspaceView("library")
+    name:
+      "Library",
+
+    run:
+      () =>
+        openWorkspaceView(
+          "library"
+        )
   },
 
   {
-    name: "Packs",
-    run: () => openWorkspaceView("packs")
+    name:
+      "Packs",
+
+    run:
+      () =>
+        openWorkspaceView(
+          "packs"
+        )
   },
 
   {
-    name: "Scheduled",
-    run: () => openWorkspaceView("scheduled")
+    name:
+      "Scheduled",
+
+    run:
+      () =>
+        openWorkspaceView(
+          "scheduled"
+        )
   },
 
   {
-    name: "Plugins",
-    run: () => openWorkspaceView("plugins")
+    name:
+      "Plugins",
+
+    run:
+      () =>
+        openWorkspaceView(
+          "plugins"
+        )
   },
 
   {
-    name: "Images",
-    run: () => openWorkspaceView("images")
+    name:
+      "Images",
+
+    run:
+      () =>
+        openWorkspaceView(
+          "images"
+        )
   },
 
   {
-    name: "Sites",
-    run: () => openWorkspaceView("sites")
+    name:
+      "Sites",
+
+    run:
+      () =>
+        openWorkspaceView(
+          "sites"
+        )
   },
 
   {
-    name: "GPTs",
-    run: () => openWorkspaceView("gpts")
+    name:
+      "GPTs",
+
+    run:
+      () =>
+        openWorkspaceView(
+          "gpts"
+        )
   },
 
   {
-    name: "Prompt templates",
-    run: openPromptTemplates
+    name:
+      "Prompt templates",
+
+    run:
+      openPromptTemplates
   },
 
   {
-    name: "Chat mode",
-    shortcut: "Alt 1",
-    run: () => switchMode("chat")
+    name:
+      "Chat mode",
+
+    shortcut:
+      "Alt 1",
+
+    run:
+      () =>
+        switchMode(
+          "chat"
+        )
   },
 
   {
-    name: "Work mode",
-    shortcut: "Alt 2",
-    run: () => switchMode("work")
+    name:
+      "Work mode",
+
+    shortcut:
+      "Alt 2",
+
+    run:
+      () =>
+        switchMode(
+          "work"
+        )
   },
 
   {
-    name: "Focus mode",
-    shortcut: "Ctrl .",
-    run: toggleFocusMode
+    name:
+      "Focus mode",
+
+    shortcut:
+      "Ctrl .",
+
+    run:
+      toggleFocusMode
   },
 
   {
-    name: "Toggle theme",
-    shortcut: "Ctrl /",
-    run: toggleTheme
+    name:
+      "Toggle theme",
+
+    shortcut:
+      "Ctrl /",
+
+    run:
+      toggleTheme
   },
 
   {
-    name: "Settings",
-    run: openSettings
+    name:
+      "Settings",
+
+    run:
+      openSettings
   }
+
 ];
 
-function openCommandPalette({
-  mode = "command"
-} = {}) {
-  const placeholder =
-    mode === "search"
-      ? "Search chats, projects, Packs, files..."
-      : "Type a command...";
 
-  const root = $("#overlayRoot");
+function openCommandPalette(
+  mode =
+    "command"
+) {
+
+  const root =
+    $("#overlayRoot");
+
+  if (!root) {
+    return;
+  }
 
   root.innerHTML = `
     <div class="overlay">
@@ -5420,7 +6524,12 @@ function openCommandPalette({
         <input
           id="commandInput"
           class="command-input"
-          placeholder="${escapeHTML(placeholder)}"
+          placeholder="${
+            mode ===
+            "search"
+              ? "Search chats, projects, Packs, files..."
+              : "Type a command..."
+          }"
           autocomplete="off"
           data-command-mode="${mode}"
         >
@@ -5435,29 +6544,57 @@ function openCommandPalette({
     </div>
   `;
 
-  renderCommandResults("", mode);
+  renderCommandResults(
+    "",
+    mode
+  );
 
-  setTimeout(() => {
-    $("#commandInput")?.focus();
-  }, 0);
+  setTimeout(
+    () =>
+      $("#commandInput")
+        ?.focus(),
+    0
+  );
+
 }
+
+
+function openSearch() {
+
+  openCommandPalette(
+    "search"
+  );
+
+}
+
 
 function renderCommandResults(
   query,
   mode
 ) {
+
   const root =
     $("#commandList");
 
-  if (!root) return;
+  if (!root) {
+    return;
+  }
 
-  if (mode === "search") {
+  if (
+    mode ===
+    "search"
+  ) {
+
     const results =
-      searchEverything(query);
+      searchEverything(
+        query
+      );
 
     root.innerHTML =
       query
+
         ? results.length
+
           ? results
               .map(
                 item => `
@@ -5483,16 +6620,18 @@ function renderCommandResults(
               `
               )
               .join("")
+
           : `
-              <div class="empty-panel">
-                No results.
-              </div>
-            `
-        : `
-            <div class="command-hint">
-              Start typing to search GALAXY AI.
+            <div class="empty-panel">
+              No results.
             </div>
-          `;
+          `
+
+        : `
+          <div class="command-hint">
+            Start typing to search GALAXY AI.
+          </div>
+        `;
 
     return;
   }
@@ -5500,705 +6639,1176 @@ function renderCommandResults(
   const q =
     query.toLowerCase();
 
-  const commands =
-    COMMANDS.filter(command =>
-      command.name
-        .toLowerCase()
-        .includes(q)
-    );
-
   root.innerHTML =
-    commands
-      .map(
-        command => `
-        <button
-          class="command-row"
-          data-command-name="${escapeHTML(command.name)}"
-        >
+    COMMANDS
 
-          <span>
-            ${escapeHTML(command.name)}
-          </span>
-
-          ${
-            command.shortcut
-              ? `
-                <kbd>
-                  ${escapeHTML(command.shortcut)}
-                </kbd>
-              `
-              : ""
-          }
-
-        </button>
-      `
+      .filter(
+        item =>
+          item.name
+            .toLowerCase()
+            .includes(q)
       )
-      .join("");
-}
 
-/* =========================================================
-   SECTION 58 — SEARCH FILTERS
-   ========================================================= */
-
-function setSearchFilter(filter) {
-  Galaxy.state.activeSearchFilter =
-    filter;
-
-  $("[data-search-filter].active")
-    ?.classList.remove("active");
-
-  $(
-    `[data-search-filter="${filter}"]`
-  )?.classList.add
-   ("active");
-("active");
-
-  const input = $("#commandInput");
-
-  if (
-    input &&
-    input.dataset.commandMode === "search"
-  ) {
-    renderFilteredSearchResults(
-      input.value,
-      filter
-    );
-  }
-}
-
-
-/* =========================================================
-   SECTION 59 — CONTENT HEADER
-   ========================================================= */
-
-function renderContentHeader(
-  eyebrow,
-  title,
-  actions = ""
-) {
-  const eyebrowElement =
-    $("#contentEyebrow");
-
-  const titleElement =
-    $("#contentTitle");
-
-  const actionsElement =
-    $("#contentActions");
-
-  if (eyebrowElement) {
-    eyebrowElement.textContent =
-      eyebrow || "Workspace";
-  }
-
-  if (titleElement) {
-    titleElement.textContent =
-      title || "GALAXY";
-  }
-
-  if (actionsElement) {
-    actionsElement.innerHTML =
-      actions || "";
-  }
-}
-
-
-/* =========================================================
-   SECTION 60 — CONTENT TABS
-   ========================================================= */
-
-function renderContentTabs(
-  tabs = [],
-  active = "",
-  group = ""
-) {
-  const root =
-    $("#contentTabs");
-
-  if (!root) return;
-
-  root.innerHTML =
-    tabs
-      .map(
-        ([value, label]) => `
-        <button
-          class="flat-tab ${
-            value === active
-              ? "active"
-              : ""
-          }"
-          data-content-tab="${escapeHTML(value)}"
-          data-content-group="${escapeHTML(group)}"
-        >
-          ${escapeHTML(label)}
-        </button>
-      `
-      )
-      .join("");
-}
-
-
-/* =========================================================
-   SECTION 61 — FILTERED SEARCH RESULTS
-   ========================================================= */
-
-function renderFilteredSearchResults(
-  query,
-  filter = Galaxy.state.activeSearchFilter
-) {
-  const root =
-    $("#commandList");
-
-  if (!root) return;
-
-  const results =
-    searchEverything(query);
-
-  const filtered =
-    filter === "all"
-      ? results
-      : results.filter(
-          item =>
-            item.type === filter
-        );
-
-  if (!query.trim()) {
-    root.innerHTML = `
-      <div class="command-hint">
-        Start typing to search GALAXY AI.
-      </div>
-    `;
-
-    return;
-  }
-
-  if (!filtered.length) {
-    root.innerHTML = `
-      <div class="empty-panel">
-        No results.
-      </div>
-    `;
-
-    return;
-  }
-
-  root.innerHTML =
-    filtered
       .map(
         item => `
-        <button
-          class="command-row"
-          data-search-result="${item.type}"
-          data-search-id="${item.id}"
-        >
-
-          <span class="command-icon">
-            ${item.icon}
-          </span>
-
-          <span>
-            ${escapeHTML(item.title)}
-          </span>
-
-          <small>
-            ${escapeHTML(item.type)}
-          </small>
-
-        </button>
-      `
-      )
-      .join("");
-}
-
-
-/* =========================================================
-   SECTION 62 — WORKSPACE ROUTER
-   ========================================================= */
-
-function openWorkspaceView(
-  view
-) {
-  Galaxy.state.view =
-    view;
-
-  $("#chatView")
-    ?.classList.remove(
-      "active-view"
-    );
-
-  $("#workView")
-    ?.classList.remove(
-      "active-view"
-    );
-
-  $("#contentView")
-    ?.classList.add(
-      "active-view"
-    );
-
-  document
-    .querySelectorAll(
-      "[data-view]"
-    )
-    .forEach(
-      item => {
-        item.classList.toggle(
-          "active",
-          item.dataset.view ===
-            view
-        );
-      }
-    );
-
-  switch (view) {
-    case "projects":
-      renderProjects();
-      break;
-
-    case "library":
-      renderLibrary();
-      break;
-
-    case "packs":
-      renderPacks(
-        Galaxy.state.activePackFilter ||
-          "all"
-      );
-      break;
-
-    case "scheduled":
-      renderScheduled();
-      break;
-
-    case "plugins":
-      renderPlugins();
-      break;
-
-    case "gpts":
-      renderAgents();
-      break;
-
-    case "sites":
-      renderSites();
-      break;
-
-    case "images":
-      renderImages();
-      break;
-
-    case "tools":
-      renderTools();
-      break;
-
-    default:
-      renderFallbackView(
-        view
-      );
-  }
-
-  if (
-    window.innerWidth <=
-    900
-  ) {
-    $("#app")
-      ?.classList.remove(
-        "mobile-sidebar-open"
-      );
-  }
-}
-
-
-/* =========================================================
-   SECTION 63 — FALLBACK VIEW
-   ========================================================= */
-
-function renderFallbackView(
-  view
-) {
-  renderContentHeader(
-    "Workspace",
-    view
-      ? view
-          .charAt(0)
-          .toUpperCase() +
-        view.slice(1)
-      : "GALAXY"
-  );
-
-  const root =
-    $("#contentBody");
-
-  if (!root) return;
-
-  root.innerHTML = `
-    <div class="empty-panel">
-
-      <span>
-        ✦
-      </span>
-
-      <h3>
-        ${escapeHTML(view || "Workspace")}
-      </h3>
-
-      <p>
-        This workspace is ready.
-      </p>
-
-    </div>
-  `;
-}
-
-
-/* =========================================================
-   SECTION 64 — TOOLS
-   ========================================================= */
-
-function renderTools() {
-  renderContentHeader(
-    "Power",
-    "Tools"
-  );
-
-  renderContentTabs(
-    [
-      [
-        "all",
-        "All"
-      ],
-      [
-        "developer",
-        "Developer"
-      ],
-      [
-        "creative",
-        "Creative"
-      ],
-      [
-        "utilities",
-        "Utilities"
-      ]
-    ],
-    "all",
-    "tools"
-  );
-
-  const root =
-    $("#contentBody");
-
-  if (!root) return;
-
-  const tools = [
-    {
-      icon: "⌘",
-      name:
-        "Command Palette",
-      description:
-        "Search and run GALAXY commands.",
-      action:
-        "command"
-    },
-
-    {
-      icon: "✦",
-      name:
-        "Prompt Templates",
-      description:
-        "Use powerful saved prompts.",
-      action:
-        "prompt-templates"
-    },
-
-    {
-      icon: "{}",
-      name:
-        "JSON Viewer",
-      description:
-        "Format and inspect JSON.",
-      action:
-        "json-viewer"
-    },
-
-    {
-      icon: "⇄",
-      name:
-        "Diff Viewer",
-      description:
-        "Compare two pieces of text.",
-      action:
-        "diff-viewer"
-    },
-
-    {
-      icon: "▦",
-      name:
-        "Scratchpad",
-      description:
-        "Quick notes and data workspace.",
-      action:
-        "scratchpad"
-    },
-
-    {
-      icon: "◌",
-      name:
-        "Focus Mode",
-      description:
-        "Hide distractions.",
-      action:
-        "focus"
-    }
-  ];
-
-  root.innerHTML = `
-    <div class="resource-grid">
-
-      ${tools
-        .map(
-          tool => `
           <button
-            class="resource-card"
-            data-tool-action="${tool.action}"
+            class="command-row"
+            data-command-name="${escapeHTML(item.name)}"
           >
 
-            <div class="resource-icon">
-              ${tool.icon}
-            </div>
-
-            <div class="resource-copy">
-
-              <strong>
-                ${escapeHTML(tool.name)}
-              </strong>
-
-              <span>
-                ${escapeHTML(tool.description)}
-              </span>
-
-            </div>
-
-            <span class="resource-arrow">
-              ›
+            <span>
+              ${escapeHTML(item.name)}
             </span>
+
+            ${
+              item.shortcut
+
+                ? `
+                  <kbd>
+                    ${escapeHTML(item.shortcut)}
+                  </kbd>
+                `
+
+                : ""
+            }
 
           </button>
         `
-        )
-        .join("")}
+      )
 
-    </div>
-  `;
+      .join("");
+
 }
 
-
-/* =========================================================
-   SECTION 65 — SEARCH RESULT OPENING
-   ========================================================= */
 
 function openSearchResult(
   type,
   id
 ) {
+
   closeOverlay();
 
-  switch (type) {
-    case "chat":
-      Galaxy.state.currentChatId =
-        id;
+  if (
+    type ===
+    "chat"
+  ) {
 
-      persistAll();
+    Galaxy.state.currentChatId =
+      id;
 
-      switchMode(
-        "chat"
-      );
+    persistAll();
 
-      renderChat();
+    switchMode(
+      "chat"
+    );
 
-      renderRecentChats();
+    renderChat();
 
-      break;
+    renderRecentChats();
 
-    case "project":
-      openWorkspaceView(
-        "projects"
-      );
-
-      break;
-
-    case "pack":
-      openWorkspaceView(
-        "packs"
-      );
-
-      setTimeout(
-        () => {
-          openPack?.(
-            id
-          );
-        },
-        0
-      );
-
-      break;
-
-    case "library":
-      openWorkspaceView(
-        "library"
-      );
-
-      setTimeout(
-        () => {
-          previewLibraryItem?.(
-            id
-          );
-        },
-        0
-      );
-
-      break;
-
-    case "agent":
-      openWorkspaceView(
-        "gpts"
-      );
-
-      break;
-
-    default:
-      toast(
-        "Opened"
-      );
+    return;
   }
+
+  if (
+    type ===
+    "project"
+  ) {
+
+    openWorkspaceView(
+      "projects"
+    );
+
+    return;
+  }
+
+  if (
+    type ===
+    "pack"
+  ) {
+
+    openWorkspaceView(
+      "packs"
+    );
+
+    setTimeout(
+      () =>
+        openPack(
+          id
+        ),
+      0
+    );
+
+    return;
+  }
+
+  if (
+    type ===
+    "library"
+  ) {
+
+    openWorkspaceView(
+      "library"
+    );
+
+    setTimeout(
+      () =>
+        previewLibraryItem(
+          id
+        ),
+      0
+    );
+
+    return;
+  }
+
+  if (
+    type ===
+    "agent"
+  ) {
+
+    openWorkspaceView(
+      "gpts"
+    );
+
+  }
+
 }
 
 
 /* =========================================================
-   SECTION 66 — FOCUS MODE
+   WEB SEARCH STATE
    ========================================================= */
 
-function toggleFocusMode() {
-  Galaxy.state.settings.focusMode =
-    !Galaxy.state.settings.focusMode;
+function toggleWebSearch() {
 
-  document.body.classList.toggle(
-    "focus-mode",
-    Galaxy.state.settings.focusMode
-  );
+  Galaxy.state.webSearchState =
+    Galaxy.state.webSearchState ===
+    "off"
+      ? "ready"
+      : "off";
 
   persistAll();
 
+  renderWebSearchState();
+
   toast(
-    Galaxy.state.settings.focusMode
-      ? "Focus mode on"
-      : "Focus mode off"
+    Galaxy.state.webSearchState ===
+    "ready"
+      ? "Web search enabled"
+      : "Web search disabled"
   );
+
 }
 
 
-function applyFocusMode() {
-  document.body.classList.toggle(
-    "focus-mode",
-    Boolean(
-      Galaxy.state.settings.focusMode
-    )
+function renderWebSearchState() {
+
+  const button =
+    $('[data-action="web-search"]');
+
+  if (!button) {
+    return;
+  }
+
+  button.classList.toggle(
+    "active",
+    Galaxy.state.webSearchState ===
+      "ready"
   );
+
+  button.dataset.state =
+    Galaxy.state.webSearchState;
+
 }
 
 
 /* =========================================================
-   SECTION 67 — SIDEBAR
+   VOICE
+   ========================================================= */
+
+function toggleVoiceRecording() {
+
+  if (
+    Galaxy.state.voiceState ===
+    "recording"
+  ) {
+
+    stopVoiceRecording();
+
+  } else {
+
+    startVoiceRecording();
+
+  }
+
+}
+
+
+function startVoiceRecording() {
+
+  const Recognition =
+    window.SpeechRecognition ||
+    window.webkitSpeechRecognition;
+
+  if (!Recognition) {
+
+    toast(
+      "Voice recognition is not supported."
+    );
+
+    return;
+  }
+
+  const recognition =
+    new Recognition();
+
+  recognition.lang =
+    Galaxy.state.settings
+      .voiceLanguage;
+
+  recognition.continuous =
+    true;
+
+  recognition.interimResults =
+    true;
+
+  Galaxy.state.voiceRecognition =
+    recognition;
+
+  Galaxy.state.voiceState =
+    "recording";
+
+  renderVoiceState();
+
+  recognition.onresult =
+    event => {
+
+      let transcript =
+        "";
+
+      for (
+        let i =
+          event.resultIndex;
+
+        i <
+        event.results.length;
+
+        i++
+      ) {
+
+        transcript +=
+          event.results[
+            i
+          ][0]
+            .transcript;
+
+      }
+
+      const input =
+        $("#promptInput");
+
+      if (input) {
+
+        input.value =
+          transcript;
+
+        autoResizeTextarea(
+          input
+        );
+
+      }
+
+    };
+
+  recognition.onerror =
+    event => {
+
+      Galaxy.state.voiceState =
+        "error";
+
+      renderVoiceState();
+
+      toast(
+        `Voice error: ${event.error}`,
+        "error"
+      );
+
+    };
+
+  recognition.onend =
+    () => {
+
+      Galaxy.state.voiceState =
+        "idle";
+
+      renderVoiceState();
+
+    };
+
+  recognition.start();
+
+}
+
+
+function stopVoiceRecording() {
+
+  Galaxy.state
+    .voiceRecognition
+    ?.stop();
+
+  Galaxy.state.voiceRecognition =
+    null;
+
+  Galaxy.state.voiceState =
+    "idle";
+
+  renderVoiceState();
+
+}
+
+
+function renderVoiceState() {
+
+  const button =
+    $('[data-action="voice"]');
+
+  if (!button) {
+    return;
+  }
+
+  button.classList.toggle(
+    "recording",
+    Galaxy.state.voiceState ===
+      "recording"
+  );
+
+}
+
+
+/* =========================================================
+   TOOL ACTIVITY
+   ========================================================= */
+
+function showToolActivity(text) {
+
+  const root =
+    $("#toolActivity");
+
+  if (!root) {
+    return;
+  }
+
+  root.hidden =
+    false;
+
+  const label =
+    $("#toolActivityText");
+
+  if (label) {
+    label.textContent =
+      text;
+  }
+
+}
+
+
+function hideToolActivity() {
+
+  const root =
+    $("#toolActivity");
+
+  if (root) {
+    root.hidden =
+      true;
+  }
+
+}
+
+
+/* =========================================================
+   SEND / STOP STATE
+   ========================================================= */
+
+function updateSendButtonState() {
+
+  const button =
+    $("#sendButton");
+
+  if (!button) {
+    return;
+  }
+
+  button.classList.toggle(
+    "is-stop",
+    Galaxy.state.generation
+      .active
+  );
+
+  button.textContent =
+    Galaxy.state.generation
+      .active
+      ? "■"
+      : "↑";
+
+  button.setAttribute(
+    "aria-label",
+    Galaxy.state.generation
+      .active
+      ? "Stop"
+      : "Send"
+  );
+
+}
+
+
+function stopGeneration() {
+
+  Galaxy.state.generation.stopped =
+    true;
+
+  Galaxy.state.generation
+    .controller
+    ?.abort();
+
+  Galaxy.state.generation.active =
+    false;
+
+  updateSendButtonState();
+
+  hideToolActivity();
+
+}
+
+
+/* =========================================================
+   REAL AI BACKEND
+   ========================================================= */
+
+async function fetchAIResponse(
+  prompt,
+  extra = {}
+) {
+
+  const response =
+    await fetch(
+      "/api/chat",
+      {
+
+        method:
+          "POST",
+
+        headers: {
+          "Content-Type":
+            "application/json"
+        },
+
+        body:
+          JSON.stringify({
+
+            message:
+              prompt,
+
+            webSearch:
+              Galaxy.state.webSearchState ===
+              "ready",
+
+            mode:
+              extra.mode ||
+              Galaxy.state.mode,
+
+            history:
+              getCurrentChat()
+                ?.messages
+                ?.slice(
+                  -20
+                )
+                .map(
+                  item => ({
+                    role:
+                      item.role,
+
+                    content:
+                      item.text
+                  })
+                ) ||
+              []
+
+          }),
+
+        signal:
+          Galaxy.state.generation
+            .controller
+            ?.signal
+
+      }
+    );
+
+  if (
+    !response.ok
+  ) {
+
+    let message =
+      `AI request failed (${response.status})`;
+
+    try {
+
+      const data =
+        await response.json();
+
+      message =
+        data.error ||
+        data.message ||
+        message;
+
+    } catch {}
+
+    throw new Error(
+      message
+    );
+
+  }
+
+  const data =
+    await response.json();
+
+  return (
+    data.reply ||
+    data.message ||
+    data.output ||
+    data.text ||
+    "No response received."
+  );
+
+}
+
+
+/* =========================================================
+   AI GENERATION
+   ========================================================= */
+
+async function generateAssistantReply(
+  prompt
+) {
+
+  const chat =
+    ensureCurrentChat();
+
+  Galaxy.state.generation.active =
+    true;
+
+  Galaxy.state.generation.stopped =
+    false;
+
+  Galaxy.state.generation.controller =
+    new AbortController();
+
+  const message = {
+
+    id:
+      uid("msg"),
+
+    role:
+      "assistant",
+
+    text:
+      "",
+
+    createdAt:
+      now(),
+
+    updatedAt:
+      now()
+
+  };
+
+  Galaxy.state.generation.messageId =
+    message.id;
+
+  chat.messages.push(
+    message
+  );
+
+  renderChat();
+
+  updateSendButtonState();
+
+  showToolActivity(
+    Galaxy.state.webSearchState ===
+    "ready"
+      ? "Searching and thinking…"
+      : "Thinking…"
+  );
+
+  try {
+
+    const fullText =
+      await fetchAIResponse(
+        prompt
+      );
+
+    if (
+      !Galaxy.state.settings
+        .streaming
+    ) {
+
+      message.text =
+        fullText;
+
+    } else {
+
+      const chunks =
+        fullText.match(
+          /.{1,12}/gs
+        ) ||
+        [
+          fullText
+        ];
+
+      for (
+        const chunk
+        of chunks
+      ) {
+
+        if (
+          Galaxy.state.generation
+            .stopped
+        ) {
+          break;
+        }
+
+        message.text +=
+          chunk;
+
+        message.updatedAt =
+          now();
+
+        renderChat();
+
+        await sleep(
+          Galaxy.state.settings
+            .streamSpeed
+        );
+
+      }
+
+    }
+
+    chat.updatedAt =
+      now();
+
+    persistAll();
+
+  } catch (error) {
+
+    if (
+      error.name !==
+      "AbortError"
+    ) {
+
+      message.text = `
+I couldn't reach the GALAXY AI backend.
+
+${error.message}
+
+Make sure your Vercel route **/api/chat** is deployed and returns JSON like:
+
+\`\`\`json
+{
+  "reply": "Hello"
+}
+\`\`\`
+`.trim();
+
+      handleError(
+        error,
+        "AI"
+      );
+
+    }
+
+  } finally {
+
+    Galaxy.state.generation.active =
+      false;
+
+    Galaxy.state.generation.controller =
+      null;
+
+    hideToolActivity();
+
+    updateSendButtonState();
+
+    renderChat();
+
+    persistAll();
+
+  }
+
+}
+
+
+/* =========================================================
+   SEND MESSAGE
+   ========================================================= */
+
+async function sendMessage() {
+
+  if (
+    Galaxy.state.generation.active
+  ) {
+
+    stopGeneration();
+
+    return;
+  }
+
+  const input =
+    $("#promptInput");
+
+  if (!input) {
+    return;
+  }
+
+  const text =
+    input.value
+      .trim();
+
+  if (
+    !text &&
+    !Galaxy.state.attachments
+      .length
+  ) {
+    return;
+  }
+
+  const chat =
+    ensureCurrentChat();
+
+  const messageText =
+    text ||
+    describeAttachments();
+
+  chat.messages.push({
+
+    id:
+      uid("msg"),
+
+    role:
+      "user",
+
+    text:
+      messageText,
+
+    createdAt:
+      now(),
+
+    updatedAt:
+      now()
+
+  });
+
+  if (
+    chat.title ===
+    "New conversation"
+  ) {
+
+    chat.title =
+      messageText.slice(
+        0,
+        48
+      );
+
+  }
+
+  chat.updatedAt =
+    now();
+
+  input.value =
+    "";
+
+  autoResizeTextarea(
+    input
+  );
+
+  DB.remove(
+    "draft"
+  );
+
+  Galaxy.state.attachments =
+    [];
+
+  renderAttachments();
+
+  persistAll();
+
+  renderRecentChats();
+
+  renderChat();
+
+  await generateAssistantReply(
+    messageText
+  );
+
+}
+
+
+/* =========================================================
+   SIDEBAR
    ========================================================= */
 
 function toggleSidebar() {
+
   const app =
     $("#app");
 
-  if (!app) return;
+  if (!app) {
+    return;
+  }
 
   if (
     window.innerWidth <=
     900
   ) {
+
     app.classList.toggle(
       "mobile-sidebar-open"
     );
 
-    Galaxy.state.sidebarOpen =
-      app.classList.contains(
-        "mobile-sidebar-open"
-      );
+  } else {
 
-    return;
-  }
-
-  app.classList.toggle(
-    "sidebar-collapsed"
-  );
-
-  Galaxy.state.sidebarOpen =
-    !app.classList.contains(
+    app.classList.toggle(
       "sidebar-collapsed"
     );
+
+  }
+
 }
 
 
 /* =========================================================
-   SECTION 68 — SHARE
+   SHARE
    ========================================================= */
 
-async function shareWorkspace() {
-  const data = {
-    title:
-      "GALAXY AI",
+function shareWorkspace() {
 
-    text:
-      "GALAXY AI Workspace",
+  if (
+    navigator.share
+  ) {
 
-    url:
-      window.location.href
-  };
+    navigator.share({
+      title:
+        "GALAXY AI",
 
-  try {
-    if (
-      navigator.share
-    ) {
-      await navigator.share(
-        data
-      );
-    } else {
-      await copyText(
-        window.location.href
-      );
-    }
-  } catch (error) {
-    if (
-      error?.name !==
-      "AbortError"
-    ) {
-      handleError(
-        error,
-        "Share"
-      );
-    }
+      text:
+        "GALAXY AI Workspace",
+
+      url:
+        location.href
+    })
+    .catch(
+      () => {}
+    );
+
+  } else {
+
+    copyText(
+      location.href
+    );
+
   }
+
 }
 
 
 /* =========================================================
-   SECTION 69 — CHAT CONTEXT MENU
+   TOOLS
+   ========================================================= */
+
+function openJSONViewer() {
+
+  openModal({
+
+    title:
+      "JSON Viewer",
+
+    body: `
+      <div class="form-stack">
+
+        <textarea
+          id="jsonViewerInput"
+          class="field textarea-field"
+          placeholder='{"hello":"GALAXY"}'
+        ></textarea>
+
+        <button
+          id="formatJSONButton"
+          class="text-action primary"
+        >
+          Format JSON
+        </button>
+
+        <pre
+          id="jsonViewerOutput"
+          class="code-block"
+        ></pre>
+
+      </div>
+    `
+
+  });
+
+  setTimeout(
+    () => {
+
+      on(
+        $("#formatJSONButton"),
+        "click",
+        () => {
+
+          try {
+
+            $("#jsonViewerOutput")
+              .textContent =
+              JSON.stringify(
+                JSON.parse(
+                  $("#jsonViewerInput")
+                    .value
+                ),
+                null,
+                2
+              );
+
+          } catch (error) {
+
+            $("#jsonViewerOutput")
+              .textContent =
+              `Invalid JSON: ${error.message}`;
+
+          }
+
+        }
+      );
+
+    },
+    0
+  );
+
+}
+
+
+function openDiffViewer() {
+
+  openModal({
+
+    title:
+      "Diff Viewer",
+
+    width:
+      "900px",
+
+    body: `
+      <div class="diff-grid">
+
+        <textarea
+          id="diffLeft"
+          class="field textarea-field"
+          placeholder="Original text"
+        ></textarea>
+
+        <textarea
+          id="diffRight"
+          class="field textarea-field"
+          placeholder="Changed text"
+        ></textarea>
+
+      </div>
+
+      <button
+        id="compareDiffButton"
+        class="text-action primary"
+      >
+        Compare
+      </button>
+
+      <div
+        id="diffOutput"
+        class="diff-output"
+      ></div>
+    `
+
+  });
+
+  setTimeout(
+    () => {
+
+      on(
+        $("#compareDiffButton"),
+        "click",
+        () => {
+
+          const left =
+            $("#diffLeft")
+              ?.value ||
+            "";
+
+          const right =
+            $("#diffRight")
+              ?.value ||
+            "";
+
+          $("#diffOutput")
+            .innerHTML =
+            left ===
+            right
+
+              ? `
+                <div class="empty-panel">
+                  Text is identical.
+                </div>
+              `
+
+              : `
+                <div class="diff-result">
+
+                  <div>
+
+                    <strong>
+                      Original
+                    </strong>
+
+                    <pre>${escapeHTML(left)}</pre>
+
+                  </div>
+
+                  <div>
+
+                    <strong>
+                      Changed
+                    </strong>
+
+                    <pre>${escapeHTML(right)}</pre>
+
+                  </div>
+
+                </div>
+              `;
+
+        }
+      );
+
+    },
+    0
+  );
+
+}
+
+
+function openScratchpad() {
+
+  openModal({
+
+    title:
+      "Scratchpad",
+
+    body: `
+      <textarea
+        id="scratchpadInput"
+        class="field textarea-field scratchpad-field"
+        placeholder="Write anything..."
+      >${escapeHTML(
+        DB.get(
+          "scratchpad",
+          ""
+        )
+      )}</textarea>
+    `
+
+  });
+
+  setTimeout(
+    () => {
+
+      on(
+        $("#scratchpadInput"),
+        "input",
+        event => {
+
+          DB.set(
+            "scratchpad",
+            event.target.value
+          );
+
+        }
+      );
+
+    },
+    0
+  );
+
+}
+
+
+function handleToolAction(action) {
+
+  if (
+    action ===
+    "command"
+  ) {
+
+    openCommandPalette();
+
+  } else if (
+    action ===
+    "prompt-templates"
+  ) {
+
+    openPromptTemplates();
+
+  } else if (
+    action ===
+    "json-viewer"
+  ) {
+
+    openJSONViewer();
+
+  } else if (
+    action ===
+    "diff-viewer"
+  ) {
+
+    openDiffViewer();
+
+  } else if (
+    action ===
+    "scratchpad"
+  ) {
+
+    openScratchpad();
+
+  } else if (
+    action ===
+    "focus"
+  ) {
+
+    toggleFocusMode();
+
+  }
+
+}
+
+
+/* =========================================================
+   CONTEXT MENU
    ========================================================= */
 
 function closeContextMenu() {
-  document
-    .querySelectorAll(
-      ".context-menu"
-    )
+
+  $$(".context-menu")
     .forEach(
       menu =>
         menu.remove()
     );
 
-  Galaxy.state.contextTarget =
-    null;
 }
 
 
@@ -6208,6 +7818,7 @@ function openContextMenu(
   x,
   y
 ) {
+
   closeContextMenu();
 
   const menu =
@@ -6224,22 +7835,20 @@ function openContextMenu(
   menu.style.top =
     `${y}px`;
 
-  Galaxy.state.contextTarget =
-    {
-      type,
-      id
-    };
-
   if (
-    type === "chat"
+    type ===
+    "chat"
   ) {
+
     const chat =
       Galaxy.state.chats.find(
         item =>
           item.id === id
       );
 
-    if (!chat) return;
+    if (!chat) {
+      return;
+    }
 
     menu.innerHTML = `
       <button
@@ -6248,9 +7857,7 @@ function openContextMenu(
         data-context-id="${id}"
       >
         ✎
-        <span>
-          Rename
-        </span>
+        <span>Rename</span>
       </button>
 
       <button
@@ -6289,9 +7896,7 @@ function openContextMenu(
         data-context-id="${id}"
       >
         ↗
-        <span>
-          Export
-        </span>
+        <span>Export</span>
       </button>
 
       <button
@@ -6300,16 +7905,17 @@ function openContextMenu(
         data-context-id="${id}"
       >
         ×
-        <span>
-          Delete
-        </span>
+        <span>Delete</span>
       </button>
     `;
+
   }
 
   if (
-    type === "project"
+    type ===
+    "project"
   ) {
+
     menu.innerHTML = `
       <button
         class="context-row"
@@ -6317,9 +7923,7 @@ function openContextMenu(
         data-context-id="${id}"
       >
         ✎
-        <span>
-          Edit
-        </span>
+        <span>Edit</span>
       </button>
 
       <button
@@ -6328,507 +7932,274 @@ function openContextMenu(
         data-context-id="${id}"
       >
         ×
-        <span>
-          Delete
-        </span>
+        <span>Delete</span>
       </button>
     `;
+
   }
 
   document.body.appendChild(
     menu
   );
+
 }
 
-
-/* =========================================================
-   SECTION 70 — CONTEXT ACTIONS
-   ========================================================= */
 
 function handleContextAction(
   action,
   id
 ) {
+
   closeContextMenu();
 
-  switch (action) {
-    case "rename-chat":
-      renameChat(
-        id
-      );
-      break;
-
-    case "pin-chat":
-      togglePinChat(
-        id
-      );
-      break;
-
-    case "archive-chat":
-      toggleArchiveChat(
-        id
-      );
-      break;
-
-    case "export-chat":
-      exportConversation(
-        id
-      );
-      break;
-
-    case "delete-chat":
-      deleteChat(
-        id
-      );
-      break;
-
-    case "edit-project":
-      editProject(
-        id
-      );
-      break;
-
-    case "delete-project":
-      deleteProject(
-        id
-      );
-      break;
-  }
-}
-
-
-/* =========================================================
-   SECTION 71 — JSON VIEWER
-   ========================================================= */
-
-function openJSONViewer() {
-  openModal({
-    title:
-      "JSON Viewer",
-
-    body: `
-      <div class="form-stack">
-
-        <textarea
-          id="jsonViewerInput"
-          class="field textarea-field"
-          placeholder='{"hello":"GALAXY"}'
-        ></textarea>
-
-        <button
-          id="formatJSONButton"
-          class="text-action primary"
-        >
-          Format JSON
-        </button>
-
-        <pre
-          id="jsonViewerOutput"
-          class="code-block"
-        ></pre>
-
-      </div>
-    `
-  });
-
-  setTimeout(
-    () => {
-      $("#formatJSONButton")
-        ?.addEventListener(
-          "click",
-          () => {
-            const input =
-              $("#jsonViewerInput");
-
-            const output =
-              $("#jsonViewerOutput");
-
-            try {
-              const parsed =
-                JSON.parse(
-                  input.value
-                );
-
-              output.textContent =
-                JSON.stringify(
-                  parsed,
-                  null,
-                  2
-                );
-            } catch (error) {
-              output.textContent =
-                `Invalid JSON: ${error.message}`;
-            }
-          }
-        );
-    },
-    0
-  );
-}
-
-
-/* =========================================================
-   SECTION 72 — DIFF VIEWER
-   ========================================================= */
-
-function openDiffViewer() {
-  openModal({
-    title:
-      "Diff Viewer",
-
-    width:
-      "900px",
-
-    body: `
-      <div class="diff-grid">
-
-        <textarea
-          id="diffLeft"
-          class="field textarea-field"
-          placeholder="Original text"
-        ></textarea>
-
-        <textarea
-          id="diffRight"
-          class="field textarea-field"
-          placeholder="Changed text"
-        ></textarea>
-
-      </div>
-
-      <button
-        id="compareDiffButton"
-        class="text-action primary"
-      >
-        Compare
-      </button>
-
-      <div
-        id="diffOutput"
-        class="diff-output"
-      ></div>
-    `
-  });
-
-  setTimeout(
-    () => {
-      $("#compareDiffButton")
-        ?.addEventListener(
-          "click",
-          () => {
-            const left =
-              $("#diffLeft")
-                ?.value ||
-              "";
-
-            const right =
-              $("#diffRight")
-                ?.value ||
-              "";
-
-            const output =
-              $("#diffOutput");
-
-            if (
-              left === right
-            ) {
-              output.innerHTML = `
-                <div class="empty-panel">
-                  Text is identical.
-                </div>
-              `;
-
-              return;
-            }
-
-            output.innerHTML = `
-              <div class="diff-result">
-
-                <div>
-                  <strong>
-                    Original
-                  </strong>
-
-                  <pre>${escapeHTML(left)}</pre>
-                </div>
-
-                <div>
-                  <strong>
-                    Changed
-                  </strong>
-
-                  <pre>${escapeHTML(right)}</pre>
-                </div>
-
-              </div>
-            `;
-          }
-        );
-    },
-    0
-  );
-}
-
-
-/* =========================================================
-   SECTION 73 — SCRATCHPAD
-   ========================================================= */
-
-function openScratchpad() {
-  const saved =
-    DB.get(
-      "scratchpad",
-      ""
-    );
-
-  openModal({
-    title:
-      "Scratchpad",
-
-    body: `
-      <textarea
-        id="scratchpadInput"
-        class="field textarea-field scratchpad-field"
-        placeholder="Write anything..."
-      >${escapeHTML(saved)}</textarea>
-    `
-  });
-
-  setTimeout(
-    () => {
-      $("#scratchpadInput")
-        ?.addEventListener(
-          "input",
-          event => {
-            DB.set(
-              "scratchpad",
-              event.target.value
-            );
-          }
-        );
-    },
-    0
-  );
-}
-
-
-/* =========================================================
-   SECTION 74 — TOOL ACTION ROUTER
-   ========================================================= */
-
-function handleToolAction(
-  action
-) {
-  switch (action) {
-    case "command":
-      openCommandPalette();
-      break;
-
-    case "prompt-templates":
-      openPromptTemplates();
-      break;
-
-    case "json-viewer":
-      openJSONViewer();
-      break;
-
-    case "diff-viewer":
-      openDiffViewer();
-      break;
-
-    case "scratchpad":
-      openScratchpad();
-      break;
-
-    case "focus":
-      toggleFocusMode();
-      break;
-  }
-}
-
-
-/* =========================================================
-   SECTION 75 — SITE EDITOR TAB
-   ========================================================= */
-
-function switchSiteEditorTab(
-  language
-) {
-  const site =
-    Galaxy.state.sites.find(
-      item =>
-        item.id ===
-        Galaxy.state.activeSiteId
-    );
-
-  const editor =
-    $("#siteEditor");
-
   if (
-    !site ||
-    !editor
+    action ===
+    "rename-chat"
   ) {
-    return;
-  }
 
-  const oldLanguage =
-    editor.dataset.language;
-
-  if (
-    oldLanguage &&
-    site[
-      oldLanguage
-    ] !== undefined
-  ) {
-    site[
-      oldLanguage
-    ] =
-      editor.value;
-  }
-
-  editor.dataset.language =
-    language;
-
-  editor.value =
-    site[
-      language
-    ] ||
-    "";
-
-  $$(".editor-tab")
-    .forEach(
-      tab =>
-        tab.classList.toggle(
-          "active",
-          tab.dataset.siteTab ===
-            language
-        )
-    );
-
-  persistAll();
-}
-
-
-/* =========================================================
-   SECTION 76 — PACK INSTALL TOGGLE
-   ========================================================= */
-
-function togglePackInstall(
-  id
-) {
-  const pack =
-    Galaxy.state.packs.find(
-      item =>
-        item.id === id
-    );
-
-  if (!pack) return;
-
-  if (
-    pack.installed
-  ) {
-    removePack(
+    renameChat(
       id
     );
-  } else {
-    installPack(
+
+  } else if (
+    action ===
+    "pin-chat"
+  ) {
+
+    togglePinChat(
       id
     );
+
+  } else if (
+    action ===
+    "archive-chat"
+  ) {
+
+    toggleArchiveChat(
+      id
+    );
+
+  } else if (
+    action ===
+    "export-chat"
+  ) {
+
+    exportConversation(
+      id
+    );
+
+  } else if (
+    action ===
+    "delete-chat"
+  ) {
+
+    deleteChat(
+      id
+    );
+
+  } else if (
+    action ===
+    "edit-project"
+  ) {
+
+    editProject(
+      id
+    );
+
+  } else if (
+    action ===
+    "delete-project"
+  ) {
+
+    deleteProject(
+      id
+    );
+
   }
+
 }
 
 
 /* =========================================================
-   SECTION 77 — CONTENT TAB ROUTING
+   CONTENT TABS
    ========================================================= */
 
 function handleContentTab(
   group,
   tab
 ) {
-  switch (group) {
-    case "library":
-      renderLibrary(
-        tab
-      );
-      break;
 
-    case "packs":
-      renderPacks(
-        tab
-      );
-      break;
+  if (
+    group ===
+    "library"
+  ) {
 
-    case "projects":
-      renderProjects();
-      break;
+    renderLibrary(
+      tab
+    );
 
-    case "scheduled":
-      renderScheduled();
-      break;
+  } else if (
+    group ===
+    "packs"
+  ) {
 
-    case "plugins":
-      renderPlugins();
-      break;
+    renderPacks(
+      tab
+    );
 
-    case "gpts":
-      renderAgents();
-      break;
-
-    case "sites":
-      renderSites();
-      break;
-
-    case "images":
-      renderImages();
-      break;
-
-    case "tools":
-      renderTools();
-      break;
   }
 
   $$(".flat-tab")
     .forEach(
       button =>
+
         button.classList.toggle(
           "active",
           button.dataset.contentTab ===
             tab
         )
     );
+
 }
 
 
 /* =========================================================
-   SECTION 78 — GENERAL CLICK ROUTER
+   FILE INPUTS
    ========================================================= */
 
-function handleDocumentClick(
-  event
-) {
-  const actionElement =
-    event.target.closest(
-      "[data-action]"
-    );
+function bindFileInputs() {
+
+  on(
+    $("#fileInput"),
+    "change",
+    event => {
+
+      addFiles(
+        event.target.files
+      );
+
+      event.target.value =
+        "";
+
+    }
+  );
+
+
+  on(
+    $("#imageInput"),
+    "change",
+    event => {
+
+      addFiles(
+        event.target.files
+      );
+
+      Array.from(
+        event.target.files ||
+        []
+      )
+        .forEach(
+          addLibraryFile
+        );
+
+      event.target.value =
+        "";
+
+    }
+  );
+
+
+  on(
+    $("#videoInput"),
+    "change",
+    event => {
+
+      addFiles(
+        event.target.files
+      );
+
+      Array.from(
+        event.target.files ||
+        []
+      )
+        .forEach(
+          addLibraryFile
+        );
+
+      event.target.value =
+        "";
+
+    }
+  );
+
+
+  on(
+    $("#libraryInput"),
+    "change",
+    event => {
+
+      Array.from(
+        event.target.files ||
+        []
+      )
+        .forEach(
+          addLibraryFile
+        );
+
+      event.target.value =
+        "";
+
+    }
+  );
+
+
+  on(
+    $("#conversationImportInput"),
+    "change",
+    event => {
+
+      const file =
+        event.target.files?.[
+          0
+        ];
+
+      if (file) {
+
+        importConversation(
+          file
+        );
+
+      }
+
+      event.target.value =
+        "";
+
+    }
+  );
+
+}
+
+
+/* =========================================================
+   CLICK ROUTER
+   ========================================================= */
+
+function handleClick(event) {
 
   const action =
-    actionElement
-      ?.dataset.action;
-
-  const viewElement =
     event.target.closest(
-      "[data-view]"
-    );
+      "[data-action]"
+    )?.dataset.action;
 
   const view =
-    viewElement
-      ?.dataset.view;
+    event.target.closest(
+      "[data-view]"
+    )?.dataset.view;
 
   const chatOpen =
     event.target.closest(
       "[data-chat-open]"
-    );
+    )?.dataset.chatOpen;
 
   const contextOpen =
     event.target.closest(
@@ -6858,297 +8229,150 @@ function handleDocumentClick(
   const toolAction =
     event.target.closest(
       "[data-tool-action]"
-    );
+    )?.dataset.toolAction;
 
-  const codeCopy =
+  const copyCode =
     event.target.closest(
       "[data-copy-code]"
-    );
+    )?.dataset.copyCode;
 
   const copyMessage =
     event.target.closest(
       "[data-copy-message]"
-    );
+    )?.dataset.copyMessage;
 
-  const editMessageButton =
+  const editMessageId =
     event.target.closest(
       "[data-edit-message]"
-    );
+    )?.dataset.editMessage;
 
-  const retryMessageButton =
+  const retryMessageId =
     event.target.closest(
       "[data-retry-message]"
-    );
+    )?.dataset.retryMessage;
 
-  const readMessageButton =
+  const readMessageId =
     event.target.closest(
       "[data-read-message]"
-    );
+    )?.dataset.readMessage;
 
-  const branchMessageButton =
+  const branchMessageId =
     event.target.closest(
       "[data-branch-message]"
-    );
+    )?.dataset.branchMessage;
 
-  const previewLibrary =
+  const removeAttachmentId =
+    event.target.closest(
+      "[data-remove-attachment]"
+    )?.dataset.removeAttachment;
+
+  const previewLibraryId =
     event.target.closest(
       "[data-preview-library]"
-    );
+    )?.dataset.previewLibrary;
 
-  const libraryFavorite =
+  const favoriteId =
     event.target.closest(
       "[data-library-favorite]"
-    );
+    )?.dataset.libraryFavorite;
 
-  const deleteLibrary =
+  const deleteLibraryId =
     event.target.closest(
       "[data-delete-library]"
-    );
+    )?.dataset.deleteLibrary;
 
-  const editProjectButton =
+  const editProjectId =
     event.target.closest(
       "[data-edit-project]"
-    );
+    )?.dataset.editProject;
 
-  const toggleScheduled =
+  const toggleScheduledId =
     event.target.closest(
       "[data-toggle-scheduled]"
-    );
+    )?.dataset.toggleScheduled;
 
-  const deleteScheduled =
+  const deleteScheduledId =
     event.target.closest(
       "[data-delete-scheduled]"
-    );
+    )?.dataset.deleteScheduled;
 
-  const pluginInstall =
+  const pluginInstallId =
     event.target.closest(
       "[data-plugin-install]"
-    );
+    )?.dataset.pluginInstall;
 
-  const pluginConnect =
+  const pluginConnectId =
     event.target.closest(
       "[data-plugin-connect]"
-    );
+    )?.dataset.pluginConnect;
 
-  const editAgentButton =
+  const editAgentId =
     event.target.closest(
       "[data-edit-agent]"
-    );
+    )?.dataset.editAgent;
 
-  const openSiteButton =
+  const openSiteId =
     event.target.closest(
       "[data-open-site]"
-    );
+    )?.dataset.openSite;
 
   const siteTab =
     event.target.closest(
       "[data-site-tab]"
-    );
+    )?.dataset.siteTab;
 
-  const openPackButton =
+  const openPackId =
     event.target.closest(
       "[data-open-pack]"
-    );
+    )?.dataset.openPack;
 
-  const packInstall =
+  const packInstallId =
     event.target.closest(
       "[data-pack-install-toggle]"
-    );
+    )?.dataset.packInstallToggle;
 
   const packItem =
     event.target.closest(
       "[data-pack-item]"
-    );
+    )?.dataset.packItem;
 
-  const promptTemplate =
+  const promptId =
     event.target.closest(
       "[data-use-prompt]"
-    );
+    )?.dataset.usePrompt;
 
   const workView =
     event.target.closest(
       "[data-work-view]"
-    );
+    )?.dataset.workView;
 
 
   if (
-    event.target.classList.contains(
-      "overlay"
-    )
+    event.target
+      .classList
+      .contains(
+        "overlay"
+      )
   ) {
+
     closeOverlay();
+
   }
 
 
   if (view) {
+
     openWorkspaceView(
       view
     );
-  }
 
-
-  if (action) {
-    switch (action) {
-      case "home":
-        switchMode(
-          "chat"
-        );
-        break;
-
-      case "new-chat":
-        newChat();
-        break;
-
-      case "search":
-        openSearch();
-        break;
-
-      case "command":
-        openCommandPalette();
-        break;
-
-      case "toggle-sidebar":
-        toggleSidebar();
-        break;
-
-      case "toggle-more": {
-        const menu =
-          $("#moreMenu");
-
-        if (menu) {
-          menu.hidden =
-            !menu.hidden;
-
-          actionElement.setAttribute(
-            "aria-expanded",
-            String(
-              !menu.hidden
-            )
-          );
-        }
-
-        break;
-      }
-
-      case "attach":
-        $("#fileInput")
-          ?.click();
-        break;
-
-      case "image":
-        $("#imageInput")
-          ?.click();
-        break;
-
-      case "video":
-        $("#videoInput")
-          ?.click();
-        break;
-
-      case "voice":
-        toggleVoiceRecording();
-        break;
-
-      case "web-search":
-        toggleWebSearch();
-        break;
-
-      case "send":
-        sendMessage();
-        break;
-
-      case "send-work":
-        sendWorkMessage();
-        break;
-
-      case "focus":
-        toggleFocusMode();
-        break;
-
-      case "notifications":
-        openNotifications();
-        break;
-
-      case "settings":
-        openSettings();
-        break;
-
-      case "share":
-        shareWorkspace();
-        break;
-
-      case "close-overlay":
-        closeOverlay();
-        break;
-
-      case "new-project":
-        createProject();
-        break;
-
-      case "new-scheduled":
-        createScheduledTask();
-        break;
-
-      case "new-agent":
-        createAgent();
-        break;
-
-      case "new-site":
-        createSite();
-        break;
-
-      case "new-image":
-        createImageConcept();
-        break;
-
-      case "save-site":
-        saveActiveSite();
-        break;
-
-      case "preview-site":
-        previewActiveSite();
-        break;
-
-      case "prompt-templates":
-        openPromptTemplates();
-        break;
-
-      case "refresh-preview":
-        renderWorkDocument();
-        break;
-
-      case "fullscreen-preview":
-        $("#previewSurface")
-          ?.requestFullscreen
-          ?.();
-        break;
-
-      case "reset-data":
-        confirmAction({
-          title:
-            "Reset GALAXY",
-
-          message:
-            "Delete all locally saved GALAXY data?",
-
-          confirmLabel:
-            "Reset",
-
-          onConfirm() {
-            DB.clear();
-
-            window.location.reload();
-          }
-        });
-
-        break;
-    }
   }
 
 
   if (chatOpen) {
+
     Galaxy.state.currentChatId =
-      chatOpen.dataset.chatOpen;
+      chatOpen;
 
     persistAll();
 
@@ -7156,681 +8380,746 @@ function handleDocumentClick(
       "chat"
     );
 
+    renderRecentChats();
+
     renderChat();
 
-    renderRecentChats();
   }
 
 
   if (contextOpen) {
-    const type =
-      contextOpen.dataset.contextOpen;
-
-    const id =
-      contextOpen.dataset.contextId;
 
     const rect =
-      contextOpen.getBoundingClientRect();
+      contextOpen
+        .getBoundingClientRect();
 
     openContextMenu(
-      type,
-      id,
+      contextOpen.dataset
+        .contextOpen,
+      contextOpen.dataset
+        .contextId,
       rect.right,
       rect.bottom
     );
+
   }
 
 
   if (contextAction) {
+
     handleContextAction(
-      contextAction.dataset.contextAction,
-      contextAction.dataset.contextId
+      contextAction.dataset
+        .contextAction,
+      contextAction.dataset
+        .contextId
     );
+
   }
 
 
   if (contentTab) {
+
     handleContentTab(
-      contentTab.dataset.contentGroup,
-      contentTab.dataset.contentTab
+      contentTab.dataset
+        .contentGroup,
+      contentTab.dataset
+        .contentTab
     );
+
   }
 
 
   if (searchResult) {
+
     openSearchResult(
-      searchResult.dataset.searchResult,
-      searchResult.dataset.searchId
+      searchResult.dataset
+        .searchResult,
+      searchResult.dataset
+        .searchId
     );
+
   }
 
 
   if (command) {
+
     const item =
       COMMANDS.find(
-        commandItem =>
-          commandItem.name ===
-          command.dataset.commandName
+        entry =>
+          entry.name ===
+          command.dataset
+            .commandName
       );
 
     closeOverlay();
 
     item?.run?.();
+
   }
 
 
   if (toolAction) {
+
     handleToolAction(
-      toolAction.dataset.toolAction
+      toolAction
     );
+
   }
 
 
-  if (codeCopy) {
+  if (copyCode) {
+
     copyText(
       decodeURIComponent(
-        codeCopy.dataset.copyCode
+        copyCode
       )
     );
+
   }
 
 
   if (copyMessage) {
-    const chat =
-      getCurrentChat();
 
     const message =
-      chat?.messages.find(
-        item =>
-          item.id ===
-          copyMessage.dataset.copyMessage
-      );
+      getCurrentChat()
+        ?.messages
+        .find(
+          item =>
+            item.id ===
+            copyMessage
+        );
 
     if (message) {
+
       copyText(
         message.text
       );
+
     }
+
   }
 
 
-  if (editMessageButton) {
+  if (editMessageId) {
+
     editMessage(
-      editMessageButton.dataset.editMessage
+      editMessageId
     );
+
   }
 
 
-  if (retryMessageButton) {
+  if (retryMessageId) {
+
     retryMessage(
-      retryMessageButton.dataset.retryMessage
+      retryMessageId
     );
+
   }
 
 
-  if (readMessageButton) {
+  if (readMessageId) {
+
     readAloud(
-      readMessageButton.dataset.readMessage
+      readMessageId
     );
+
   }
 
 
-  if (branchMessageButton) {
+  if (branchMessageId) {
+
     branchConversation(
-      branchMessageButton.dataset.branchMessage
+      branchMessageId
     );
+
   }
 
 
-  if (previewLibrary) {
+  if (removeAttachmentId) {
+
+    removeAttachment(
+      removeAttachmentId
+    );
+
+  }
+
+
+  if (previewLibraryId) {
+
     previewLibraryItem(
-      previewLibrary.dataset.previewLibrary
+      previewLibraryId
     );
+
   }
 
 
-  if (libraryFavorite) {
+  if (favoriteId) {
+
     toggleLibraryFavorite(
-      libraryFavorite.dataset.libraryFavorite
+      favoriteId
     );
+
   }
 
 
-  if (deleteLibrary) {
+  if (deleteLibraryId) {
+
     deleteLibraryItem(
-      deleteLibrary.dataset.deleteLibrary
+      deleteLibraryId
     );
+
   }
 
 
-  if (editProjectButton) {
+  if (editProjectId) {
+
     editProject(
-      editProjectButton.dataset.editProject
+      editProjectId
     );
+
   }
 
 
-  if (toggleScheduled) {
+  if (toggleScheduledId) {
+
     toggleScheduledTask(
-      toggleScheduled.dataset.toggleScheduled
+      toggleScheduledId
     );
+
   }
 
 
-  if (deleteScheduled) {
+  if (deleteScheduledId) {
+
     deleteScheduledTask(
-      deleteScheduled.dataset.deleteScheduled
+      deleteScheduledId
     );
+
   }
 
 
-  if (pluginInstall) {
+  if (pluginInstallId) {
+
     togglePluginInstall(
-      pluginInstall.dataset.pluginInstall
+      pluginInstallId
     );
+
   }
 
 
-  if (pluginConnect) {
+  if (pluginConnectId) {
+
     togglePluginConnection(
-      pluginConnect.dataset.pluginConnect
+      pluginConnectId
     );
+
   }
 
 
-  if (editAgentButton) {
+  if (editAgentId) {
+
     const agent =
       Galaxy.state.agents.find(
         item =>
           item.id ===
-          editAgentButton.dataset.editAgent
+          editAgentId
       );
 
     if (agent) {
+
       openAgentEditor(
         agent
       );
+
     }
+
   }
 
 
-  if (openSiteButton) {
+  if (openSiteId) {
+
     openSiteEditor(
-      openSiteButton.dataset.openSite
+      openSiteId
     );
+
   }
 
 
   if (siteTab) {
+
     switchSiteEditorTab(
-      siteTab.dataset.siteTab
+      siteTab
     );
+
   }
 
 
-  if (openPackButton) {
+  if (openPackId) {
+
     openPack(
-      openPackButton.dataset.openPack
+      openPackId
     );
+
   }
 
 
-  if (packInstall) {
+  if (packInstallId) {
+
     togglePackInstall(
-      packInstall.dataset.packInstallToggle
+      packInstallId
     );
+
   }
 
 
   if (packItem) {
+
+    switchMode(
+      "chat"
+    );
+
     const input =
       $("#promptInput");
 
     if (input) {
-      input.value =
-        packItem.dataset.packItem;
 
-      switchMode(
-        "chat"
-      );
+      input.value =
+        packItem;
 
       autoResizeTextarea(
         input
       );
 
       input.focus();
+
     }
+
   }
 
 
-  if (promptTemplate) {
+  if (promptId) {
+
     usePromptTemplate(
-      promptTemplate.dataset.usePrompt
+      promptId
     );
+
   }
 
 
-  if (workView) {
-    if (
-      workView.dataset.workView ===
-      "preview"
-    ) {
-      previewWorkDocument();
-    }
+  if (
+    workView ===
+    "preview"
+  ) {
+
+    previewWorkDocument();
+
+  }
+
+
+  if (
+    workView ===
+    "edit"
+  ) {
+
+    renderWorkDocument();
+
+  }
+
+
+  if (action) {
 
     if (
-      workView.dataset.workView ===
-      "edit"
+      action ===
+      "home"
     ) {
+
+      switchMode(
+        "chat"
+      );
+
+    } else if (
+      action ===
+      "new-chat"
+    ) {
+
+      newChat();
+
+    } else if (
+      action ===
+      "search"
+    ) {
+
+      openSearch();
+
+    } else if (
+      action ===
+      "command"
+    ) {
+
+      openCommandPalette();
+
+    } else if (
+      action ===
+      "toggle-sidebar"
+    ) {
+
+      toggleSidebar();
+
+    } else if (
+      action ===
+      "toggle-more"
+    ) {
+
+      const menu =
+        $("#moreMenu");
+
+      if (menu) {
+        menu.hidden =
+          !menu.hidden;
+      }
+
+    } else if (
+      action ===
+      "attach"
+    ) {
+
+      $("#fileInput")
+        ?.click();
+
+    } else if (
+      action ===
+      "image"
+    ) {
+
+      $("#imageInput")
+        ?.click();
+
+    } else if (
+      action ===
+      "video"
+    ) {
+
+      $("#videoInput")
+        ?.click();
+
+    } else if (
+      action ===
+      "voice"
+    ) {
+
+      toggleVoiceRecording();
+
+    } else if (
+      action ===
+      "web-search"
+    ) {
+
+      toggleWebSearch();
+
+    } else if (
+      action ===
+      "send"
+    ) {
+
+      sendMessage();
+
+    } else if (
+      action ===
+      "send-work"
+    ) {
+
+      sendWorkMessage();
+
+    } else if (
+      action ===
+      "focus"
+    ) {
+
+      toggleFocusMode();
+
+    } else if (
+      action ===
+      "notifications"
+    ) {
+
+      openNotifications();
+
+    } else if (
+      action ===
+      "settings"
+    ) {
+
+      openSettings();
+
+    } else if (
+      action ===
+      "share"
+    ) {
+
+      shareWorkspace();
+
+    } else if (
+      action ===
+      "close-overlay"
+    ) {
+
+      closeOverlay();
+
+    } else if (
+      action ===
+      "new-project"
+    ) {
+
+      createProject();
+
+    } else if (
+      action ===
+      "new-scheduled"
+    ) {
+
+      createScheduledTask();
+
+    } else if (
+      action ===
+      "new-agent"
+    ) {
+
+      createAgent();
+
+    } else if (
+      action ===
+      "new-site"
+    ) {
+
+      createSite();
+
+    } else if (
+      action ===
+      "new-image"
+    ) {
+
+      createImageConcept();
+
+    } else if (
+      action ===
+      "save-site"
+    ) {
+
+      saveActiveSite();
+
+    } else if (
+      action ===
+      "preview-site"
+    ) {
+
+      previewActiveSite();
+
+    } else if (
+      action ===
+      "prompt-templates"
+    ) {
+
+      openPromptTemplates();
+
+    } else if (
+      action ===
+      "library-upload"
+    ) {
+
+      $("#libraryInput")
+        ?.click();
+
+    } else if (
+      action ===
+      "refresh-preview"
+    ) {
+
       renderWorkDocument();
-    }
-  }
-}
 
-
-/* =========================================================
-   SECTION 79 — RIGHT CLICK
-   ========================================================= */
-
-function handleContextMenuEvent(
-  event
-) {
-  const target =
-    event.target.closest(
-      "[data-context-type]"
-    );
-
-  if (!target) return;
-
-  event.preventDefault();
-
-  openContextMenu(
-    target.dataset.contextType,
-    target.dataset.contextId,
-    event.clientX,
-    event.clientY
-  );
-}
-
-
-/* =========================================================
-   SECTION 80 — INPUT EVENTS
-   ========================================================= */
-
-function handleDocumentInput(
-  event
-) {
-  if (
-    event.target.id ===
-    "promptInput"
-  ) {
-    autoResizeTextarea(
-      event.target
-    );
-
-    if (
-      Galaxy.state.settings.autosave
+    } else if (
+      action ===
+      "fullscreen-preview"
     ) {
-      clearTimeout(
-        handleDocumentInput.autosaveTimer
+
+      $("#previewSurface")
+        ?.requestFullscreen
+        ?.();
+
+    } else if (
+      action ===
+      "reset-data"
+    ) {
+
+      confirmAction({
+
+        title:
+          "Reset GALAXY",
+
+        message:
+          "Delete all locally saved GALAXY data?",
+
+        confirmLabel:
+          "Reset",
+
+        onConfirm() {
+
+          DB.clear();
+
+          location.reload();
+
+        }
+
+      });
+
+    }
+
+  }
+
+}
+
+
+/* =========================================================
+   EVENTS
+   ========================================================= */
+
+function bindEvents() {
+
+  document.addEventListener(
+    "click",
+    handleClick
+  );
+
+
+  document.addEventListener(
+    "contextmenu",
+    event => {
+
+      const target =
+        event.target.closest(
+          "[data-context-type]"
+        );
+
+      if (!target) {
+        return;
+      }
+
+      event.preventDefault();
+
+      openContextMenu(
+        target.dataset
+          .contextType,
+        target.dataset
+          .contextId,
+        event.clientX,
+        event.clientY
       );
 
-      handleDocumentInput.autosaveTimer =
-        setTimeout(
-          () => {
-            DB.set(
-              "draft",
-              event.target.value
+    }
+  );
+
+
+  document.addEventListener(
+    "input",
+    event => {
+
+      if (
+        event.target.id ===
+        "promptInput"
+      ) {
+
+        autoResizeTextarea(
+          event.target
+        );
+
+        if (
+          Galaxy.state.settings
+            .autosave
+        ) {
+
+          clearTimeout(
+            bindEvents.draftTimer
+          );
+
+          bindEvents.draftTimer =
+            setTimeout(
+              () => {
+
+                DB.set(
+                  "draft",
+                  event.target.value
+                );
+
+              },
+              Galaxy.state.settings
+                .autosaveDelay
             );
 
-            const state =
-              $("#draftState");
+        }
 
-            if (state) {
-              state.textContent =
-                event.target.value
-                  ? "Draft saved"
-                  : "Ready";
-            }
-          },
-          Galaxy.state.settings.autosaveDelay
-        );
-    }
-  }
+      }
 
 
-  if (
-    event.target.id ===
-    "commandInput"
-  ) {
-    const mode =
-      event.target.dataset.commandMode;
-
-    if (
-      mode === "search"
-    ) {
-      renderFilteredSearchResults(
-        event.target.value
-      );
-    } else {
-      renderCommandResults(
-        event.target.value,
-        mode
-      );
-    }
-  }
-}
-
-
-/* =========================================================
-   SECTION 81 — MESSAGE INPUT KEYDOWN
-   ========================================================= */
-
-function handlePromptKeydown(
-  event
-) {
-  if (
-    event.target.id !==
-    "promptInput"
-  ) {
-    return;
-  }
-
-  if (
-    event.key ===
-      "Enter" &&
-    !event.shiftKey &&
-    Galaxy.state.settings.enterToSend
-  ) {
-    event.preventDefault();
-
-    sendMessage();
-  }
-}
-
-
-/* =========================================================
-   SECTION 82 — GLOBAL KEYBOARD SHORTCUTS
-   ========================================================= */
-
-function handleKeyboardShortcuts(
-  event
-) {
-  const key =
-    event.key.toLowerCase();
-
-  const modifier =
-    event.ctrlKey ||
-    event.metaKey;
-
-  if (
-    event.key ===
-    "Escape"
-  ) {
-    closeOverlay();
-
-    closeContextMenu();
-
-    return;
-  }
-
-
-  if (
-    modifier &&
-    key === "k"
-  ) {
-    event.preventDefault();
-
-    openSearch();
-
-    return;
-  }
-
-
-  if (
-    modifier &&
-    key === "n"
-  ) {
-    event.preventDefault();
-
-    newChat();
-
-    return;
-  }
-
-
-  if (
-    modifier &&
-    event.key === "."
-  ) {
-    event.preventDefault();
-
-    toggleFocusMode();
-
-    return;
-  }
-
-
-  if (
-    modifier &&
-    event.key === "/"
-  ) {
-    event.preventDefault();
-
-    toggleTheme();
-
-    return;
-  }
-
-
-  if (
-    event.altKey &&
-    event.key === "1"
-  ) {
-    event.preventDefault();
-
-    switchMode(
-      "chat"
-    );
-
-    return;
-  }
-
-
-  if (
-    event.altKey &&
-    event.key === "2"
-  ) {
-    event.preventDefault();
-
-    switchMode(
-      "work"
-    );
-  }
-}
-
-
-/* =========================================================
-   SECTION 83 — FILE INPUT EVENTS
-   ========================================================= */
-
-function bindFileInputs() {
-  on(
-    $("#fileInput"),
-    "change",
-    event => {
       if (
-        event.target.files
-          ?.length
+        event.target.id ===
+        "commandInput"
       ) {
-        addFiles(
-          event.target.files
+
+        renderCommandResults(
+          event.target.value,
+          event.target.dataset
+            .commandMode
         );
+
       }
 
-      event.target.value =
-        "";
     }
   );
 
 
-  on(
-    $("#imageInput"),
+  document.addEventListener(
     "change",
     event => {
-      if (
-        event.target.files
-          ?.length
-      ) {
-        addFiles(
-          event.target.files
+
+      const select =
+        event.target.closest(
+          "[data-setting-select]"
         );
 
-        Array.from(
-          event.target.files
-        )
-          .forEach(
-            file =>
-              addLibraryFile(
-                file
-              )
-          );
+      if (!select) {
+        return;
       }
 
-      event.target.value =
-        "";
+      Galaxy.state.settings[
+        select.dataset
+          .settingSelect
+      ] =
+        select.value;
+
+      persistAll();
+
+      applyTheme();
+
     }
   );
 
 
-  on(
-    $("#videoInput"),
-    "change",
-    event => {
-      if (
-        event.target.files
-          ?.length
-      ) {
-        addFiles(
-          event.target.files
-        );
-
-        Array.from(
-          event.target.files
-        )
-          .forEach(
-            file =>
-              addLibraryFile(
-                file
-              )
-          );
-      }
-
-      event.target.value =
-        "";
-    }
-  );
-
-
-  on(
-    $("#libraryInput"),
-    "change",
-    event => {
-      Array.from(
-        event.target.files ||
-          []
-      )
-        .forEach(
-          file =>
-            addLibraryFile(
-              file
-            )
-        );
-
-      event.target.value =
-        "";
-    }
-  );
-
-
-  on(
-    $("#conversationImportInput"),
-    "change",
-    event => {
-      const file =
-        event.target.files?.[
-          0
-        ];
-
-      if (file) {
-        importConversation(
-          file
-        );
-      }
-
-      event.target.value =
-        "";
-    }
-  );
-}
-
-
-/* =========================================================
-   SECTION 84 — MODE TABS
-   ========================================================= */
-
-function bindModeTabs() {
-  $$(".mode-tab")
-    .forEach(
-      tab => {
-        on(
-          tab,
-          "click",
-          () => {
-            switchMode(
-              tab.dataset.mode
-            );
-          }
-        );
-      }
-    );
-}
-
-
-/* =========================================================
-   SECTION 85 — WINDOW RESIZE
-   ========================================================= */
-
-function handleResize() {
-  if (
-    window.innerWidth >
-    900
-  ) {
-    $("#app")
-      ?.classList.remove(
-        "mobile-sidebar-open"
-      );
-  }
-}
-
-
-/* =========================================================
-   SECTION 86 — SETTINGS CHANGE EVENTS
-   ========================================================= */
-
-function bindSettingsEvents() {
   document.addEventListener(
     "click",
     event => {
+
       const toggle =
         event.target.closest(
           "[data-setting-toggle]"
         );
 
-      if (!toggle) return;
+      if (!toggle) {
+        return;
+      }
 
       const key =
-        toggle.dataset.settingToggle;
+        toggle.dataset
+          .settingToggle;
 
       Galaxy.state.settings[
         key
@@ -7843,55 +9132,271 @@ function bindSettingsEvents() {
 
       applyTheme();
 
-      applyFocusMode();
-
       toggle.classList.toggle(
         "active",
-        Galaxy.state.settings[
+        !!Galaxy.state.settings[
           key
         ]
       );
 
-      toggle.setAttribute(
-        "aria-pressed",
-        String(
-          Galaxy.state.settings[
-            key
-          ]
-        )
-      );
     }
   );
 
 
   document.addEventListener(
-    "change",
+    "keydown",
     event => {
-      const select =
-        event.target.closest(
-          "[data-setting-select]"
+
+      if (
+        event.target.id ===
+        "promptInput" &&
+        event.key ===
+        "Enter" &&
+        !event.shiftKey &&
+        Galaxy.state.settings
+          .enterToSend
+      ) {
+
+        event.preventDefault();
+
+        sendMessage();
+
+        return;
+      }
+
+      const mod =
+        event.ctrlKey ||
+        event.metaKey;
+
+      if (
+        event.key ===
+        "Escape"
+      ) {
+
+        closeOverlay();
+
+        closeContextMenu();
+
+      } else if (
+        mod &&
+        event.key
+          .toLowerCase() ===
+        "k"
+      ) {
+
+        event.preventDefault();
+
+        openSearch();
+
+      } else if (
+        mod &&
+        event.key
+          .toLowerCase() ===
+        "n"
+      ) {
+
+        event.preventDefault();
+
+        newChat();
+
+      } else if (
+        mod &&
+        event.key ===
+        "."
+      ) {
+
+        event.preventDefault();
+
+        toggleFocusMode();
+
+      } else if (
+        mod &&
+        event.key ===
+        "/"
+      ) {
+
+        event.preventDefault();
+
+        toggleTheme();
+
+      } else if (
+        event.altKey &&
+        event.key ===
+        "1"
+      ) {
+
+        event.preventDefault();
+
+        switchMode(
+          "chat"
         );
 
-      if (!select) return;
+      } else if (
+        event.altKey &&
+        event.key ===
+        "2"
+      ) {
 
-      Galaxy.state.settings[
-        select.dataset.settingSelect
-      ] =
-        select.value;
+        event.preventDefault();
 
-      persistAll();
+        switchMode(
+          "work"
+        );
 
-      applyTheme();
+      }
+
     }
   );
+
+
+  $$(".mode-tab")
+    .forEach(
+      tab => {
+
+        on(
+          tab,
+          "click",
+          () =>
+            switchMode(
+              tab.dataset.mode
+            )
+        );
+
+      }
+    );
+
+
+  [
+    "dragenter",
+    "dragover"
+  ]
+    .forEach(
+      type => {
+
+        document.addEventListener(
+          type,
+          event => {
+
+            event.preventDefault();
+
+            Galaxy.state.dragCounter++;
+
+            document.body
+              .classList
+              .add(
+                "dragging"
+              );
+
+          }
+        );
+
+      }
+    );
+
+
+  document.addEventListener(
+    "dragleave",
+    event => {
+
+      event.preventDefault();
+
+      Galaxy.state.dragCounter =
+        Math.max(
+          0,
+          Galaxy.state.dragCounter -
+          1
+        );
+
+      if (
+        !Galaxy.state.dragCounter
+      ) {
+
+        document.body
+          .classList
+          .remove(
+            "dragging"
+          );
+
+      }
+
+    }
+  );
+
+
+  document.addEventListener(
+    "drop",
+    event => {
+
+      event.preventDefault();
+
+      Galaxy.state.dragCounter =
+        0;
+
+      document.body
+        .classList
+        .remove(
+          "dragging"
+        );
+
+      if (
+        event.dataTransfer
+          ?.files
+          ?.length
+      ) {
+
+        addFiles(
+          event.dataTransfer
+            .files
+        );
+
+      }
+
+    }
+  );
+
+
+  window.addEventListener(
+    "resize",
+    () => {
+
+      if (
+        window.innerWidth >
+        900
+      ) {
+
+        $("#app")
+          ?.classList
+          .remove(
+            "mobile-sidebar-open"
+          );
+
+      }
+
+    }
+  );
+
+
+  window.addEventListener(
+    "blur",
+    closeContextMenu
+  );
+
+
+  bindFileInputs();
+
 }
 
 
 /* =========================================================
-   SECTION 87 — INITIAL CHAT
+   START
    ========================================================= */
 
-function ensureInitialChatState() {
+function initGalaxy() {
+
+  seedData();
+
+  applyTheme();
+
   if (
     Galaxy.state.currentChatId &&
     !Galaxy.state.chats.some(
@@ -7900,29 +9405,23 @@ function ensureInitialChatState() {
         Galaxy.state.currentChatId
     )
   ) {
+
     Galaxy.state.currentChatId =
       null;
+
   }
 
   if (
     !Galaxy.state.currentChatId &&
     Galaxy.state.chats.length
   ) {
+
     Galaxy.state.currentChatId =
-      Galaxy.state.chats[0].id;
+      Galaxy.state.chats[
+        0
+      ].id;
+
   }
-}
-
-
-/* =========================================================
-   SECTION 88 — RESTORE DRAFT
-   ========================================================= */
-
-function restoreDraft() {
-  const input =
-    $("#promptInput");
-
-  if (!input) return;
 
   const draft =
     DB.get(
@@ -7930,157 +9429,61 @@ function restoreDraft() {
       ""
     );
 
-  input.value =
-    draft || "";
+  const input =
+    $("#promptInput");
 
-  autoResizeTextarea(
-    input
-  );
+  if (input) {
 
-  const status =
-    $("#draftState");
+    input.value =
+      draft;
 
-  if (
-    status &&
-    draft
-  ) {
-    status.textContent =
-      "Draft restored";
-  }
-}
-
-
-/* =========================================================
-   SECTION 89 — INITIAL VIEW
-   ========================================================= */
-
-function restoreView() {
-  if (
-    Galaxy.state.mode ===
-    "work"
-  ) {
-    switchMode(
-      "work"
+    autoResizeTextarea(
+      input
     );
 
-    return;
   }
+
+  renderRecentChats();
+
+  renderChat();
+
+  renderWebSearchState();
+
+  renderVoiceState();
+
+  updateNotificationIndicator();
+
+  updateSendButtonState();
+
+  bindEvents();
 
   switchMode(
     "chat"
   );
+
+  console.log(
+    `GALAXY AI ${Galaxy.version} ready`
+  );
+
 }
 
-
-/* =========================================================
-   SECTION 90 — INITIALIZE GALAXY
-   ========================================================= */
-
-function initGalaxy() {
-  try {
-    seedGalaxyData();
-
-    ensureInitialChatState();
-
-    applyTheme();
-
-    applyFocusMode();
-
-    restoreDraft();
-
-    renderRecentChats();
-
-    renderChat();
-
-    renderWebSearchState();
-
-    renderVoiceState();
-
-    updateNotificationIndicator();
-
-    updateSendButtonState();
-
-    bindModeTabs();
-
-    bindFileInputs();
-
-    bindSettingsEvents();
-
-    document.addEventListener(
-      "click",
-      handleDocumentClick
-    );
-
-    document.addEventListener(
-      "contextmenu",
-      handleContextMenuEvent
-    );
-
-    document.addEventListener(
-      "input",
-      handleDocumentInput
-    );
-
-    document.addEventListener(
-      "keydown",
-      handlePromptKeydown
-    );
-
-    document.addEventListener(
-      "keydown",
-      handleKeyboardShortcuts
-    );
-
-    window.addEventListener(
-      "resize",
-      handleResize
-    );
-
-    window.addEventListener(
-      "blur",
-      closeContextMenu
-    );
-
-    restoreView();
-
-    addNotification({
-      title:
-        "GALAXY ready",
-
-      message:
-        "Your AI workspace is ready.",
-
-      type:
-        "info"
-    });
-
-    console.log(
-      `GALAXY AI ${Galaxy.version} ready`
-    );
-  } catch (error) {
-    handleError(
-      error,
-      "Initialization"
-    );
-  }
-}
-
-
-/* =========================================================
-   SECTION 91 — START APPLICATION
-   ========================================================= */
 
 if (
   document.readyState ===
   "loading"
 ) {
+
   document.addEventListener(
     "DOMContentLoaded",
     initGalaxy,
     {
-      once: true
+      once:
+        true
     }
   );
+
 } else {
+
   initGalaxy();
+
 }
