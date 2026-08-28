@@ -1,174 +1,102 @@
-import OpenAI from "openai";
-
-const client = new OpenAI({
-  apiKey: process.env.OPENAI_API_KEY
-});
-
-export default async function handler(req, res) {
-  try {
-    if (req.method !== "POST") {
-      return res.status(405).json({
-        error: "Method not allowed"
-      });
-    }
-
-    const {
-      message,
-      history = [],
-      webSearch = false,
-      mode = "chat"
-    } = req.body || {};
-
-    if (
-      !message ||
-      typeof message !== "string"
-    ) {
-      return res.status(400).json({
-        error: "Message is required"
-      });
-    }
-
-    const conversation = [
-      {
-        role: "developer",
-        content:
-          mode === "work"
-            ? `
-            You are GALAXY AI operating in Work mode.
-
-GALAXY AI was created and is owned by Harshavardhan.
-
-Help the user create, edit, plan, code, analyze, design and improve work.
-
-Be intelligent, practical and clear.
-
-You are powered by an OpenAI model through the OpenAI API.
-`.trim()
-
-        : `
-You are GALAXY AI.
-
-GALAXY AI was created and is owned by Harshavardhan.
-
-If the user asks:
-- Who created you?
-- Who owns you?
-- Who is your founder?
-- Who built GALAXY AI?
-
-Answer clearly that GALAXY AI was created and is owned by Harshavardhan.
-
-You are powered by an OpenAI model through the OpenAI API.
-
-Be helpful, clear and intelligent.
-
-Answer the user's actual question directly.
-
-Do not say that you are only a frontend.
-Do not say that a backend needs to be connected unless there is actually a backend error.
-`.trim()
-  },
-
-  ...history,
-
-  {
-    role: "user",
-    content: message
+module.exports = async function handler(req, res) {
+  if (req.method !== "POST") {
+    return res.status(405).json({
+      error: "Method not allowed"
+    });
   }
-];
-You are GALAXY AI operating in Work mode.
 
-Help the user create, edit, plan, code, analyze, design and improve work.
+  const apiKey = process.env.OPENAI_API_KEY;
 
-Be intelligent, concise when appropriate, detailed when necessary, and practical.
+  if (!apiKey) {
+    return res.status(500).json({
+      error: "OPENAI_API_KEY is missing in Vercel."
+    });
+  }
 
-Use Markdown when useful.
+  try {
+    const body = req.body || {};
+    const message = body.message || "";
 
-Do not mention internal API implementation unless specifically asked.
-`.trim()
-            : `
-You are GALAXY AI.
-
-You are an advanced general-purpose AI assistant.
-
-Help with questions, research, writing, coding, analysis, planning, creativity, learning and problem solving.
-
-Answer the user's actual question directly.
-
-Be clear, intelligent and useful.
-
-Use Markdown when useful.
-
-Do not say that you are only a frontend.
-Do not say that a backend needs to be connected.
-Do not repeat implementation instructions unless the user asks about the website itself.
-`.trim()
-      },
-
-      ...history
-        .filter(
-          item =>
-            item &&
-            typeof item.content === "string" &&
-            (
-              item.role === "user" ||
-              item.role === "assistant"
-            )
-        )
-        .slice(-20),
-
-      {
-        role: "user",
-        content: message
-      }
-    ];
-
-    const request = {
-      model: "gpt-5.6",
-      reasoning: {
-        effort: "low"
-      },
-      input: conversation
-    };
-
-    if (webSearch) {
-      request.tools = [
-        {
-          type: "web_search"
-        }
-      ];
+    if (!message.trim()) {
+      return res.status(400).json({
+        error: "Message is required."
+      });
     }
 
-    const response =
-      await client.responses.create(
-        request
-      );
+    const response = await fetch(
+      "https://api.openai.com/v1/responses",
+      {
+        method: "POST",
 
-    const reply =
-      response.output_text?.trim();
+        headers: {
+          "Content-Type": "application/json",
+          "Authorization": `Bearer ${apiKey}`
+        },
 
-    if (!reply) {
-      return res.status(500).json({
+        body: JSON.stringify({
+          model: "gpt-5.6-luna",
+
+          instructions: `
+You are GALAXY AI.
+
+GALAXY AI was created and founded by Harshavardhan.
+
+If anyone asks who created, made, founded, or owns GALAXY AI,
+answer that Harshavardhan created GALAXY AI.
+
+Do not claim that OpenAI or Google created GALAXY AI.
+
+If asked about the underlying technology,
+explain that GALAXY AI can use external AI models
+through APIs depending on the selected provider.
+
+Be helpful, clear, intelligent, and concise.
+          `.trim(),
+
+          input: message
+        })
+      }
+    );
+
+    const data = await response.json();
+
+    if (!response.ok) {
+      console.error("OpenAI API error:", data);
+
+      return res.status(response.status).json({
         error:
-          "The AI returned an empty response."
+          data?.error?.message ||
+          "OpenAI API request failed."
       });
+    }
+
+    let reply = "";
+
+    if (data.output_text) {
+      reply = data.output_text;
+    }
+
+    if (!reply && Array.isArray(data.output)) {
+      for (const item of data.output) {
+        if (!Array.isArray(item.content)) continue;
+
+        for (const content of item.content) {
+          if (content.type === "output_text" && content.text) {
+            reply += content.text;
+          }
+        }
+      }
     }
 
     return res.status(200).json({
-      reply
+      reply: reply || "GALAXY did not return a response."
     });
-  } catch (error) {
-    console.error(
-      "GALAXY API ERROR:",
-      error
-    );
 
-    return res.status(
-      error?.status || 500
-    ).json({
-      error:
-        error?.message ||
-        "GALAXY AI request failed."
+  } catch (error) {
+    console.error("GALAXY OpenAI backend error:", error);
+
+    return res.status(500).json({
+      error: error.message || "Internal server error."
     });
   }
-}
+};
