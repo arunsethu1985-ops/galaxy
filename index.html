@@ -1679,3 +1679,147 @@
 <script src="script.js"></script>
 </body>
 </html>
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>GALAXY AI</title>
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+  <div class="app-shell">
+    <aside class="sidebar">
+      <div class="brand">
+        <div class="brand-mark">✦</div>
+        <div>
+          <strong>GALAXY AI</strong>
+          <span>by Harshavardhan</span>
+        </div>
+      </div>
+
+      <button class="sidebar-primary" data-action="new-chat">＋ New chat</button>
+
+      <nav class="nav">
+        <button class="nav-row active" data-view="chat"><span>◌</span>Chat</button>
+        <button class="nav-row" data-view="work"><span>▦</span>Work</button>
+        <button class="nav-row" data-view="games"><span>♛</span>Gaming Center</button>
+        <button class="nav-row" data-view="projects"><span>▱</span>Projects</button>
+        <button class="nav-row" data-view="library"><span>◫</span>Library</button>
+        <button class="nav-row" data-view="studio"><span>▷</span>Create Studio</button>
+      </nav>
+
+      <div class="sidebar-spacer"></div>
+
+      <div class="sidebar-section">
+        <span class="sidebar-label">RECENT</span>
+        <div id="recentChats" class="recent-list"></div>
+      </div>
+    </aside>
+
+    <main class="main-shell">
+      <header class="topbar">
+        <div class="mode-tabs">
+          <button class="mode-tab active" data-view="chat">Chat</button>
+          <button class="mode-tab" data-view="work">Work</button>
+          <button class="mode-tab" data-view="games">Games</button>
+        </div>
+
+        <div class="topbar-right">
+          <select id="aiProvider" aria-label="AI provider">
+            <option value="gemini" selected>Gemini</option>
+            <option value="openai">OpenAI</option>
+          </select>
+          <span class="status-dot"></span>
+        </div>
+      </header>
+
+      <section id="chatView" class="view active-view">
+        <div id="chatEmpty" class="empty-state">
+          <div class="empty-logo">✦</div>
+          <h1>What can GALAXY help with?</h1>
+          <p>Chat, create, build, research, code and play.</p>
+        </div>
+
+        <div id="messages" class="messages"></div>
+
+        <div class="composer-dock">
+          <div id="attachmentTray" class="attachment-tray"></div>
+
+          <div id="composer" class="composer">
+            <button class="composer-icon" data-action="attach" title="Add files">＋</button>
+
+            <textarea
+              id="promptInput"
+              rows="1"
+              maxlength="50000"
+              placeholder="Ask anything"
+              aria-label="Message GALAXY AI"
+            ></textarea>
+
+            <button class="composer-icon" data-action="web-search" title="Web search">⌕</button>
+            <button class="composer-icon" data-action="image" title="Images">◫</button>
+            <button class="composer-icon" data-action="video" title="Videos">▷</button>
+            <button class="composer-icon" data-action="voice" title="Voice">◉</button>
+
+            <button
+              id="sendButton"
+              class="send-arrow"
+              data-action="send"
+              aria-label="Send"
+              title="Send"
+              type="button"
+            >↑</button>
+          </div>
+
+          <div class="composer-footer">
+            <span id="draftState">Ready</span>
+            <span>GALAXY can make mistakes. Check important information.</span>
+          </div>
+        </div>
+      </section>
+
+      <section id="workView" class="view">
+        <div class="page">
+          <div class="page-head">
+            <div>
+              <span class="eyebrow">WORKSPACE</span>
+              <h1>Work with GALAXY</h1>
+              <p>Draft, edit and improve structured work.</p>
+            </div>
+          </div>
+
+          <div class="work-grid">
+            <div class="panel">
+              <h3>Work request</h3>
+              <textarea id="workPrompt" class="large-textarea" placeholder="Ask GALAXY to create or improve something..."></textarea>
+              <button class="primary-btn" data-action="send-work">Run with GALAXY</button>
+            </div>
+            <div class="panel">
+              <h3>Output</h3>
+              <div id="workOutput" class="work-output">Your work output will appear here.</div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section id="contentView" class="view">
+        <div class="content-shell">
+          <div class="content-head">
+            <div>
+              <span id="contentEyebrow" class="eyebrow">GALAXY</span>
+              <h1 id="contentTitle">Workspace</h1>
+            </div>
+          </div>
+          <div id="contentBody"></div>
+        </div>
+      </section>
+    </main>
+  </div>
+
+  <input id="fileInput" type="file" multiple hidden />
+  <div id="toastRoot" class="toast-root"></div>
+
+  <script src="script.js"></script>
+</body>
+</html>
