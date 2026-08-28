@@ -4745,3 +4745,179 @@ if (
 } else {
   initGalaxy();
 }
+async function fetchAIResponse(message) {
+  const creatorContext =
+    "You are GALAXY AI. " +
+    "GALAXY AI was created and founded by Harshavardhan. " +
+    "If anyone asks who created, made, founded, designed or owns GALAXY AI, " +
+    "answer: Harshavardhan created GALAXY AI. " +
+    "GALAXY AI uses Gemini technology through an API for AI responses. " +
+    "Be intelligent, friendly, clear and helpful.";
+
+  const history = state.messages
+    .slice(-20)
+    .map(item => ({
+      role: item.role,
+      content: item.text
+    }));
+
+  const response = await fetch("/api/gemini", {
+    method: "POST",
+
+    headers: {
+      "Content-Type": "application/json"
+    },
+
+    body: JSON.stringify({
+      message: message,
+      prompt: message,
+      system: creatorContext,
+      messages: [
+        {
+          role: "system",
+          content: creatorContext
+        },
+        ...history,
+        {
+          role: "user",
+          content: message
+        }
+      ]
+    })
+  });
+
+  let data = {};
+
+  try {
+    data = await response.json();
+  } catch {
+    throw new Error(
+      "GALAXY received an invalid response from Gemini."
+    );
+  }
+
+  if (!response.ok) {
+    throw new Error(
+      data.error ||
+      data.message ||
+      `Gemini backend error ${response.status}`
+    );
+  }
+
+  const reply =
+    data.reply ||
+    data.text ||
+    data.output ||
+    data.response ||
+    data.message;
+
+  if (!reply) {
+    throw new Error(
+      "Gemini returned an empty response."
+    );
+  }
+
+  return reply;
+}
+async function sendWork() {
+  const input = $("#workPrompt");
+  const output = $("#workOutput");
+
+  if (!input || !output) {
+    return;
+  }
+
+  const text = input.value.trim();
+
+  if (!text) {
+    toast("Enter a work request.");
+    return;
+  }
+
+  output.textContent = "GALAXY is working…";
+
+  try {
+    const response = await fetch("/api/gemini", {
+      method: "POST",
+
+      headers: {
+        "Content-Type": "application/json"
+      },
+
+      body: JSON.stringify({
+        message: text,
+        prompt: text,
+        system:
+          "You are GALAXY AI, created by Harshavardhan. " +
+          "Help the user complete professional and creative work clearly."
+      })
+    });
+
+    let data = {};
+
+    try {
+      data = await response.json();
+    } catch {
+      throw new Error(
+        "GALAXY received an invalid Gemini response."
+      );
+    }
+
+    if (!response.ok) {
+      throw new Error(
+        data.error ||
+        data.message ||
+        `Gemini backend error ${response.status}`
+      );
+    }
+
+    output.textContent =
+      data.reply ||
+      data.text ||
+      data.output ||
+      data.response ||
+      data.message ||
+      "No response received.";
+
+  } catch (error) {
+    output.textContent =
+      `GALAXY error: ${error.message}`;
+
+    toast(error.message, "error");
+  }
+}
+/* =========================================================
+   GALAXY — GEMINI ONLY
+   ========================================================= */
+
+function forceGalaxyGemini() {
+  const provider = document.querySelector("#aiProvider");
+
+  if (!provider) {
+    return;
+  }
+
+  const openAIOption =
+    provider.querySelector(
+      'option[value="openai"]'
+    );
+
+  if (openAIOption) {
+    openAIOption.remove();
+  }
+
+  provider.value = "gemini";
+  provider.disabled = true;
+
+  provider.title =
+    "GALAXY AI powered by Gemini";
+}
+
+if (document.readyState === "loading") {
+  document.addEventListener(
+    "DOMContentLoaded",
+    forceGalaxyGemini
+  );
+} else {
+  forceGalaxyGemini();
+}
