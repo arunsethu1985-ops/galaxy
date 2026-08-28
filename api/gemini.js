@@ -1,9 +1,3 @@
-import { GoogleGenAI } from "@google/genai";
-
-const ai = new GoogleGenAI({
-  apiKey: process.env.GEMINI_API_KEY
-});
-
 export default async function handler(req, res) {
   try {
     if (req.method !== "POST") {
@@ -12,16 +6,24 @@ export default async function handler(req, res) {
       });
     }
 
+    const apiKey = process.env.GEMINI_API_KEY;
+
+    if (!apiKey) {
+      return res.status(500).json({
+        error: "GEMINI_API_KEY is missing in Vercel."
+      });
+    }
+
     const {
       message,
+      prompt,
       history = [],
       mode = "chat"
     } = req.body || {};
 
-    if (
-      !message ||
-      typeof message !== "string"
-    ) {
+    const userMessage = message || prompt;
+
+    if (!userMessage || typeof userMessage !== "string") {
       return res.status(400).json({
         error: "Message is required"
       });
@@ -38,86 +40,128 @@ Help the user create, edit, plan, code, analyze, design and improve work.
 
 Be intelligent, practical, clear and useful.
 
-You are powered by Google Gemini through the Gemini API.
+GALAXY AI can use Google Gemini through an API.
 `.trim()
         : `
 You are GALAXY AI.
 
-GALAXY AI was created and is owned by Harshavardhan.
+GALAXY AI was created and founded by Harshavardhan.
 
 If the user asks:
 - Who created you?
-- Who owns you?
-- Who is your founder?
-- Who built GALAXY AI?
+- Who made you?
+- Who is your creator?
+- Who founded GALAXY AI?
+- Who owns GALAXY AI?
 
-Answer clearly that GALAXY AI was created and is owned by Harshavardhan.
+Answer:
+"Harshavardhan created GALAXY AI."
 
-You are powered by Google Gemini through the Gemini API.
+Do not claim that Google or OpenAI created GALAXY AI.
+
+If asked about the underlying technology, explain that GALAXY AI can use external AI models through APIs.
 
 Answer the user's actual question directly.
 
 Be helpful, clear and intelligent.
 `.trim();
 
-    const cleanHistory = history
-      .filter(
-        item =>
-          item &&
-          typeof item.content === "string" &&
-          (
-            item.role === "user" ||
-            item.role === "assistant"
+    const cleanHistory = Array.isArray(history)
+      ? history
+          .filter(
+            item =>
+              item &&
+              typeof item.content === "string" &&
+              (item.role === "user" ||
+                item.role === "assistant")
           )
-      )
-      .slice(-20);
+          .slice(-20)
+      : [];
 
-    const historyText = cleanHistory
-      .map(
-        item =>
-          `${
-            item.role === "assistant"
-              ? "Assistant"
-              : "User"
-          }: ${item.content}`
-      )
-      .join("\n\n");
+    const contents = [];
 
-    const contents = historyText
-      ? `
-Conversation history:
-
-${historyText}
-
-Current user message:
-
-${message}
-`.trim()
-      : message;
-
-    const response =
-      await ai.models.generateContent({
-        model: "gemini-3.7-flash",
-
-        contents,
-
-        config: {
-          systemInstruction
-        }
+    for (const item of cleanHistory) {
+      contents.push({
+        role:
+          item.role === "assistant"
+            ? "model"
+            : "user",
+        parts: [
+          {
+            text: item.content
+          }
+        ]
       });
+    }
+
+    contents.push({
+      role: "user",
+      parts: [
+        {
+          text: userMessage
+        }
+      ]
+    });
+
+    const response = await fetch(
+      "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent",
+      {
+        method: "POST",
+
+        headers: {
+          "Content-Type": "application/json",
+          "x-goog-api-key": apiKey
+        },
+
+        body: JSON.stringify({
+          systemInstruction: {
+            parts: [
+              {
+                text: systemInstruction
+              }
+            ]
+          },
+
+          contents,
+
+          generationConfig: {
+            temperature: 0.8,
+            maxOutputTokens: 2048
+          }
+        })
+      }
+    );
+
+    const data = await response.json();
+
+    if (!response.ok) {
+      console.error(
+        "GEMINI API ERROR:",
+        JSON.stringify(data)
+      );
+
+      return res.status(response.status).json({
+        error:
+          data?.error?.message ||
+          "Gemini API request failed."
+      });
+    }
 
     const reply =
-      response.text?.trim();
+      data?.candidates?.[0]?.content?.parts
+        ?.map(part => part.text || "")
+        .join("")
+        .trim();
 
     if (!reply) {
       return res.status(500).json({
-        error:
-          "Gemini returned an empty response."
+        error: "Gemini returned an empty response."
       });
     }
 
     return res.status(200).json({
       reply,
+      text: reply,
       provider: "gemini"
     });
 
