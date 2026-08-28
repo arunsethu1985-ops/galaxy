@@ -1,3124 +1,1110 @@
 "use strict";
 
 /* =========================================================
-   GALAXY AI — COMPLETE FRONT-END CONTROLLER
-   Clean replacement script
+   GALAXY AI
+   FINAL FRONTEND SCRIPT
+   index.html + style.css + script.js
+
+   IMPORTANT:
+   API KEYS MUST NEVER BE PUT IN THIS FILE.
+
+   Backend endpoints:
+   OpenAI -> /api/chat
+   Gemini -> /api/gemini
+   Image  -> /api/image
+   Video  -> /api/video
+   ========================================================= */
+
+
+/* =========================================================
+   HELPERS
    ========================================================= */
 
 const $ = (selector, root = document) =>
   root.querySelector(selector);
 
 const $$ = (selector, root = document) =>
-  Array.from(root.querySelectorAll(selector));
+  [...root.querySelectorAll(selector)];
 
-const on = (target, type, handler, options) => {
-  if (target) {
-    target.addEventListener(type, handler, options);
-  }
-};
+const uid = (prefix = "galaxy") =>
+  `${prefix}_${Date.now()}_${Math.random().toString(36).slice(2, 9)}`;
 
-const uid = prefix =>
-  `${prefix}_${Date.now().toString(36)}_${Math.random()
-    .toString(36)
-    .slice(2, 9)}`;
+function escapeHTML(value = "") {
+  return String(value)
+    .replaceAll("&", "&amp;")
+    .replaceAll("<", "&lt;")
+    .replaceAll(">", "&gt;")
+    .replaceAll('"', "&quot;")
+    .replaceAll("'", "&#039;");
+}
 
-const now = () => Date.now();
+function formatTime(date = new Date()) {
+  return date.toLocaleTimeString([], {
+    hour: "2-digit",
+    minute: "2-digit"
+  });
+}
 
-const sleep = ms =>
-  new Promise(resolve =>
-    setTimeout(resolve, ms)
-  );
-
-const escapeHTML = value =>
-  String(value ?? "").replace(
-    /[&<>"']/g,
-    ch =>
-      ({
-        "&": "&amp;",
-        "<": "&lt;",
-        ">": "&gt;",
-        '"': "&quot;",
-        "'": "&#039;"
-      })[ch]
-  );
+function delay(ms) {
+  return new Promise(resolve => setTimeout(resolve, ms));
+}
 
 
 /* =========================================================
-   LOCAL DATABASE
+   LOCAL STORAGE
    ========================================================= */
 
-const DB = {
+const Storage = {
+  prefix: "galaxy.ai.final.",
 
-  prefix: "galaxy.ai.",
-
-  key(name) {
-    return `${this.prefix}${name}`;
-  },
-
-  get(name, fallback = null) {
-
+  get(key, fallback = null) {
     try {
-
-      const raw =
-        localStorage.getItem(
-          this.key(name)
-        );
-
-      return raw === null
-        ? fallback
-        : JSON.parse(raw);
-
-    } catch (error) {
-
-      console.error(
-        "GALAXY DB GET ERROR",
-        name,
-        error
-      );
-
+      const raw = localStorage.getItem(this.prefix + key);
+      return raw === null ? fallback : JSON.parse(raw);
+    } catch {
       return fallback;
     }
-
   },
 
-  set(name, value) {
-
+  set(key, value) {
     try {
-
       localStorage.setItem(
-        this.key(name),
+        this.prefix + key,
         JSON.stringify(value)
       );
-
-      return true;
-
     } catch (error) {
-
-      console.error(
-        "GALAXY DB SET ERROR",
-        name,
-        error
-      );
-
-      return false;
+      console.warn("GALAXY storage error:", error);
     }
-
   },
 
-  remove(name) {
-
-    try {
-
-      localStorage.removeItem(
-        this.key(name)
-      );
-
-    } catch (error) {
-
-      console.error(
-        "GALAXY DB REMOVE ERROR",
-        name,
-        error
-      );
-
-    }
-
-  },
-
-  clear() {
-
-    Object.keys(localStorage)
-      .filter(
-        key =>
-          key.startsWith(this.prefix)
-      )
-      .forEach(
-        key =>
-          localStorage.removeItem(key)
-      );
-
+  remove(key) {
+    localStorage.removeItem(this.prefix + key);
   }
-
 };
 
 
 /* =========================================================
-   SETTINGS
-   ========================================================= */
-
-const DEFAULT_SETTINGS = {
-
-  theme: "dark",
-
-  accent: "violet",
-
-  focusMode: false,
-
-  enterToSend: true,
-
-  autosave: true,
-
-  autosaveDelay: 300,
-
-  streaming: true,
-
-  streamSpeed: 10,
-
-  showTimestamps: false,
-
-  voiceLanguage: "en-US",
-
-  confirmDeletes: true,
-
-  webSearchDefault: false
-
-};
-
-
-/* =========================================================
-   PACKS
-   ========================================================= */
-
-const DEFAULT_PACKS = [
-
-  {
-    id: "pack_prompt",
-    name: "Ultimate Prompt Pack",
-    category: "prompt",
-    icon: "✦",
-    description:
-      "Research, writing, analysis and planning prompts.",
-    installed: true,
-    featured: true,
-    items: [
-      "Deep Research",
-      "Executive Summary",
-      "Critical Thinking",
-      "Decision Matrix",
-      "Professional Rewrite",
-      "Comparison Analysis",
-      "Step-by-Step Planner"
-    ]
-  },
-
-  {
-    id: "pack_sites",
-    name: "Website Builder Pack",
-    category: "website",
-    icon: "⌘",
-    description:
-      "Modern website creation workflows.",
-    installed: true,
-    featured: true,
-    items: [
-      "Landing Page",
-      "Portfolio",
-      "Business Site",
-      "SaaS Site",
-      "Dashboard",
-      "Docs Site",
-      "SEO Review",
-      "Accessibility Review"
-    ]
-  },
-
-  {
-    id: "pack_creator",
-    name: "Creator Power Pack",
-    category: "creator",
-    icon: "◫",
-    description:
-      "Content, video and campaign workflows.",
-    installed: true,
-    featured: true,
-    items: [
-      "YouTube Script",
-      "Short Video Script",
-      "Hook Generator",
-      "Storyboard",
-      "Voiceover",
-      "Campaign Generator"
-    ]
-  },
-
-  {
-    id: "pack_productivity",
-    name: "Productivity Pack",
-    category: "productivity",
-    icon: "✓",
-    description:
-      "Tasks, goals, meetings and planning.",
-    installed: true,
-    featured: false,
-    items: [
-      "Daily Planner",
-      "Weekly Planner",
-      "Meeting Summary",
-      "Priority Matrix",
-      "Goal Breakdown",
-      "Risk Register"
-    ]
-  },
-
-  {
-    id: "pack_research",
-    name: "Research Intelligence Pack",
-    category: "research",
-    icon: "⌕",
-    description:
-      "Advanced research and evidence workflows.",
-    installed: true,
-    featured: true,
-    items: [
-      "Research Question Builder",
-      "Evidence Table",
-      "Fact Verification",
-      "Timeline Builder",
-      "Market Research",
-      "Competitor Research"
-    ]
-  },
-
-  {
-    id: "pack_developer",
-    name: "Developer Pack",
-    category: "developer",
-    icon: "</>",
-    description:
-      "Coding, debugging and architecture workflows.",
-    installed: true,
-    featured: true,
-    items: [
-      "Code Generator",
-      "Bug Finder",
-      "Code Review",
-      "Refactor",
-      "API Design",
-      "Database Design",
-      "System Architecture"
-    ]
-  },
-
-  {
-    id: "pack_design",
-    name: "Design System Pack",
-    category: "design",
-    icon: "◇",
-    description:
-      "UI systems, visual direction and UX review.",
-    installed: true,
-    featured: false,
-    items: [
-      "UI Audit",
-      "UX Review",
-      "Color System",
-      "Typography",
-      "Spacing",
-      "Component Planner"
-    ]
-  },
-
-  {
-    id: "pack_video",
-    name: "Video Creator Pack",
-    category: "video",
-    icon: "▷",
-    description:
-      "Video ideas, scenes, scripts and production plans.",
-    installed: true,
-    featured: false,
-    items: [
-      "30 Second Video",
-      "Scene Generator",
-      "Shot List",
-      "Character Prompt",
-      "Camera Prompt",
-      "Lighting Prompt"
-    ]
-  },
-
-  {
-    id: "pack_startup",
-    name: "Startup Launch Pack",
-    category: "startup",
-    icon: "↗",
-    description:
-      "Validate ideas and prepare go-to-market plans.",
-    installed: true,
-    featured: true,
-    items: [
-      "Idea Validator",
-      "MVP Planner",
-      "Feature Prioritizer",
-      "Launch Checklist",
-      "Pitch Outline",
-      "Go-To-Market Plan"
-    ]
-  },
-
-  {
-    id: "pack_data",
-    name: "Data Analysis Pack",
-    category: "data",
-    icon: "▦",
-    description:
-      "Analyze metrics, tables and structured data.",
-    installed: true,
-    featured: false,
-    items: [
-      "Dataset Summary",
-      "Trend Detection",
-      "Anomaly Detection",
-      "KPI Builder",
-      "Forecast Prompt",
-      "CSV Analyzer"
-    ]
-  }
-
-];
-
-
-/* =========================================================
-   PROMPT TEMPLATES
-   ========================================================= */
-
-const DEFAULT_PROMPTS = [
-
-  {
-    id: "p_site",
-    title: "Build a modern website",
-    category: "website",
-    prompt:
-      "Build a modern responsive website with excellent typography, spacing, accessibility and mobile behavior."
-  },
-
-  {
-    id: "p_research",
-    title: "Deep research",
-    category: "research",
-    prompt:
-      "Research this topic deeply. Separate facts, assumptions, uncertainties, risks and conclusions."
-  },
-
-  {
-    id: "p_project",
-    title: "Project planner",
-    category: "project",
-    prompt:
-      "Create a structured project plan with scope, milestones, tasks, owners, risks and next actions."
-  },
-
-  {
-    id: "p_improve",
-    title: "Improve my idea",
-    category: "creative",
-    prompt:
-      "Analyze this idea, identify weaknesses and propose a much stronger version."
-  },
-
-  {
-    id: "p_compare",
-    title: "Compare options",
-    category: "analysis",
-    prompt:
-      "Compare these options across cost, quality, risk, usability, scalability and long-term value."
-  },
-
-  {
-    id: "p_video",
-    title: "Video creator",
-    category: "video",
-    prompt:
-      "Create a complete short-video plan with hook, scenes, dialogue, camera instructions and ending."
-  },
-
-  {
-    id: "p_code",
-    title: "Code builder",
-    category: "developer",
-    prompt:
-      "Build production-quality code for this requirement. Keep the architecture clean and explain important tradeoffs."
-  }
-
-];
-
-
-/* =========================================================
-   PLUGINS
-   ========================================================= */
-
-const DEFAULT_PLUGINS = [
-
-  {
-    id: "plugin_mail",
-    name: "Mail",
-    description:
-      "Search messages and draft replies.",
-    icon: "✉",
-    installed: false,
-    connected: false
-  },
-
-  {
-    id: "plugin_calendar",
-    name: "Calendar",
-    description:
-      "Find events and manage meetings.",
-    icon: "◷",
-    installed: false,
-    connected: false
-  },
-
-  {
-    id: "plugin_drive",
-    name: "Drive",
-    description:
-      "Find and work with cloud files.",
-    icon: "▱",
-    installed: false,
-    connected: false
-  },
-
-  {
-    id: "plugin_github",
-    name: "GitHub",
-    description:
-      "Repositories and development workflows.",
-    icon: "⌘",
-    installed: false,
-    connected: false
-  },
-
-  {
-    id: "plugin_slack",
-    name: "Slack",
-    description:
-      "Search channels and team conversations.",
-    icon: "#",
-    installed: false,
-    connected: false
-  }
-
-];
-
-
-/* =========================================================
-   APPLICATION STATE
+   MAIN STATE
    ========================================================= */
 
 const Galaxy = {
-
-  version: "4.0.0",
+  version: "5.0.0",
 
   state: {
-
-    mode: "chat",
-
     view: "chat",
+    provider: Storage.get("provider", "openai"),
+    webSearch: false,
+    generating: false,
 
-    settings: {
-      ...DEFAULT_SETTINGS,
-      ...DB.get("settings", {})
-    },
+    chats: Storage.get("chats", []),
 
-    chats:
-      DB.get("chats", []),
-
-    currentChatId:
-      DB.get("currentChatId", null),
+    activeChatId:
+      Storage.get("activeChatId", null),
 
     projects:
-      DB.get("projects", []),
+      Storage.get("projects", []),
 
-    library:
-      DB.get("library", []),
+    assets:
+      Storage.get("assets", []),
 
-    packs:
-      DB.get("packs", []),
+    generations:
+      Storage.get("generations", []),
+
+    creativeProjects:
+      Storage.get("creativeProjects", []),
 
     scheduled:
-      DB.get("scheduled", []),
+      Storage.get("scheduled", []),
 
-    plugins:
-      DB.get("plugins", []),
+    selectedStudioMode: "text-video",
+    selectedCamera: "Static",
 
-    agents:
-      DB.get("agents", []),
-
-    sites:
-      DB.get("sites", []),
-
-    images:
-      DB.get("images", []),
-
-    prompts:
-      DB.get("prompts", []),
-
-    notifications:
-      DB.get("notifications", []),
-
-    workDocuments:
-      DB.get("workDocuments", []),
-
-    activeWorkDocumentId:
-      DB.get(
-        "activeWorkDocumentId",
-        null
-      ),
-
-    activeSiteId: null,
-
-    activeLibraryFilter: "all",
-
-    activePackFilter: "all",
-
-    activeSearchFilter: "all",
-
-    attachments: [],
-
-    webSearchState:
-      DB.get(
-        "webSearchState",
-        "off"
-      ),
-
-    voiceState: "idle",
-
-    voiceRecognition: null,
-
-    generation: {
-      active: false,
-      stopped: false,
-      controller: null,
-      messageId: null
-    },
-
-    dragCounter: 0
-
+    studioReferences: []
   }
-
 };
 
 
 /* =========================================================
-   INITIAL DATA
+   DEFAULT DATA
    ========================================================= */
 
-function seedData() {
-
-  if (!Galaxy.state.packs.length) {
-    Galaxy.state.packs =
-      structuredClone(DEFAULT_PACKS);
+const DEFAULT_PACKS = [
+  {
+    icon: "⌕",
+    name: "Research Pack",
+    description:
+      "Research topics, compare sources and organize findings."
+  },
+  {
+    icon: "✎",
+    name: "Writing Pack",
+    description:
+      "Draft, rewrite, summarize and improve written content."
+  },
+  {
+    icon: "▣",
+    name: "Developer Pack",
+    description:
+      "Build websites, apps and software projects."
+  },
+  {
+    icon: "◈",
+    name: "Design Pack",
+    description:
+      "Plan interfaces, visuals and creative projects."
+  },
+  {
+    icon: "▷",
+    name: "Video Pack",
+    description:
+      "Develop scenes, prompts, shots and video concepts."
+  },
+  {
+    icon: "▤",
+    name: "Data Pack",
+    description:
+      "Analyze structured information and reports."
   }
+];
 
-  if (!Galaxy.state.prompts.length) {
-    Galaxy.state.prompts =
-      structuredClone(DEFAULT_PROMPTS);
+const DEFAULT_AGENTS = [
+  {
+    icon: "◇",
+    name: "Research Agent",
+    description:
+      "Investigates topics and organizes findings."
+  },
+  {
+    icon: "⌘",
+    name: "Coding Agent",
+    description:
+      "Helps build, debug and improve software."
+  },
+  {
+    icon: "✦",
+    name: "Creative Agent",
+    description:
+      "Creates visual concepts, prompts and stories."
+  },
+  {
+    icon: "▣",
+    name: "Project Agent",
+    description:
+      "Plans projects, milestones and tasks."
   }
+];
 
-  if (!Galaxy.state.plugins.length) {
-    Galaxy.state.plugins =
-      structuredClone(DEFAULT_PLUGINS);
+const DEFAULT_PLUGINS = [
+  {
+    icon: "✉",
+    name: "Mail",
+    description:
+      "Connect email workflows."
+  },
+  {
+    icon: "◷",
+    name: "Calendar",
+    description:
+      "Work with schedules and events."
+  },
+  {
+    icon: "▤",
+    name: "Drive",
+    description:
+      "Work with cloud files."
+  },
+  {
+    icon: "⌘",
+    name: "GitHub",
+    description:
+      "Work with repositories and code."
+  },
+  {
+    icon: "◇",
+    name: "Slack",
+    description:
+      "Work with team conversations."
   }
+];
 
-  persistAll();
+
+/* =========================================================
+   SAVE STATE
+   ========================================================= */
+
+function saveState() {
+  Storage.set("provider", Galaxy.state.provider);
+  Storage.set("chats", Galaxy.state.chats);
+  Storage.set("activeChatId", Galaxy.state.activeChatId);
+  Storage.set("projects", Galaxy.state.projects);
+  Storage.set("assets", Galaxy.state.assets);
+  Storage.set("generations", Galaxy.state.generations);
+  Storage.set(
+    "creativeProjects",
+    Galaxy.state.creativeProjects
+  );
+  Storage.set("scheduled", Galaxy.state.scheduled);
 }
 
 
 /* =========================================================
-   SAVE
+   TOAST
    ========================================================= */
 
-function persistAll() {
+function toast(message) {
+  const root = $("#toastRoot");
 
-  DB.set(
-    "settings",
-    Galaxy.state.settings
-  );
+  if (!root) return;
 
-  DB.set(
-    "chats",
-    Galaxy.state.chats
-  );
+  const item = document.createElement("div");
 
-  DB.set(
-    "currentChatId",
-    Galaxy.state.currentChatId
-  );
+  item.className = "toast";
+  item.textContent = message;
 
-  DB.set(
-    "projects",
-    Galaxy.state.projects
-  );
+  root.appendChild(item);
 
-  DB.set(
-    "library",
-    Galaxy.state.library
-  );
-
-  DB.set(
-    "packs",
-    Galaxy.state.packs
-  );
-
-  DB.set(
-    "scheduled",
-    Galaxy.state.scheduled
-  );
-
-  DB.set(
-    "plugins",
-    Galaxy.state.plugins
-  );
-
-  DB.set(
-    "agents",
-    Galaxy.state.agents
-  );
-
-  DB.set(
-    "sites",
-    Galaxy.state.sites
-  );
-
-  DB.set(
-    "images",
-    Galaxy.state.images
-  );
-
-  DB.set(
-    "prompts",
-    Galaxy.state.prompts
-  );
-
-  DB.set(
-    "notifications",
-    Galaxy.state.notifications
-  );
-
-  DB.set(
-    "workDocuments",
-    Galaxy.state.workDocuments
-  );
-
-  DB.set(
-    "activeWorkDocumentId",
-    Galaxy.state.activeWorkDocumentId
-  );
-
-  DB.set(
-    "webSearchState",
-    Galaxy.state.webSearchState
-  );
-
+  setTimeout(() => {
+    item.remove();
+  }, 2800);
 }
 
 
 /* =========================================================
-   TOASTS
+   VIEW ROUTING
    ========================================================= */
 
-function toast(
-  message,
-  type = "default"
-) {
-
-  const root =
-    $("#toastRoot");
-
-  if (!root) {
-    return;
-  }
-
-  const node =
-    document.createElement("div");
-
-  node.className =
-    `toast toast-${type}`;
-
-  node.textContent =
-    message;
-
-  root.appendChild(node);
-
-  setTimeout(
-    () =>
-      node.classList.add(
-        "toast-out"
-      ),
-    2200
+function hideAllViews() {
+  $$(".view").forEach(view =>
+    view.classList.remove("active-view")
   );
-
-  setTimeout(
-    () =>
-      node.remove(),
-    2600
-  );
-
 }
 
-
-/* =========================================================
-   ERRORS
-   ========================================================= */
-
-function handleError(
-  error,
-  context = "GALAXY AI"
-) {
-
-  console.error(
-    `[${context}]`,
-    error
-  );
-
-  toast(
-    error?.message ||
-      "Something went wrong.",
-    "error"
-  );
-
-}
-
-
-/* =========================================================
-   MODALS
-   ========================================================= */
-
-function openModal({
-  title,
-  body,
-  width = "680px"
-}) {
-
-  const root =
-    $("#overlayRoot");
-
-  if (!root) {
-    return;
-  }
-
-  root.innerHTML = `
-    <div class="overlay">
-
-      <section
-        class="modal"
-        role="dialog"
-        aria-modal="true"
-        style="max-width:${width}"
-      >
-
-        <div class="modal-head">
-
-          <strong>
-            ${escapeHTML(title)}
-          </strong>
-
-          <button
-            class="icon-btn"
-            data-action="close-overlay"
-            aria-label="Close"
-          >
-            ×
-          </button>
-
-        </div>
-
-        <div class="modal-body">
-          ${body}
-        </div>
-
-      </section>
-
-    </div>
-  `;
-
-}
-
-
-function closeOverlay() {
-
-  const root =
-    $("#overlayRoot");
-
-  if (root) {
-    root.innerHTML = "";
-  }
-
-}
-
-
-/* =========================================================
-   CONFIRM
-   ========================================================= */
-
-function confirmAction({
-  title = "Confirm",
-  message = "Are you sure?",
-  confirmLabel = "Delete",
-  onConfirm
-}) {
-
-  if (
-    !Galaxy.state.settings
-      .confirmDeletes
-  ) {
-
-    onConfirm?.();
-
-    return;
-  }
-
-  openModal({
-
-    title,
-
-    body: `
-      <div class="confirm-dialog">
-
-        <p>
-          ${escapeHTML(message)}
-        </p>
-
-        <div class="confirm-actions">
-
-          <button
-            class="text-action"
-            data-action="close-overlay"
-          >
-            Cancel
-          </button>
-
-          <button
-            class="text-action danger"
-            id="confirmActionButton"
-          >
-            ${escapeHTML(confirmLabel)}
-          </button>
-
-        </div>
-
-      </div>
-    `
-
+function updateNavigation(view) {
+  $$("[data-view]").forEach(button => {
+    button.classList.toggle(
+      "active",
+      button.dataset.view === view
+    );
   });
 
-  setTimeout(
-    () => {
-
-      on(
-        $("#confirmActionButton"),
-        "click",
-        () => {
-
-          closeOverlay();
-
-          onConfirm?.();
-
-        }
-      );
-
-    },
-    0
-  );
-
-}
-
-
-/* =========================================================
-   THEME
-   ========================================================= */
-
-function applyTheme() {
-
-  const {
-    theme,
-    accent,
-    focusMode
-  } =
-    Galaxy.state.settings;
-
-  document.body
-    .classList
-    .toggle(
-      "light",
-      theme === "light"
+  $$(".mode").forEach(button => {
+    button.classList.toggle(
+      "active",
+      button.dataset.view === view
     );
-
-  document.body
-    .classList
-    .toggle(
-      "dark",
-      theme === "dark"
-    );
-
-  document.body
-    .classList
-    .toggle(
-      "focus-mode",
-      !!focusMode
-    );
-
-  document
-    .documentElement
-    .dataset
-    .accent =
-      accent;
-
-}
-
-
-function toggleTheme() {
-
-  Galaxy.state.settings.theme =
-    Galaxy.state.settings.theme ===
-    "dark"
-      ? "light"
-      : "dark";
-
-  persistAll();
-
-  applyTheme();
-
-}
-
-
-function toggleFocusMode() {
-
-  Galaxy.state.settings.focusMode =
-    !Galaxy.state.settings.focusMode;
-
-  persistAll();
-
-  applyTheme();
-
-  toast(
-    Galaxy.state.settings.focusMode
-      ? "Focus mode on"
-      : "Focus mode off"
-  );
-
-}
-
-
-/* =========================================================
-   NOTIFICATIONS
-   ========================================================= */
-
-function addNotification(
-  title,
-  message,
-  type = "info"
-) {
-
-  Galaxy.state.notifications.unshift({
-    id:
-      uid("notification"),
-
-    title,
-
-    message,
-
-    type,
-
-    read: false,
-
-    createdAt:
-      now()
   });
-
-  Galaxy.state.notifications =
-    Galaxy.state.notifications.slice(
-      0,
-      100
-    );
-
-  persistAll();
-
-  updateNotificationIndicator();
-
 }
 
+function openView(view) {
+  Galaxy.state.view = view;
 
-function updateNotificationIndicator() {
+  hideAllViews();
+  updateNavigation(view);
 
-  const unread =
-    Galaxy.state.notifications
-      .filter(
-        item =>
-          !item.read
-      )
-      .length;
+  if (view === "chat") {
+    $("#chatView")?.classList.add("active-view");
+    renderChat();
+  }
 
-  const button =
-    $('[data-action="notifications"]');
+  else if (view === "work") {
+    $("#workView")?.classList.add("active-view");
+  }
 
-  button?.classList.toggle(
-    "has-notifications",
-    unread > 0
-  );
+  else if (view === "create") {
+    $("#createView")?.classList.add("active-view");
+  }
 
-}
+  else {
+    $("#contentView")?.classList.add("active-view");
+    renderWorkspace(view);
+  }
 
-
-function openNotifications() {
-
-  Galaxy.state.notifications
-    .forEach(
-      item =>
-        item.read = true
-    );
-
-  persistAll();
-
-  updateNotificationIndicator();
-
-  openModal({
-
-    title:
-      "Notifications",
-
-    body:
-      Galaxy.state.notifications
-        .length
-
-        ? `
-          <div class="notification-list">
-
-            ${Galaxy.state.notifications
-              .map(
-                item => `
-                <article class="notification-row">
-
-                  <div class="notification-icon">
-                    ${
-                      item.type ===
-                      "error"
-                        ? "!"
-                        : "◔"
-                    }
-                  </div>
-
-                  <div class="notification-copy">
-
-                    <strong>
-                      ${escapeHTML(item.title)}
-                    </strong>
-
-                    <span>
-                      ${escapeHTML(item.message)}
-                    </span>
-
-                  </div>
-
-                </article>
-              `
-              )
-              .join("")}
-
-          </div>
-        `
-
-        : `
-          <div class="empty-panel">
-            No notifications yet.
-          </div>
-        `
-
-  });
-
+  $("#sidebar")?.classList.remove("open");
 }
 
 
 /* =========================================================
-   SETTINGS UI
+   CHAT
    ========================================================= */
 
-function renderSettingToggle(
-  title,
-  key,
-  value
-) {
-
-  return `
-    <div class="setting-row">
-
-      <div>
-        <strong>
-          ${escapeHTML(title)}
-        </strong>
-      </div>
-
-      <button
-        class="toggle-switch ${
-          value
-            ? "active"
-            : ""
-        }"
-        data-setting-toggle="${escapeHTML(key)}"
-        aria-pressed="${String(value)}"
-      >
-        <span></span>
-      </button>
-
-    </div>
-  `;
-
-}
-
-
-function openSettings() {
-
-  const s =
-    Galaxy.state.settings;
-
-  openModal({
-
-    title:
-      "Settings",
-
-    body: `
-      <div class="settings-list">
-
-        <div class="setting-row">
-
-          <strong>
-            Theme
-          </strong>
-
-          <select
-            data-setting-select="theme"
-          >
-
-            <option
-              value="dark"
-              ${
-                s.theme ===
-                "dark"
-                  ? "selected"
-                  : ""
-              }
-            >
-              Dark
-            </option>
-
-            <option
-              value="light"
-              ${
-                s.theme ===
-                "light"
-                  ? "selected"
-                  : ""
-              }
-            >
-              Light
-            </option>
-
-          </select>
-
-        </div>
-
-        <div class="setting-row">
-
-          <strong>
-            Accent
-          </strong>
-
-          <select
-            data-setting-select="accent"
-          >
-
-            <option
-              value="violet"
-              ${
-                s.accent ===
-                "violet"
-                  ? "selected"
-                  : ""
-              }
-            >
-              Violet
-            </option>
-
-            <option
-              value="blue"
-              ${
-                s.accent ===
-                "blue"
-                  ? "selected"
-                  : ""
-              }
-            >
-              Blue
-            </option>
-
-            <option
-              value="green"
-              ${
-                s.accent ===
-                "green"
-                  ? "selected"
-                  : ""
-              }
-            >
-              Green
-            </option>
-
-            <option
-              value="orange"
-              ${
-                s.accent ===
-                "orange"
-                  ? "selected"
-                  : ""
-              }
-            >
-              Orange
-            </option>
-
-          </select>
-
-        </div>
-
-        ${renderSettingToggle(
-          "Focus mode",
-          "focusMode",
-          s.focusMode
-        )}
-
-        ${renderSettingToggle(
-          "Enter to send",
-          "enterToSend",
-          s.enterToSend
-        )}
-
-        ${renderSettingToggle(
-          "Autosave",
-          "autosave",
-          s.autosave
-        )}
-
-        ${renderSettingToggle(
-          "Streaming responses",
-          "streaming",
-          s.streaming
-        )}
-
-        ${renderSettingToggle(
-          "Show timestamps",
-          "showTimestamps",
-          s.showTimestamps
-        )}
-
-        <div class="setting-row">
-
-          <div>
-
-            <strong>
-              Reset GALAXY data
-            </strong>
-
-            <span>
-              Remove locally saved workspace data.
-            </span>
-
-          </div>
-
-          <button
-            class="text-action danger"
-            data-action="reset-data"
-          >
-            Reset
-          </button>
-
-        </div>
-
-      </div>
-    `
-
-  });
-
-}
-
-
-/* =========================================================
-   CHAT HELPERS
-   ========================================================= */
-
-function getCurrentChat() {
-
-  return (
-    Galaxy.state.chats
-      .find(
-        chat =>
-          chat.id ===
-          Galaxy.state.currentChatId
-      ) ||
-    null
+function getActiveChat() {
+  return Galaxy.state.chats.find(
+    chat => chat.id === Galaxy.state.activeChatId
   );
-
 }
 
-
-function createChat(
-  title = "New conversation"
-) {
-
+function createChat() {
   const chat = {
-
-    id:
-      uid("chat"),
-
-    title,
-
-    messages: [],
-
-    pinned: false,
-
-    archived: false,
-
-    createdAt:
-      now(),
-
-    updatedAt:
-      now(),
-
-    branchOf: null
-
+    id: uid("chat"),
+    title: "New chat",
+    createdAt: Date.now(),
+    messages: []
   };
 
-  Galaxy.state.chats.unshift(
-    chat
-  );
+  Galaxy.state.chats.unshift(chat);
+  Galaxy.state.activeChatId = chat.id;
 
-  Galaxy.state.currentChatId =
-    chat.id;
-
-  persistAll();
-
+  saveState();
   renderRecentChats();
+  openView("chat");
 
-  renderChat();
+  setTimeout(() => {
+    $("#promptInput")?.focus();
+  }, 50);
+}
+
+function ensureChat() {
+  let chat = getActiveChat();
+
+  if (!chat) {
+    createChat();
+    chat = getActiveChat();
+  }
 
   return chat;
-
 }
-
-
-function ensureCurrentChat() {
-
-  return (
-    getCurrentChat() ||
-    createChat()
-  );
-
-}
-
-
-function newChat() {
-
-  createChat();
-
-  switchMode("chat");
-
-  $("#promptInput")
-    ?.focus();
-
-}
-
-
-/* =========================================================
-   CHAT LIST
-   ========================================================= */
-
-function sortChats() {
-
-  Galaxy.state.chats.sort(
-    (a, b) => {
-
-      if (
-        a.pinned !==
-        b.pinned
-      ) {
-
-        return a.pinned
-          ? -1
-          : 1;
-
-      }
-
-      return (
-        b.updatedAt -
-        a.updatedAt
-      );
-
-    }
-  );
-
-}
-
 
 function renderRecentChats() {
+  const root = $("#recentChats");
 
-  const root =
-    $("#recentChats");
+  if (!root) return;
 
-  if (!root) {
+  const chats = Galaxy.state.chats.slice(0, 15);
+
+  if (!chats.length) {
+    root.innerHTML = "";
     return;
   }
 
-  sortChats();
-
-  root.innerHTML =
-    Galaxy.state.chats
-
-      .filter(
-        chat =>
-          !chat.archived
-      )
-
-      .slice(0, 40)
-
-      .map(
-        chat => `
-          <div
-            class="recent-chat-row ${
-              chat.id ===
-              Galaxy.state.currentChatId
-                ? "active"
-                : ""
-            }"
-            data-context-type="chat"
-            data-context-id="${chat.id}"
-          >
-
-            <button
-              class="recent-chat"
-              data-chat-open="${chat.id}"
-              title="${escapeHTML(chat.title)}"
-            >
-
-              ${
-                chat.pinned
-                  ? '<span class="pin-dot">•</span>'
-                  : ""
-              }
-
-              <span>
-                ${escapeHTML(chat.title)}
-              </span>
-
-            </button>
-
-            <button
-              class="recent-more"
-              data-context-open="chat"
-              data-context-id="${chat.id}"
-              aria-label="More"
-            >
-              ⋯
-            </button>
-
-          </div>
-        `
-      )
-
-      .join("");
-
-}
-
-
-/* =========================================================
-   RENAME CHAT
-   ========================================================= */
-
-function renameChat(id) {
-
-  const chat =
-    Galaxy.state.chats.find(
-      item =>
-        item.id === id
-    );
-
-  if (!chat) {
-    return;
-  }
-
-  openModal({
-
-    title:
-      "Rename chat",
-
-    body: `
-      <div class="form-stack">
-
-        <input
-          id="renameChatInput"
-          class="field"
-          value="${escapeHTML(chat.title)}"
-        >
-
-        <button
-          id="renameChatSave"
-          class="text-action primary"
-        >
-          Save
-        </button>
-
-      </div>
-    `
-
-  });
-
-  setTimeout(
-    () => {
-
-      on(
-        $("#renameChatSave"),
-        "click",
-        () => {
-
-          const value =
-            $("#renameChatInput")
-              ?.value
-              .trim();
-
-          if (!value) {
-            return;
-          }
-
-          chat.title =
-            value;
-
-          chat.updatedAt =
-            now();
-
-          persistAll();
-
-          renderRecentChats();
-
-          closeOverlay();
-
-        }
-      );
-
-    },
-    0
-  );
-
-}
-
-
-/* =========================================================
-   DELETE CHAT
-   ========================================================= */
-
-function deleteChat(id) {
-
-  const chat =
-    Galaxy.state.chats.find(
-      item =>
-        item.id === id
-    );
-
-  if (!chat) {
-    return;
-  }
-
-  confirmAction({
-
-    title:
-      "Delete chat",
-
-    message:
-      `Delete “${chat.title}”?`,
-
-    onConfirm() {
-
-      Galaxy.state.chats =
-        Galaxy.state.chats.filter(
-          item =>
-            item.id !== id
-        );
-
-      if (
-        Galaxy.state.currentChatId ===
-        id
-      ) {
-
-        Galaxy.state.currentChatId =
-          Galaxy.state.chats[0]?.id ||
-          null;
-
-      }
-
-      persistAll();
-
-      renderRecentChats();
-
-      renderChat();
-
-    }
-
-  });
-
-}
-
-
-/* =========================================================
-   PIN / ARCHIVE
-   ========================================================= */
-
-function togglePinChat(id) {
-
-  const chat =
-    Galaxy.state.chats.find(
-      item =>
-        item.id === id
-    );
-
-  if (!chat) {
-    return;
-  }
-
-  chat.pinned =
-    !chat.pinned;
-
-  chat.updatedAt =
-    now();
-
-  persistAll();
-
-  renderRecentChats();
-
-}
-
-
-function toggleArchiveChat(id) {
-
-  const chat =
-    Galaxy.state.chats.find(
-      item =>
-        item.id === id
-    );
-
-  if (!chat) {
-    return;
-  }
-
-  chat.archived =
-    !chat.archived;
-
-  chat.updatedAt =
-    now();
-
-  persistAll();
-
-  renderRecentChats();
-
-}
-
-
-/* =========================================================
-   BRANCH CONVERSATION
-   ========================================================= */
-
-function branchConversation(
-  messageId
-) {
-
-  const source =
-    getCurrentChat();
-
-  if (!source) {
-    return;
-  }
-
-  const index =
-    source.messages
-      .findIndex(
-        message =>
-          message.id ===
-          messageId
-      );
-
-  if (index < 0) {
-    return;
-  }
-
-  const chat = {
-
-    id:
-      uid("chat"),
-
-    title:
-      `${source.title} — Branch`,
-
-    messages:
-      structuredClone(
-        source.messages.slice(
-          0,
-          index + 1
-        )
-      ),
-
-    pinned: false,
-
-    archived: false,
-
-    createdAt:
-      now(),
-
-    updatedAt:
-      now(),
-
-    branchOf:
-      source.id
-
-  };
-
-  Galaxy.state.chats.unshift(
-    chat
-  );
-
-  Galaxy.state.currentChatId =
-    chat.id;
-
-  persistAll();
-
-  renderRecentChats();
-
-  renderChat();
-
-}
-
-
-/* =========================================================
-   EXPORT / IMPORT
-   ========================================================= */
-
-function safeFilename(value) {
-
-  return (
-    String(value)
-      .replace(
-        /[^\w\- ]+/g,
-        ""
-      )
-      .trim()
-      .replace(
-        /\s+/g,
-        "_"
-      )
-      .slice(0, 80) ||
-    "galaxy"
-  );
-
-}
-
-
-function downloadText(
-  filename,
-  content,
-  type = "text/plain"
-) {
-
-  const blob =
-    new Blob(
-      [content],
-      { type }
-    );
-
-  const url =
-    URL.createObjectURL(blob);
-
-  const a =
-    document.createElement("a");
-
-  a.href = url;
-
-  a.download = filename;
-
-  a.click();
-
-  URL.revokeObjectURL(url);
-
-}
-
-
-function exportConversation(id) {
-
-  const chat =
-    Galaxy.state.chats.find(
-      item =>
-        item.id === id
-    );
-
-  if (!chat) {
-    return;
-  }
-
-  downloadText(
-    `${safeFilename(chat.title)}.galaxy.json`,
-    JSON.stringify(
-      {
-        galaxyVersion:
-          Galaxy.version,
-        chat
-      },
-      null,
-      2
-    ),
-    "application/json"
-  );
-
-}
-
-
-function importConversation(file) {
-
-  const reader =
-    new FileReader();
-
-  reader.onload =
-    () => {
-
-      try {
-
-        const parsed =
-          JSON.parse(
-            reader.result
-          );
-
-        const imported =
-          parsed.chat ||
-          parsed;
-
-        if (
-          !Array.isArray(
-            imported.messages
-          )
-        ) {
-
-          throw new Error(
-            "Invalid GALAXY conversation."
-          );
-
-        }
-
-        imported.id =
-          uid("chat");
-
-        imported.title =
-          imported.title ||
-          "Imported conversation";
-
-        imported.createdAt =
-          now();
-
-        imported.updatedAt =
-          now();
-
-        Galaxy.state.chats.unshift(
-          imported
-        );
-
-        Galaxy.state.currentChatId =
-          imported.id;
-
-        persistAll();
-
-        renderRecentChats();
-
-        renderChat();
-
-        toast(
-          "Conversation imported"
-        );
-
-      } catch (error) {
-
-        handleError(
-          error,
-          "Import conversation"
-        );
-
-      }
-
-    };
-
-  reader.readAsText(file);
-
-}
-
-
-/* =========================================================
-   MARKDOWN RENDERER
-   ========================================================= */
-
-function renderMarkdown(input) {
-
-  const codeBlocks = [];
-
-  let text =
-    String(input ?? "")
-      .replace(
-        /```([\w-]*)\n([\s\S]*?)```/g,
-        (
-          _,
-          language,
-          code
-        ) => {
-
-          const index =
-            codeBlocks.length;
-
-          codeBlocks.push({
-            language:
-              language ||
-              "code",
-            code
-          });
-
-          return `@@GALAXY_CODE_${index}@@`;
-
-        }
-      );
-
-  text =
-    escapeHTML(text);
-
-  text =
-    text
-      .replace(
-        /^### (.+)$/gm,
-        "<h3>$1</h3>"
-      )
-      .replace(
-        /^## (.+)$/gm,
-        "<h2>$1</h2>"
-      )
-      .replace(
-        /^# (.+)$/gm,
-        "<h1>$1</h1>"
-      )
-      .replace(
-        /\*\*(.+?)\*\*/g,
-        "<strong>$1</strong>"
-      )
-      .replace(
-        /\*([^*]+)\*/g,
-        "<em>$1</em>"
-      )
-      .replace(
-        /`([^`\n]+)`/g,
-        '<code class="inline-code">$1</code>'
-      )
-      .replace(
-        /^> (.+)$/gm,
-        "<blockquote>$1</blockquote>"
-      )
-      .replace(
-        /^- (.+)$/gm,
-        '<div class="markdown-list-item">• $1</div>'
-      )
-      .replace(
-        /^\d+\. (.+)$/gm,
-        '<div class="markdown-list-item numbered">$1</div>'
-      )
-      .replace(
-        /\n/g,
-        "<br>"
-      );
-
-  codeBlocks.forEach(
-    (block, index) => {
-
-      const encoded =
-        encodeURIComponent(
-          block.code
-        );
-
-      const html = `
-        <div class="code-block">
-
-          <div class="code-head">
-
-            <span>
-              ${escapeHTML(block.language)}
-            </span>
-
-            <button
-              class="code-copy"
-              data-copy-code="${encoded}"
-            >
-              Copy
-            </button>
-
-          </div>
-
-          <pre><code>${escapeHTML(block.code)}</code></pre>
-
-        </div>
-      `;
-
-      text =
-        text.replace(
-          `@@GALAXY_CODE_${index}@@`,
-          html
-        );
-
-    }
-  );
-
-  return text;
-
-}
-
-
-/* =========================================================
-   MESSAGE RENDERING
-   ========================================================= */
-
-function renderMessage(message) {
-
-  const user =
-    message.role ===
-    "user";
-
-  const actions =
-    user
-
-      ? `
-        <div class="message-actions">
-
-          <button
-            class="message-action"
-            data-edit-message="${message.id}"
-            title="Edit"
-          >
-            ✎
-          </button>
-
-          <button
-            class="message-action"
-            data-copy-message="${message.id}"
-            title="Copy"
-          >
-            ⧉
-          </button>
-
-          <button
-            class="message-action"
-            data-branch-message="${message.id}"
-            title="Branch"
-          >
-            ⑂
-          </button>
-
-        </div>
-      `
-
-      : `
-        <div class="message-actions">
-
-          <button
-            class="message-action"
-            data-copy-message="${message.id}"
-            title="Copy"
-          >
-            ⧉
-          </button>
-
-          <button
-            class="message-action"
-            data-retry-message="${message.id}"
-            title="Retry"
-          >
-            ↻
-          </button>
-
-          <button
-            class="message-action"
-            data-read-message="${message.id}"
-            title="Read aloud"
-          >
-            ◉
-          </button>
-
-          <button
-            class="message-action"
-            data-branch-message="${message.id}"
-            title="Branch"
-          >
-            ⑂
-          </button>
-
-        </div>
-      `;
-
-  const time =
-    Galaxy.state.settings
-      .showTimestamps
-
-      ? `
-        <time class="message-time">
-          ${new Date(
-            message.createdAt
-          ).toLocaleTimeString(
-            [],
-            {
-              hour: "2-digit",
-              minute: "2-digit"
-            }
-          )}
-        </time>
-      `
-
-      : "";
-
-  return `
-    <article
-      class="message ${message.role}"
-      data-message-id="${message.id}"
+  root.innerHTML = chats.map(chat => `
+    <button
+      class="recent-btn"
+      data-chat-id="${chat.id}"
+      title="${escapeHTML(chat.title)}"
     >
-
-      <div class="bubble">
-        ${renderMarkdown(message.text || "")}
-      </div>
-
-      ${time}
-
-      ${actions}
-
-    </article>
-  `;
-
+      ${escapeHTML(chat.title)}
+    </button>
+  `).join("");
 }
-
 
 function renderChat() {
+  const messagesRoot = $("#messages");
+  const empty = $("#chatEmpty");
 
-  const root =
-    $("#messages");
+  if (!messagesRoot || !empty) return;
 
-  const empty =
-    $("#emptyState");
+  const chat = getActiveChat();
 
-  if (!root) {
+  if (!chat || !chat.messages.length) {
+    messagesRoot.innerHTML = "";
+    empty.style.display = "";
     return;
   }
+
+  empty.style.display = "none";
+
+  messagesRoot.innerHTML =
+    chat.messages.map(message => `
+      <article class="message ${message.role}">
+        <div class="bubble">
+          ${
+            message.role === "assistant"
+              ? renderMarkdown(message.content)
+              : escapeHTML(message.content)
+          }
+        </div>
+
+        <div class="message-meta">
+          ${escapeHTML(message.time || "")}
+        </div>
+      </article>
+    `).join("");
+
+  requestAnimationFrame(() => {
+    messagesRoot.lastElementChild?.scrollIntoView({
+      behavior: "smooth",
+      block: "end"
+    });
+  });
+}
+
+function addMessage(role, content) {
+  const chat = ensureChat();
+
+  chat.messages.push({
+    id: uid("message"),
+    role,
+    content,
+    time: formatTime()
+  });
+
+  if (
+    role === "user" &&
+    (
+      chat.title === "New chat" ||
+      !chat.title
+    )
+  ) {
+    chat.title =
+      content.length > 38
+        ? content.slice(0, 38) + "…"
+        : content;
+  }
+
+  saveState();
+  renderChat();
+  renderRecentChats();
+}
+
+
+/* =========================================================
+   BASIC MARKDOWN
+   ========================================================= */
+
+function renderMarkdown(text = "") {
+  let output = escapeHTML(text);
+
+  output = output.replace(
+    /```([\s\S]*?)```/g,
+    "<pre><code>$1</code></pre>"
+  );
+
+  output = output.replace(
+    /\*\*(.*?)\*\*/g,
+    "<strong>$1</strong>"
+  );
+
+  output = output.replace(
+    /^### (.*)$/gm,
+    "<h3>$1</h3>"
+  );
+
+  output = output.replace(
+    /^## (.*)$/gm,
+    "<h2>$1</h2>"
+  );
+
+  output = output.replace(
+    /^# (.*)$/gm,
+    "<h1>$1</h1>"
+  );
+
+  output = output.replace(/\n/g, "<br>");
+
+  return output;
+}
+
+
+/* =========================================================
+   BACKEND AI
+   ========================================================= */
+
+async function fetchAIResponse(prompt) {
+  const provider =
+    $("#aiProvider")?.value ||
+    Galaxy.state.provider ||
+    "openai";
+
+  Galaxy.state.provider = provider;
+
+  saveState();
+
+  const endpoint =
+    provider === "gemini"
+      ? "/api/gemini"
+      : "/api/chat";
+
+  const chat = getActiveChat();
 
   const messages =
-    getCurrentChat()
-      ?.messages ||
-    [];
+    chat?.messages.map(message => ({
+      role: message.role,
+      content: message.content
+    })) || [];
 
-  if (empty) {
+  const response = await fetch(endpoint, {
+    method: "POST",
 
-    empty.style.display =
-      messages.length
-        ? "none"
-        : "";
+    headers: {
+      "Content-Type": "application/json"
+    },
 
+    body: JSON.stringify({
+      prompt,
+      messages,
+      webSearch: Galaxy.state.webSearch
+    })
+  });
+
+  if (!response.ok) {
+    let message =
+      `GALAXY API error (${response.status})`;
+
+    try {
+      const data = await response.json();
+
+      message =
+        data.error ||
+        data.message ||
+        message;
+    } catch {}
+
+    throw new Error(message);
   }
 
-  root.innerHTML =
-    messages
-      .map(renderMessage)
-      .join("");
+  const data = await response.json();
 
-  requestAnimationFrame(
-    () => {
-
-      const scroller =
-        $("#chatScroller");
-
-      if (scroller) {
-
-        scroller.scrollTop =
-          scroller.scrollHeight;
-
-      }
-
-    }
+  return (
+    data.reply ||
+    data.text ||
+    data.output ||
+    data.output_text ||
+    data.message ||
+    "GALAXY received an empty response."
   );
-
 }
 
+async function sendChatMessage() {
+  if (Galaxy.state.generating) return;
 
-/* =========================================================
-   COPY
-   ========================================================= */
+  const input = $("#promptInput");
 
-async function copyText(text) {
+  if (!input) return;
+
+  const prompt = input.value.trim();
+
+  if (!prompt) return;
+
+  input.value = "";
+  resizePrompt();
+
+  addMessage("user", prompt);
+
+  Galaxy.state.generating = true;
+
+  $("#sendBtn")?.setAttribute("disabled", "");
 
   try {
+    const reply =
+      await fetchAIResponse(prompt);
 
-    await navigator
-      .clipboard
-      .writeText(text);
-
-  } catch {
-
-    const area =
-      document.createElement(
-        "textarea"
-      );
-
-    area.value = text;
-
-    document.body.appendChild(area);
-
-    area.select();
-
-    document.execCommand("copy");
-
-    area.remove();
-
+    addMessage("assistant", reply);
   }
 
-  toast("Copied");
+  catch (error) {
+    addMessage(
+      "assistant",
+      `I couldn't reach the GALAXY backend.\n\n${error.message}`
+    );
+  }
 
+  finally {
+    Galaxy.state.generating = false;
+
+    $("#sendBtn")?.removeAttribute("disabled");
+  }
+}
+
+function resizePrompt() {
+  const input = $("#promptInput");
+
+  if (!input) return;
+
+  input.style.height = "auto";
+
+  input.style.height =
+    Math.min(input.scrollHeight, 180) + "px";
 }
 
 
 /* =========================================================
-   READ ALOUD
+   WORK
    ========================================================= */
 
-function readAloud(messageId) {
+async function runWork() {
+  const input = $("#workPrompt");
+  const output = $("#workOutput");
 
-  const message =
-    getCurrentChat()
-      ?.messages
-      .find(
-        item =>
-          item.id ===
-          messageId
-      );
+  if (!input || !output) return;
 
-  if (
-    !message ||
-    !(
-      "speechSynthesis" in
-      window
-    )
-  ) {
+  const prompt = input.value.trim();
+
+  if (!prompt) {
+    toast("Describe the work first.");
     return;
   }
 
-  speechSynthesis.cancel();
+  output.textContent =
+    "GALAXY is working…";
 
-  const speech =
-    new SpeechSynthesisUtterance(
-      message.text
-    );
+  try {
+    const reply =
+      await fetchAIResponse(
+        `Work task:\n${prompt}`
+      );
 
-  speech.lang =
-    Galaxy.state.settings
-      .voiceLanguage;
+    output.textContent = reply;
+  }
 
-  speechSynthesis.speak(speech);
-
+  catch (error) {
+    output.textContent =
+      error.message;
+  }
 }
 
 
 /* =========================================================
-   EDIT MESSAGE
+   CREATE STUDIO
    ========================================================= */
 
-function editMessage(messageId) {
+function setStudioMode(mode) {
+  Galaxy.state.selectedStudioMode = mode;
 
-  const chat =
-    getCurrentChat();
-
-  const message =
-    chat?.messages.find(
-      item =>
-        item.id ===
-        messageId
+  $$("[data-studio]").forEach(button => {
+    button.classList.toggle(
+      "active",
+      button.dataset.studio === mode
     );
-
-  if (
-    !chat ||
-    !message
-  ) {
-    return;
-  }
-
-  openModal({
-
-    title:
-      "Edit message",
-
-    body: `
-      <div class="form-stack">
-
-        <textarea
-          id="editMessageField"
-          class="field textarea-field"
-        >${escapeHTML(message.text)}</textarea>
-
-        <button
-          id="saveEditedMessage"
-          class="text-action primary"
-        >
-          Save and retry
-        </button>
-
-      </div>
-    `
-
   });
 
-  setTimeout(
-    () => {
+  const prompt = $("#studioPrompt");
 
-      on(
-        $("#saveEditedMessage"),
-        "click",
-        async () => {
+  if (!prompt) return;
 
-          const value =
-            $("#editMessageField")
-              ?.value
-              .trim();
+  const placeholders = {
+    "text-video":
+      "Describe the scene, subject, motion, camera, lighting and audio…",
 
-          if (!value) {
-            return;
-          }
+    "frames-video":
+      "Describe how the start frame should transition into the end frame…",
 
-          const index =
-            chat.messages
-              .findIndex(
-                item =>
-                  item.id ===
-                  messageId
-              );
+    ingredients:
+      "Describe how GALAXY should combine your characters, objects and references…",
 
-          message.text =
-            value;
+    image:
+      "Describe the image you want to create…",
 
-          message.updatedAt =
-            now();
+    character:
+      "Describe the character, appearance, clothing and personality…",
 
-          chat.messages =
-            chat.messages.slice(
-              0,
-              index + 1
-            );
-
-          persistAll();
-
-          renderChat();
-
-          closeOverlay();
-
-          await generateAssistantReply(
-            value
-          );
-
-        }
-      );
-
-    },
-    0
-  );
-
-}
-
-
-/* =========================================================
-   RETRY
-   ========================================================= */
-
-async function retryMessage(
-  messageId
-) {
-
-  const chat =
-    getCurrentChat();
-
-  if (!chat) {
-    return;
-  }
-
-  const index =
-    chat.messages.findIndex(
-      item =>
-        item.id ===
-        messageId
-    );
-
-  if (index < 0) {
-    return;
-  }
-
-  const previous =
-    [...chat.messages]
-      .slice(0, index)
-      .reverse()
-      .find(
-        item =>
-          item.role ===
-          "user"
-      );
-
-  if (!previous) {
-    return;
-  }
-
-  chat.messages =
-    chat.messages.slice(
-      0,
-      index
-    );
-
-  persistAll();
-
-  renderChat();
-
-  await generateAssistantReply(
-    previous.text
-  );
-
-}
-
-
-/* =========================================================
-   TEXTAREA
-   ========================================================= */
-
-function autoResizeTextarea(
-  textarea
-) {
-
-  if (!textarea) {
-    return;
-  }
-
-  textarea.style.height =
-    "auto";
-
-  textarea.style.height =
-    `${Math.min(
-      textarea.scrollHeight,
-      180
-    )}px`;
-
-}
-
-
-/* =========================================================
-   ATTACHMENTS
-   ========================================================= */
-
-function detectFileType(file) {
-
-  if (
-    file.type.startsWith(
-      "image/"
-    )
-  ) {
-    return "image";
-  }
-
-  if (
-    file.type.startsWith(
-      "video/"
-    )
-  ) {
-    return "video";
-  }
-
-  return "file";
-
-}
-
-
-function addFiles(files) {
-
-  Array.from(
-    files || []
-  ).forEach(
-    file => {
-
-      Galaxy.state.attachments.push({
-
-        id:
-          uid("attachment"),
-
-        name:
-          file.name,
-
-        size:
-          file.size,
-
-        mime:
-          file.type,
-
-        type:
-          detectFileType(file),
-
-        file
-
-      });
-
-    }
-  );
-
-  renderAttachments();
-
-}
-
-
-function removeAttachment(id) {
-
-  Galaxy.state.attachments =
-    Galaxy.state.attachments
-      .filter(
-        item =>
-          item.id !== id
-      );
-
-  renderAttachments();
-
-}
-
-
-function renderAttachments() {
-
-  const strip =
-    $("#attachmentStrip");
-
-  if (!strip) {
-    return;
-  }
-
-  if (
-    !Galaxy.state.attachments
-      .length
-  ) {
-
-    strip.hidden = true;
-
-    strip.innerHTML = "";
-
-    return;
-
-  }
-
-  strip.hidden = false;
-
-  strip.innerHTML =
-    Galaxy.state.attachments
-      .map(
-        item => `
-          <div class="attachment-chip">
-
-            <span>
-              ${
-                item.type ===
-                "image"
-                  ? "◫"
-                  : item.type ===
-                    "video"
-                    ? "▷"
-                    : "▱"
-              }
-            </span>
-
-            <span>
-              ${escapeHTML(item.name)}
-            </span>
-
-            <button
-              class="icon-btn"
-              data-remove-attachment="${item.id}"
-              aria-label="Remove"
-            >
-              ×
-            </button>
-
-          </div>
-        `
-      )
-      .join("");
-
-}
-
-
-function describeAttachments() {
-
-  return Galaxy.state.attachments
-    .map(
-      item =>
-        `[${item.type}: ${item.name}]`
-    )
-    .join("\n");
-
-}
-
-
-/* =========================================================
-   LIBRARY
-   ========================================================= */
-
-function addLibraryFile(file) {
-
-  const reader =
-    new FileReader();
-
-  const item = {
-
-    id:
-      uid("library"),
-
-    name:
-      file.name,
-
-    type:
-      detectFileType(file),
-
-    mime:
-      file.type,
-
-    size:
-      file.size,
-
-    createdAt:
-      now(),
-
-    favorite: false,
-
-    dataUrl: null
-
+    avatar:
+      "Describe the avatar, speaking style, appearance and scene…"
   };
 
-  reader.onload =
-    () => {
-
-      item.dataUrl =
-        reader.result;
-
-      Galaxy.state.library.unshift(
-        item
-      );
-
-      persistAll();
-
-      if (
-        Galaxy.state.view ===
-        "library"
-      ) {
-
-        renderLibrary();
-
-      }
-
-    };
-
-  reader.onerror =
-    () =>
-      handleError(
-        new Error(
-          "Could not read the file."
-        ),
-        "Library"
-      );
-
-  reader.readAsDataURL(file);
-
+  prompt.placeholder =
+    placeholders[mode] ||
+    "Describe what you want to create…";
 }
 
+function selectCamera(button) {
+  $$("#cameraChips button").forEach(item =>
+    item.classList.remove("active")
+  );
 
-function toggleLibraryFavorite(id) {
+  button.classList.add("active");
 
-  const item =
-    Galaxy.state.library.find(
-      entry =>
-        entry.id === id
-    );
+  Galaxy.state.selectedCamera =
+    button.textContent.trim();
+}
 
-  if (!item) {
+function newCreativeProject() {
+  const project = {
+    id: uid("creative"),
+    name:
+      `Creative Project ${Galaxy.state.creativeProjects.length + 1}`,
+    createdAt: Date.now()
+  };
+
+  Galaxy.state.creativeProjects.unshift(project);
+
+  saveState();
+
+  $("#studioPrompt").value = "";
+
+  Galaxy.state.studioReferences = [];
+
+  toast("New creative project created.");
+}
+
+function studioUpload() {
+  const input = $("#fileInput");
+
+  if (!input) return;
+
+  input.dataset.target = "studio";
+  input.click();
+}
+
+async function generateStudioContent() {
+  const prompt =
+    $("#studioPrompt")?.value.trim();
+
+  if (!prompt) {
+    toast("Enter a creative prompt first.");
     return;
   }
 
-  item.favorite =
-    !item.favorite;
+  const mode =
+    Galaxy.state.selectedStudioMode;
 
-  persistAll();
+  const camera =
+    Galaxy.state.selectedCamera;
 
-  renderLibrary();
+  const model =
+    $("#studioModel")?.value || "";
 
-}
+  const aspect =
+    $("#studioAspect")?.value || "16:9";
 
+  const duration =
+    $("#studioDuration")?.value || "";
 
-function deleteLibraryItem(id) {
+  const quality =
+    $("#studioQuality")?.value || "";
 
-  Galaxy.state.library =
-    Galaxy.state.library.filter(
-      item =>
-        item.id !== id
-    );
+  const generation = {
+    id: uid("generation"),
+    mode,
+    prompt,
+    camera,
+    model,
+    aspect,
+    duration,
+    quality,
+    status: "generating",
+    createdAt: Date.now(),
+    url: null
+  };
 
-  persistAll();
+  Galaxy.state.generations.unshift(generation);
 
-  renderLibrary();
+  saveState();
+  renderGenerations();
 
-}
+  const endpoint =
+    mode === "image"
+      ? "/api/image"
+      : "/api/video";
 
+  try {
+    const response = await fetch(endpoint, {
+      method: "POST",
 
-function renderContentHeader(
-  eyebrow,
-  title,
-  actions = ""
-) {
+      headers: {
+        "Content-Type": "application/json"
+      },
 
-  const eyebrowElement =
-    $("#contentEyebrow");
+      body: JSON.stringify({
+        prompt,
+        mode,
+        camera,
+        model,
+        aspect,
+        duration,
+        quality
+      })
+    });
 
-  const titleElement =
-    $("#contentTitle");
+    if (!response.ok)
+      throw new Error("Media API not connected");
 
-  const actionsElement =
-    $("#contentActions");
+    const data = await response.json();
 
-  if (eyebrowElement) {
-    eyebrowElement.textContent =
-      eyebrow;
+    generation.status = "ready";
+
+    generation.url =
+      data.url ||
+      data.image ||
+      data.video ||
+      null;
   }
 
-  if (titleElement) {
-    titleElement.textContent =
-      title;
+  catch {
+    /*
+       Frontend still works without media API.
+       It creates a draft generation card.
+    */
+
+    await delay(700);
+
+    generation.status = "draft";
   }
 
-  if (actionsElement) {
-    actionsElement.innerHTML =
-      actions;
-  }
-
+  saveState();
+  renderGenerations();
 }
 
+function renderGenerations() {
+  const root = $("#generationGrid");
 
-function renderContentTabs(
-  tabs,
-  active,
-  group
-) {
+  if (!root) return;
 
-  const root =
-    $("#contentTabs");
+  const generations =
+    Galaxy.state.generations.slice(0, 12);
 
-  if (!root) {
+  if (!generations.length) {
+    root.innerHTML = `
+      <div class="empty-card">
+        <span>✦</span>
+        <b>Your generations appear here</b>
+        <small>
+          Connect /api/image and /api/video
+          for real media generation.
+        </small>
+      </div>
+    `;
+
     return;
   }
 
   root.innerHTML =
-    tabs
-      .map(
-        ([value, label]) => `
-          <button
-            class="flat-tab ${
-              value === active
-                ? "active"
-                : ""
-            }"
-            data-content-tab="${escapeHTML(value)}"
-            data-content-group="${escapeHTML(group)}"
-          >
-            ${escapeHTML(label)}
-          </button>
-        `
-      )
-      .join("");
+    generations.map(item => `
+      <article class="generation-card">
 
-}
+        <div class="generation-preview">
 
-
-function renderLibrary(
-  filter =
-    Galaxy.state
-      .activeLibraryFilter
-) {
-
-  Galaxy.state.activeLibraryFilter =
-    filter;
-
-  renderContentHeader(
-    "Your content",
-    "Library",
-    `
-      <button
-        class="text-action"
-        data-action="library-upload"
-      >
-        ＋ Add
-      </button>
-    `
-  );
-
-  renderContentTabs(
-    [
-      ["all", "All"],
-      ["photos", "Photos"],
-      ["videos", "Videos"],
-      ["files", "Files"],
-      ["favorites", "Favorites"]
-    ],
-    filter,
-    "library"
-  );
-
-  const root =
-    $("#contentBody");
-
-  if (!root) {
-    return;
-  }
-
-  const items =
-    Galaxy.state.library.filter(
-      item =>
-
-        filter ===
-        "all" ||
-
-        (
-          filter ===
-          "photos" &&
-          item.type ===
-          "image"
-        ) ||
-
-        (
-          filter ===
-          "videos" &&
-          item.type ===
-          "video"
-        ) ||
-
-        (
-          filter ===
-          "files" &&
-          item.type ===
-          "file"
-        ) ||
-
-        (
-          filter ===
-          "favorites" &&
-          item.favorite
-        )
-    );
-
-  root.innerHTML =
-    items.length
-
-      ? `
-        <div class="media-grid">
-
-          ${items
-            .map(
-              item => `
-              <article class="media-card">
-
-                <button
-                  class="media-preview"
-                  data-preview-library="${item.id}"
-                >
-
-                  ${
-                    item.type ===
-                    "image"
-
-                      ? `
-                        <img
-                          src="${item.dataUrl}"
-                          alt="${escapeHTML(item.name)}"
-                        >
-                      `
-
-                      : item.type ===
-                        "video"
-
-                        ? `
-                          <video
-                            src="${item.dataUrl}"
-                            muted
-                          ></video>
-                        `
-
-                        : `
-                          <div class="file-preview-tile">
-                            ▱
-                          </div>
-                        `
-                  }
-
-                </button>
-
-                <div class="media-meta">
-
-                  <div>
-
-                    <strong>
-                      ${escapeHTML(item.name)}
-                    </strong>
-
-                    <small>
-                      ${item.type}
-                    </small>
-
-                  </div>
-
-                  <button
-                    class="icon-btn ${
-                      item.favorite
-                        ? "active"
-                        : ""
-                    }"
-                    data-library-favorite="${item.id}"
-                  >
-                    ♡
-                  </button>
-
-                  <button
-                    class="icon-btn"
-                    data-delete-library="${item.id}"
-                  >
-                    ×
-                  </button>
-
-                </div>
-
-              </article>
-            `
-            )
-            .join("")}
+          ${
+            item.url &&
+            item.mode === "image"
+              ? `<img src="${escapeHTML(item.url)}" alt="">`
+              : item.url
+                ? `<video src="${escapeHTML(item.url)}" controls></video>`
+                : item.mode === "image"
+                  ? "▧"
+                  : "▷"
+          }
 
         </div>
-      `
 
-      : `
-        <div class="empty-panel">
+        <div class="generation-body">
 
-          <span>
-            ▣
-          </span>
-
-          <h3>
-            No items yet
-          </h3>
+          <b>
+            ${escapeHTML(
+              item.mode.replaceAll("-", " ")
+            )}
+          </b>
 
           <p>
-            Add photos, videos or files.
+            ${escapeHTML(item.prompt)}
           </p>
 
-        </div>
-      `;
+          <small>
+            ${escapeHTML(item.status)}
+          </small>
 
+          <br><br>
+
+          <button
+            data-generation-reuse="${item.id}"
+          >
+            Reuse prompt
+          </button>
+
+          <button
+            data-generation-delete="${item.id}"
+          >
+            Delete
+          </button>
+
+        </div>
+
+      </article>
+    `).join("");
 }
 
 
-function previewLibraryItem(id) {
+/* =========================================================
+   WORKSPACE HEADER
+   ========================================================= */
 
-  const item =
-    Galaxy.state.library.find(
-      entry =>
-        entry.id === id
-    );
+function workspaceHeader(
+  eyebrow,
+  title,
+  description = ""
+) {
+  return `
+    <div class="page-head">
 
-  if (!item) {
-    return;
-  }
+      <div>
+        <span class="eyebrow">
+          ${escapeHTML(eyebrow)}
+        </span>
 
-  if (
-    item.type ===
-    "image"
-  ) {
+        <h1>
+          ${escapeHTML(title)}
+        </h1>
 
-    openModal({
-
-      title:
-        item.name,
-
-      width:
-        "1000px",
-
-      body: `
-        <div class="image-preview">
-
-          <img
-            src="${item.dataUrl}"
-            alt="${escapeHTML(item.name)}"
-          >
-
-        </div>
-      `
-
-    });
-
-    return;
-  }
-
-  if (
-    item.type ===
-    "video"
-  ) {
-
-    openModal({
-
-      title:
-        item.name,
-
-      width:
-        "1000px",
-
-      body: `
-        <div class="video-preview">
-
-          <video
-            src="${item.dataUrl}"
-            controls
-            autoplay
-          ></video>
-
-        </div>
-      `
-
-    });
-
-    return;
-  }
-
-  openModal({
-
-    title:
-      item.name,
-
-    body: `
-      <div class="file-preview">
-
-        <div class="file-large-icon">
-          ▱
-        </div>
-
-        <h3>
-          ${escapeHTML(item.name)}
-        </h3>
-
-        <p>
-          ${escapeHTML(item.mime || "File")}
-        </p>
-
+        ${
+          description
+            ? `<p>${escapeHTML(description)}</p>`
+            : ""
+        }
       </div>
-    `
 
+    </div>
+  `;
+}
+
+
+/* =========================================================
+   WORKSPACE ROUTER
+   ========================================================= */
+
+function renderWorkspace(view) {
+  const root = $("#contentBody");
+
+  if (!root) return;
+
+  switch (view) {
+    case "search":
+      renderSearch();
+      break;
+
+    case "projects":
+      renderProjects();
+      break;
+
+    case "assets":
+      renderAssets();
+      break;
+
+    case "scenes":
+      renderScenes();
+      break;
+
+    case "games":
+      renderGames();
+      break;
+
+    case "packs":
+      renderPacks();
+      break;
+
+    case "agents":
+      renderAgents();
+      break;
+
+    case "plugins":
+      renderPlugins();
+      break;
+
+    case "scheduled":
+      renderScheduled();
+      break;
+
+    case "sites":
+      renderSites();
+      break;
+
+    default:
+      root.innerHTML =
+        workspaceHeader(
+          "GALAXY",
+          "Workspace"
+        );
+  }
+}
+
+
+/* =========================================================
+   SEARCH
+   ========================================================= */
+
+function renderSearch() {
+  $("#contentBody").innerHTML = `
+    ${workspaceHeader(
+      "GALAXY SEARCH",
+      "Search",
+      "Search across your GALAXY workspace."
+    )}
+
+    <div class="panel">
+
+      <input
+        id="workspaceSearch"
+        placeholder="Search chats, projects and assets…"
+        style="
+          width:100%;
+          padding:14px;
+          border:1px solid var(--line, #3a3a3a);
+          background:transparent;
+          color:inherit;
+          border-radius:12px;
+        "
+      >
+
+      <div
+        id="workspaceSearchResults"
+        class="cards"
+        style="margin-top:15px"
+      ></div>
+
+    </div>
+  `;
+}
+
+function runWorkspaceSearch(query) {
+  const root =
+    $("#workspaceSearchResults");
+
+  if (!root) return;
+
+  const q =
+    query.toLowerCase().trim();
+
+  if (!q) {
+    root.innerHTML = "";
+    return;
+  }
+
+  const results = [];
+
+  Galaxy.state.chats.forEach(chat => {
+    if (
+      chat.title.toLowerCase().includes(q)
+    ) {
+      results.push({
+        type: "Chat",
+        name: chat.title
+      });
+    }
   });
 
+  Galaxy.state.projects.forEach(project => {
+    if (
+      project.name.toLowerCase().includes(q)
+    ) {
+      results.push({
+        type: "Project",
+        name: project.name
+      });
+    }
+  });
+
+  Galaxy.state.assets.forEach(asset => {
+    if (
+      asset.name.toLowerCase().includes(q)
+    ) {
+      results.push({
+        type: "Asset",
+        name: asset.name
+      });
+    }
+  });
+
+  root.innerHTML =
+    results.length
+      ? results.map(item => `
+          <div class="card">
+            <small>${item.type}</small>
+            <h3>${escapeHTML(item.name)}</h3>
+          </div>
+        `).join("")
+      : `
+        <div class="card">
+          <p>No results found.</p>
+        </div>
+      `;
 }
 
 
@@ -3126,652 +1112,318 @@ function previewLibraryItem(id) {
    PROJECTS
    ========================================================= */
 
-function createProject() {
-
-  openProjectEditor();
-
-}
-
-
-function openProjectEditor(
-  project = null
-) {
-
-  const editing =
-    !!project;
-
-  openModal({
-
-    title:
-      editing
-        ? "Edit project"
-        : "New project",
-
-    body: `
-      <form
-        id="projectForm"
-        class="form-stack"
-      >
-
-        <label>
-          Name
-
-          <input
-            class="field"
-            name="name"
-            value="${
-              project
-                ? escapeHTML(project.name)
-                : ""
-            }"
-            required
-          >
-
-        </label>
-
-        <label>
-          Description
-
-          <textarea
-            class="field textarea-field"
-            name="description"
-          >${
-            project
-              ? escapeHTML(
-                  project.description ||
-                  ""
-                )
-              : ""
-          }</textarea>
-
-        </label>
-
-        <label>
-          Status
-
-          <select
-            class="field"
-            name="status"
-          >
-
-            ${[
-              "active",
-              "planning",
-              "paused",
-              "complete"
-            ]
-              .map(
-                status => `
-                <option
-                  value="${status}"
-                  ${
-                    project?.status ===
-                    status
-                      ? "selected"
-                      : ""
-                  }
-                >
-                  ${status}
-                </option>
-              `
-              )
-              .join("")}
-
-          </select>
-
-        </label>
-
-        <button
-          class="text-action primary"
-          type="submit"
-        >
-          ${
-            editing
-              ? "Save changes"
-              : "Create project"
-          }
-        </button>
-
-      </form>
-    `
-
-  });
-
-  setTimeout(
-    () => {
-
-      on(
-        $("#projectForm"),
-        "submit",
-        event => {
-
-          event.preventDefault();
-
-          const form =
-            new FormData(
-              event.currentTarget
-            );
-
-          const data = {
-
-            name:
-              String(
-                form.get("name") ||
-                ""
-              ).trim(),
-
-            description:
-              String(
-                form.get("description") ||
-                ""
-              ).trim(),
-
-            status:
-              form.get("status")
-
-          };
-
-          if (!data.name) {
-            return;
-          }
-
-          if (editing) {
-
-            Object.assign(
-              project,
-              data,
-              {
-                updatedAt:
-                  now()
-              }
-            );
-
-          } else {
-
-            Galaxy.state.projects.unshift({
-
-              id:
-                uid("project"),
-
-              ...data,
-
-              createdAt:
-                now(),
-
-              updatedAt:
-                now()
-
-            });
-
-          }
-
-          persistAll();
-
-          closeOverlay();
-
-          renderProjects();
-
-        }
-      );
-
-    },
-    0
-  );
-
-}
-
-
-function editProject(id) {
-
-  const project =
-    Galaxy.state.projects.find(
-      item =>
-        item.id === id
-    );
-
-  if (project) {
-    openProjectEditor(project);
-  }
-
-}
-
-
-function deleteProject(id) {
-
-  const project =
-    Galaxy.state.projects.find(
-      item =>
-        item.id === id
-    );
-
-  if (!project) {
-    return;
-  }
-
-  confirmAction({
-
-    title:
-      "Delete project",
-
-    message:
-      `Delete “${project.name}”?`,
-
-    onConfirm() {
-
-      Galaxy.state.projects =
-        Galaxy.state.projects.filter(
-          item =>
-            item.id !== id
-        );
-
-      persistAll();
-
-      renderProjects();
-
-    }
-
-  });
-
-}
-
-
 function renderProjects() {
+  const projects =
+    Galaxy.state.projects;
 
-  renderContentHeader(
-    "Workspace",
-    "Projects",
-    `
-      <button
-        class="text-action"
-        data-action="new-project"
-      >
-        ＋ New project
-      </button>
-    `
-  );
+  $("#contentBody").innerHTML = `
+    ${workspaceHeader(
+      "WORKSPACE",
+      "Projects",
+      "Organize chats, files and work."
+    )}
 
-  renderContentTabs(
-    [
-      ["all", "All"],
-      ["active", "Active"],
-      ["planning", "Planning"],
-      ["complete", "Complete"]
-    ],
-    "all",
-    "projects"
-  );
+    <button
+      class="primary"
+      data-action="create-project"
+    >
+      ＋ New project
+    </button>
 
-  const root =
-    $("#contentBody");
+    <div class="cards" style="margin-top:18px">
 
-  if (!root) {
-    return;
-  }
+      ${
+        projects.length
+          ? projects.map(project => `
+              <article class="card">
 
-  root.innerHTML =
-    Galaxy.state.projects.length
+                <h3>
+                  ${escapeHTML(project.name)}
+                </h3>
 
-      ? `
-        <div class="resource-grid">
-
-          ${Galaxy.state.projects
-            .map(
-              project => `
-              <article
-                class="resource-card"
-                data-context-type="project"
-                data-context-id="${project.id}"
-              >
-
-                <div class="resource-icon">
-                  ▱
-                </div>
-
-                <div class="resource-copy">
-
-                  <strong>
-                    ${escapeHTML(project.name)}
-                  </strong>
-
-                  <span>
-                    ${escapeHTML(project.status)}
-                  </span>
-
-                </div>
+                <p>
+                  GALAXY project workspace
+                </p>
 
                 <button
-                  class="icon-btn"
-                  data-edit-project="${project.id}"
+                  data-delete-project="${project.id}"
                 >
-                  ⋯
+                  Delete
                 </button>
 
               </article>
-            `
-            )
-            .join("")}
+            `).join("")
+          : `
+            <article class="card">
+              <h3>No projects yet</h3>
+              <p>Create your first GALAXY project.</p>
+            </article>
+          `
+      }
 
-        </div>
-      `
+    </div>
+  `;
+}
 
-      : `
-        <div class="empty-panel">
+function createProject() {
+  const name =
+    prompt("Project name:");
 
-          <span>
-            ▱
-          </span>
+  if (!name?.trim()) return;
 
-          <h3>
-            No projects yet
-          </h3>
+  Galaxy.state.projects.unshift({
+    id: uid("project"),
+    name: name.trim(),
+    createdAt: Date.now()
+  });
 
-          <p>
-            Create your first GALAXY project.
-          </p>
-
-        </div>
-      `;
-
+  saveState();
+  renderProjects();
 }
 
 
 /* =========================================================
-   SCHEDULED TASKS
+   ASSETS
    ========================================================= */
 
-function createScheduledTask() {
+function renderAssets() {
+  $("#contentBody").innerHTML = `
+    ${workspaceHeader(
+      "LIBRARY",
+      "Library / Assets",
+      "Images, videos and uploaded files."
+    )}
 
-  openModal({
+    <button
+      class="primary"
+      data-action="upload"
+    >
+      ＋ Upload
+    </button>
 
-    title:
-      "New scheduled task",
+    <div class="cards" style="margin-top:18px">
 
-    body: `
-      <form
-        id="scheduleForm"
-        class="form-stack"
-      >
+      ${
+        Galaxy.state.assets.length
+          ? Galaxy.state.assets.map(asset => `
+              <article class="card">
+                <div class="game-icon">
+                  ${
+                    asset.type?.startsWith("image/")
+                      ? "▧"
+                      : asset.type?.startsWith("video/")
+                        ? "▷"
+                        : "▤"
+                  }
+                </div>
 
-        <label>
-          Name
+                <h3>
+                  ${escapeHTML(asset.name)}
+                </h3>
 
-          <input
-            class="field"
-            name="name"
-            required
-          >
+                <p>
+                  ${escapeHTML(asset.type || "File")}
+                </p>
 
-        </label>
+                <button
+                  data-delete-asset="${asset.id}"
+                >
+                  Delete
+                </button>
+              </article>
+            `).join("")
+          : `
+            <article class="card">
+              <h3>No assets yet</h3>
+              <p>Upload images, videos or files.</p>
+            </article>
+          `
+      }
 
-        <label>
-          Prompt
-
-          <textarea
-            class="field textarea-field"
-            name="prompt"
-            required
-          ></textarea>
-
-        </label>
-
-        <label>
-          Frequency
-
-          <select
-            class="field"
-            name="frequency"
-          >
-
-            <option value="once">
-              Once
-            </option>
-
-            <option value="daily">
-              Daily
-            </option>
-
-            <option value="weekly">
-              Weekly
-            </option>
-
-            <option value="monthly">
-              Monthly
-            </option>
-
-          </select>
-
-        </label>
-
-        <label>
-          Date and time
-
-          <input
-            class="field"
-            type="datetime-local"
-            name="datetime"
-          >
-
-        </label>
-
-        <button
-          class="text-action primary"
-          type="submit"
-        >
-          Schedule
-        </button>
-
-      </form>
-    `
-
-  });
-
-  setTimeout(
-    () => {
-
-      on(
-        $("#scheduleForm"),
-        "submit",
-        event => {
-
-          event.preventDefault();
-
-          const form =
-            new FormData(
-              event.currentTarget
-            );
-
-          Galaxy.state.scheduled.unshift({
-
-            id:
-              uid("schedule"),
-
-            name:
-              String(
-                form.get("name") ||
-                ""
-              ).trim(),
-
-            prompt:
-              String(
-                form.get("prompt") ||
-                ""
-              ).trim(),
-
-            frequency:
-              form.get("frequency"),
-
-            datetime:
-              form.get("datetime"),
-
-            enabled: true,
-
-            createdAt:
-              now()
-
-          });
-
-          persistAll();
-
-          closeOverlay();
-
-          renderScheduled();
-
-        }
-      );
-
-    },
-    0
-  );
-
+    </div>
+  `;
 }
 
 
-function toggleScheduledTask(id) {
+/* =========================================================
+   SCENEBUILDER
+   ========================================================= */
 
-  const task =
-    Galaxy.state.scheduled.find(
-      item =>
-        item.id === id
-    );
+function renderScenes() {
+  $("#contentBody").innerHTML = `
+    ${workspaceHeader(
+      "GALAXY CREATE",
+      "Scenebuilder",
+      "Build your story shot by shot."
+    )}
 
-  if (!task) {
-    return;
-  }
+    <div class="panel">
 
-  task.enabled =
-    !task.enabled;
+      <textarea
+        id="scenePrompt"
+        class="studio-prompt"
+        placeholder="Describe a scene…"
+      ></textarea>
 
-  persistAll();
-
-  renderScheduled();
-
-}
-
-
-function deleteScheduledTask(id) {
-
-  Galaxy.state.scheduled =
-    Galaxy.state.scheduled.filter(
-      item =>
-        item.id !== id
-    );
-
-  persistAll();
-
-  renderScheduled();
-
-}
-
-
-function renderScheduled() {
-
-  renderContentHeader(
-    "Automation",
-    "Scheduled",
-    `
       <button
-        class="text-action"
-        data-action="new-scheduled"
+        class="primary"
+        data-action="add-scene"
+        style="margin-top:12px"
       >
-        ＋ New
+        ＋ Add scene
       </button>
-    `
-  );
 
-  renderContentTabs(
-    [
-      ["upcoming", "Upcoming"],
-      ["recurring", "Recurring"],
-      ["completed", "Completed"]
-    ],
-    "upcoming",
-    "scheduled"
-  );
+      <div
+        id="sceneList"
+        class="cards"
+        style="margin-top:18px"
+      ></div>
 
-  const root =
-    $("#contentBody");
+    </div>
+  `;
 
-  if (!root) {
-    return;
-  }
+  renderSceneList();
+}
+
+let scenes =
+  Storage.get("scenes", []);
+
+function renderSceneList() {
+  const root = $("#sceneList");
+
+  if (!root) return;
 
   root.innerHTML =
-    Galaxy.state.scheduled.length
-
-      ? `
-        <div class="schedule-list">
-
-          ${Galaxy.state.scheduled
-            .map(
-              task => `
-              <article class="schedule-row">
-
-                <div class="resource-icon">
-                  ◷
-                </div>
-
-                <div class="resource-copy">
-
-                  <strong>
-                    ${escapeHTML(task.name)}
-                  </strong>
-
-                  <span>
-                    ${escapeHTML(task.frequency)}
-
-                    ${
-                      task.datetime
-                        ? ` · ${escapeHTML(task.datetime)}`
-                        : ""
-                    }
-                  </span>
-
-                </div>
-
-                <button
-                  class="toggle-switch ${
-                    task.enabled
-                      ? "active"
-                      : ""
-                  }"
-                  data-toggle-scheduled="${task.id}"
-                >
-                  <span></span>
-                </button>
-
-                <button
-                  class="icon-btn"
-                  data-delete-scheduled="${task.id}"
-                >
-                  ×
-                </button>
-
-              </article>
-            `
-            )
-            .join("")}
-
-        </div>
-      `
-
+    scenes.length
+      ? scenes.map((scene, index) => `
+          <article class="card">
+            <small>SCENE ${index + 1}</small>
+            <h3>
+              ${escapeHTML(scene.title)}
+            </h3>
+            <p>
+              ${escapeHTML(scene.prompt)}
+            </p>
+            <button
+              data-delete-scene="${scene.id}"
+            >
+              Delete
+            </button>
+          </article>
+        `).join("")
       : `
-        <div class="empty-panel">
+        <article class="card">
+          <h3>No scenes</h3>
+          <p>Add your first scene.</p>
+        </article>
+      `;
+}
 
-          <span>
-            ◷
-          </span>
+function addScene() {
+  const input = $("#scenePrompt");
+
+  const promptText =
+    input?.value.trim();
+
+  if (!promptText) return;
+
+  scenes.push({
+    id: uid("scene"),
+    title: `Scene ${scenes.length + 1}`,
+    prompt: promptText
+  });
+
+  Storage.set("scenes", scenes);
+
+  input.value = "";
+
+  renderSceneList();
+}
+
+
+/* =========================================================
+   PACKS
+   ========================================================= */
+
+function renderPacks() {
+  $("#contentBody").innerHTML = `
+    ${workspaceHeader(
+      "EXPLORE",
+      "Packs",
+      "Ready-made GALAXY workflows."
+    )}
+
+    <div class="cards">
+
+      ${DEFAULT_PACKS.map(pack => `
+        <article class="card">
+
+          <div class="game-icon">
+            ${pack.icon}
+          </div>
 
           <h3>
-            No scheduled tasks
+            ${escapeHTML(pack.name)}
           </h3>
 
           <p>
-            Create recurring AI workflows.
+            ${escapeHTML(pack.description)}
           </p>
 
-        </div>
-      `;
+          <button
+            data-use-pack="${escapeHTML(pack.name)}"
+          >
+            Use pack
+          </button>
 
+        </article>
+      `).join("")}
+
+    </div>
+  `;
+}
+
+
+/* =========================================================
+   AGENTS
+   ========================================================= */
+
+function renderAgents() {
+  $("#contentBody").innerHTML = `
+    ${workspaceHeader(
+      "GALAXY",
+      "GPTs / Agents",
+      "Specialized AI assistants."
+    )}
+
+    <div class="cards">
+
+      ${DEFAULT_AGENTS.map(agent => `
+        <article class="card">
+
+          <div class="game-icon">
+            ${agent.icon}
+          </div>
+
+          <h3>
+            ${escapeHTML(agent.name)}
+          </h3>
+
+          <p>
+            ${escapeHTML(agent.description)}
+          </p>
+
+          <button
+            data-agent="${escapeHTML(agent.name)}"
+          >
+            Start
+          </button>
+
+        </article>
+      `).join("")}
+
+    </div>
+  `;
 }
 
 
@@ -3779,427 +1431,111 @@ function renderScheduled() {
    PLUGINS
    ========================================================= */
 
-function togglePluginInstall(id) {
-
-  const plugin =
-    Galaxy.state.plugins.find(
-      item =>
-        item.id === id
-    );
-
-  if (!plugin) {
-    return;
-  }
-
-  plugin.installed =
-    !plugin.installed;
-
-  if (!plugin.installed) {
-    plugin.connected = false;
-  }
-
-  persistAll();
-
-  renderPlugins();
-
-}
-
-
-function togglePluginConnection(id) {
-
-  const plugin =
-    Galaxy.state.plugins.find(
-      item =>
-        item.id === id
-    );
-
-  if (!plugin) {
-    return;
-  }
-
-  plugin.installed = true;
-
-  plugin.connected =
-    !plugin.connected;
-
-  persistAll();
-
-  renderPlugins();
-
-}
-
-
 function renderPlugins() {
+  $("#contentBody").innerHTML = `
+    ${workspaceHeader(
+      "TOOLS",
+      "Plugins",
+      "Connect GALAXY with external services."
+    )}
 
-  renderContentHeader(
-    "Connections",
-    "Plugins"
-  );
+    <div class="cards">
 
-  renderContentTabs(
-    [
-      ["installed", "Installed"],
-      ["discover", "Discover"],
-      ["permissions", "Permissions"]
-    ],
-    "discover",
-    "plugins"
-  );
+      ${DEFAULT_PLUGINS.map(plugin => `
+        <article class="card">
 
-  const root =
-    $("#contentBody");
+          <div class="game-icon">
+            ${plugin.icon}
+          </div>
 
-  if (!root) {
-    return;
-  }
+          <h3>
+            ${escapeHTML(plugin.name)}
+          </h3>
 
-  root.innerHTML = `
-    <div class="resource-grid">
+          <p>
+            ${escapeHTML(plugin.description)}
+          </p>
 
-      ${Galaxy.state.plugins
-        .map(
-          plugin => `
-          <article class="plugin-card">
+          <button
+            data-plugin="${escapeHTML(plugin.name)}"
+          >
+            Connect
+          </button>
 
-            <div class="resource-icon">
-              ${plugin.icon}
-            </div>
-
-            <div class="resource-copy">
-
-              <strong>
-                ${escapeHTML(plugin.name)}
-              </strong>
-
-              <span>
-                ${escapeHTML(plugin.description)}
-              </span>
-
-            </div>
-
-            <div class="plugin-actions">
-
-              <button
-                class="text-action"
-                data-plugin-install="${plugin.id}"
-              >
-                ${
-                  plugin.installed
-                    ? "Remove"
-                    : "Install"
-                }
-              </button>
-
-              ${
-                plugin.installed
-
-                  ? `
-                    <button
-                      class="text-action"
-                      data-plugin-connect="${plugin.id}"
-                    >
-                      ${
-                        plugin.connected
-                          ? "Disconnect"
-                          : "Connect"
-                      }
-                    </button>
-                  `
-
-                  : ""
-              }
-
-            </div>
-
-          </article>
-        `
-        )
-        .join("")}
+        </article>
+      `).join("")}
 
     </div>
   `;
-
 }
 
 
 /* =========================================================
-   GPT / AGENT CREATOR
+   SCHEDULED
    ========================================================= */
 
-function createAgent() {
+function renderScheduled() {
+  $("#contentBody").innerHTML = `
+    ${workspaceHeader(
+      "AUTOMATION",
+      "Scheduled",
+      "Tasks GALAXY can run later."
+    )}
 
-  openAgentEditor();
+    <button
+      class="primary"
+      data-action="new-scheduled"
+    >
+      ＋ New task
+    </button>
 
+    <div class="cards" style="margin-top:18px">
+
+      ${
+        Galaxy.state.scheduled.length
+          ? Galaxy.state.scheduled.map(task => `
+              <article class="card">
+                <h3>${escapeHTML(task.name)}</h3>
+                <p>${escapeHTML(task.schedule)}</p>
+                <button
+                  data-delete-task="${task.id}"
+                >
+                  Delete
+                </button>
+              </article>
+            `).join("")
+          : `
+            <article class="card">
+              <h3>No scheduled tasks</h3>
+              <p>Create a scheduled GALAXY task.</p>
+            </article>
+          `
+      }
+
+    </div>
+  `;
 }
 
+function createScheduledTask() {
+  const name =
+    prompt("Task name:");
 
-function openAgentEditor(
-  agent = null
-) {
+  if (!name?.trim()) return;
 
-  openModal({
+  const schedule =
+    prompt(
+      "When should it run?",
+      "Every day"
+    );
 
-    title:
-      agent
-        ? "Edit GPT"
-        : "Create GPT",
-
-    body: `
-      <form
-        id="agentForm"
-        class="form-stack"
-      >
-
-        <label>
-          Name
-
-          <input
-            class="field"
-            name="name"
-            value="${
-              agent
-                ? escapeHTML(agent.name)
-                : ""
-            }"
-            required
-          >
-
-        </label>
-
-        <label>
-          Instructions
-
-          <textarea
-            class="field textarea-field"
-            name="instructions"
-            required
-          >${
-            agent
-              ? escapeHTML(
-                  agent.instructions ||
-                  ""
-                )
-              : ""
-          }</textarea>
-
-        </label>
-
-        <label>
-          Personality
-
-          <select
-            class="field"
-            name="personality"
-          >
-
-            <option value="balanced">
-              Balanced
-            </option>
-
-            <option value="creative">
-              Creative
-            </option>
-
-            <option value="precise">
-              Precise
-            </option>
-
-            <option value="technical">
-              Technical
-            </option>
-
-          </select>
-
-        </label>
-
-        <button
-          class="text-action primary"
-          type="submit"
-        >
-          ${
-            agent
-              ? "Save GPT"
-              : "Create GPT"
-          }
-        </button>
-
-      </form>
-    `
-
+  Galaxy.state.scheduled.push({
+    id: uid("task"),
+    name: name.trim(),
+    schedule: schedule || "Not set"
   });
 
-  setTimeout(
-    () => {
-
-      on(
-        $("#agentForm"),
-        "submit",
-        event => {
-
-          event.preventDefault();
-
-          const form =
-            new FormData(
-              event.currentTarget
-            );
-
-          const data = {
-
-            name:
-              String(
-                form.get("name") ||
-                ""
-              ).trim(),
-
-            instructions:
-              String(
-                form.get("instructions") ||
-                ""
-              ).trim(),
-
-            personality:
-              form.get("personality")
-
-          };
-
-          if (agent) {
-
-            Object.assign(
-              agent,
-              data,
-              {
-                updatedAt:
-                  now()
-              }
-            );
-
-          } else {
-
-            Galaxy.state.agents.unshift({
-
-              id:
-                uid("agent"),
-
-              ...data,
-
-              createdAt:
-                now(),
-
-              updatedAt:
-                now()
-
-            });
-
-          }
-
-          persistAll();
-
-          closeOverlay();
-
-          renderAgents();
-
-        }
-      );
-
-    },
-    0
-  );
-
-}
-
-
-function renderAgents() {
-
-  renderContentHeader(
-    "Agents",
-    "GPTs",
-    `
-      <button
-        class="text-action"
-        data-action="new-agent"
-      >
-        ＋ Create GPT
-      </button>
-    `
-  );
-
-  renderContentTabs(
-    [
-      ["mine", "Mine"],
-      ["favorites", "Favorites"],
-      ["explore", "Explore"]
-    ],
-    "mine",
-    "gpts"
-  );
-
-  const root =
-    $("#contentBody");
-
-  if (!root) {
-    return;
-  }
-
-  root.innerHTML =
-    Galaxy.state.agents.length
-
-      ? `
-        <div class="resource-grid">
-
-          ${Galaxy.state.agents
-            .map(
-              agent => `
-              <article class="resource-card">
-
-                <div class="resource-icon">
-                  ✧
-                </div>
-
-                <div class="resource-copy">
-
-                  <strong>
-                    ${escapeHTML(agent.name)}
-                  </strong>
-
-                  <span>
-                    ${escapeHTML(agent.personality)}
-                  </span>
-
-                </div>
-
-                <button
-                  class="icon-btn"
-                  data-edit-agent="${agent.id}"
-                >
-                  ⋯
-                </button>
-
-              </article>
-            `
-            )
-            .join("")}
-
-        </div>
-      `
-
-      : `
-        <div class="empty-panel">
-
-          <span>
-            ✧
-          </span>
-
-          <h3>
-            Create your first GPT
-          </h3>
-
-          <p>
-            Build specialized GALAXY agents.
-          </p>
-
-        </div>
-      `;
-
+  saveState();
+  renderScheduled();
 }
 
 
@@ -4207,1225 +1543,57 @@ function renderAgents() {
    SITES
    ========================================================= */
 
-function createSite() {
-
-  const site = {
-
-    id:
-      uid("site"),
-
-    name:
-      "Untitled Site",
-
-    html:
-      "<h1>GALAXY Site</h1><p>Start building here.</p>",
-
-    css:
-      "body { font-family: system-ui; padding: 40px; }",
-
-    js: "",
-
-    status: "draft",
-
-    createdAt:
-      now(),
-
-    updatedAt:
-      now()
-
-  };
-
-  Galaxy.state.sites.unshift(site);
-
-  Galaxy.state.activeSiteId =
-    site.id;
-
-  persistAll();
-
-  openSiteEditor(site.id);
-
-}
-
-
-function openSiteEditor(id) {
-
-  const site =
-    Galaxy.state.sites.find(
-      item =>
-        item.id === id
-    );
-
-  if (!site) {
-    return;
-  }
-
-  Galaxy.state.activeSiteId =
-    id;
-
-  renderContentHeader(
-    "Build",
-    site.name,
-    `
-      <button
-        class="text-action"
-        data-action="save-site"
-      >
-        Save
-      </button>
-
-      <button
-        class="text-action"
-        data-action="preview-site"
-      >
-        Preview
-      </button>
-    `
-  );
-
-  const root =
-    $("#contentBody");
-
-  if (!root) {
-    return;
-  }
-
-  root.innerHTML = `
-    <div class="site-editor">
-
-      <div class="site-editor-tabs">
-
-        <button
-          class="editor-tab active"
-          data-site-tab="html"
-        >
-          HTML
-        </button>
-
-        <button
-          class="editor-tab"
-          data-site-tab="css"
-        >
-          CSS
-        </button>
-
-        <button
-          class="editor-tab"
-          data-site-tab="js"
-        >
-          JS
-        </button>
-
-      </div>
-
-      <textarea
-        id="siteEditor"
-        class="code-editor"
-        data-language="html"
-      >${escapeHTML(site.html)}</textarea>
-
-    </div>
-  `;
-
-}
-
-
-function saveActiveSite() {
-
-  const site =
-    Galaxy.state.sites.find(
-      item =>
-        item.id ===
-        Galaxy.state.activeSiteId
-    );
-
-  const editor =
-    $("#siteEditor");
-
-  if (
-    !site ||
-    !editor
-  ) {
-    return;
-  }
-
-  site[
-    editor.dataset.language
-  ] =
-    editor.value;
-
-  site.updatedAt =
-    now();
-
-  persistAll();
-
-  toast("Site saved");
-
-}
-
-
-function switchSiteEditorTab(
-  language
-) {
-
-  const site =
-    Galaxy.state.sites.find(
-      item =>
-        item.id ===
-        Galaxy.state.activeSiteId
-    );
-
-  const editor =
-    $("#siteEditor");
-
-  if (
-    !site ||
-    !editor
-  ) {
-    return;
-  }
-
-  site[
-    editor.dataset.language
-  ] =
-    editor.value;
-
-  editor.dataset.language =
-    language;
-
-  editor.value =
-    site[language] ||
-    "";
-
-  $$(".editor-tab")
-    .forEach(
-      tab =>
-        tab.classList.toggle(
-          "active",
-          tab.dataset.siteTab ===
-            language
-        )
-    );
-
-  persistAll();
-
-}
-
-
-function previewActiveSite() {
-
-  saveActiveSite();
-
-  const site =
-    Galaxy.state.sites.find(
-      item =>
-        item.id ===
-        Galaxy.state.activeSiteId
-    );
-
-  if (!site) {
-    return;
-  }
-
-  const source = `
-    <!DOCTYPE html>
-
-    <html>
-
-      <head>
-
-        <style>
-          ${site.css}
-        </style>
-
-      </head>
-
-      <body>
-
-        ${site.html}
-
-        <script>
-          ${site.js}
-        <\/script>
-
-      </body>
-
-    </html>
-  `;
-
-  openModal({
-
-    title:
-      site.name,
-
-    width:
-      "1100px",
-
-    body: `
-      <iframe
-        class="site-preview-frame"
-        id="sitePreviewFrame"
-      ></iframe>
-    `
-
-  });
-
-  setTimeout(
-    () => {
-
-      const frame =
-        $("#sitePreviewFrame");
-
-      if (frame) {
-        frame.srcdoc =
-          source;
-      }
-
-    },
-    0
-  );
-
-}
-
-
 function renderSites() {
+  $("#contentBody").innerHTML = `
+    ${workspaceHeader(
+      "BUILD",
+      "Sites",
+      "Build websites with GALAXY."
+    )}
 
-  renderContentHeader(
-    "Build",
-    "Sites",
-    `
-      <button
-        class="text-action"
-        data-action="new-site"
-      >
-        ＋ New site
-      </button>
-    `
-  );
+    <div class="cards">
 
-  renderContentTabs(
-    [
-      ["drafts", "Drafts"],
-      ["published", "Published"],
-      ["templates", "Templates"]
-    ],
-    "drafts",
-    "sites"
-  );
-
-  const root =
-    $("#contentBody");
-
-  if (!root) {
-    return;
-  }
-
-  root.innerHTML =
-    Galaxy.state.sites.length
-
-      ? `
-        <div class="resource-grid">
-
-          ${Galaxy.state.sites
-            .map(
-              site => `
-              <button
-                class="resource-card"
-                data-open-site="${site.id}"
-              >
-
-                <div class="resource-icon">
-                  ⌘
-                </div>
-
-                <div class="resource-copy">
-
-                  <strong>
-                    ${escapeHTML(site.name)}
-                  </strong>
-
-                  <span>
-                    ${escapeHTML(site.status)}
-                  </span>
-
-                </div>
-
-                <span class="resource-arrow">
-                  ›
-                </span>
-
-              </button>
-            `
-            )
-            .join("")}
-
-        </div>
-      `
-
-      : `
-        <div class="empty-panel">
-
-          <span>
-            ⌘
-          </span>
-
-          <h3>
-            No sites yet
-          </h3>
-
-          <p>
-            Create a website in GALAXY Work.
-          </p>
-
-        </div>
-      `;
-
-}
-
-
-/* =========================================================
-   IMAGES
-   ========================================================= */
-
-function createImageConcept() {
-
-  openModal({
-
-    title:
-      "Create image",
-
-    body: `
-      <form
-        id="imageConceptForm"
-        class="form-stack"
-      >
-
-        <label>
-          Describe your image
-
-          <textarea
-            class="field textarea-field"
-            name="prompt"
-            required
-          ></textarea>
-
-        </label>
-
-        <label>
-          Aspect ratio
-
-          <select
-            class="field"
-            name="ratio"
-          >
-
-            <option value="1:1">
-              Square 1:1
-            </option>
-
-            <option value="16:9">
-              Landscape 16:9
-            </option>
-
-            <option value="9:16">
-              Portrait 9:16
-            </option>
-
-          </select>
-
-        </label>
-
+      <article class="card">
+        <div class="game-icon">◎</div>
+        <h3>New website</h3>
+        <p>
+          Ask GALAXY to design and build a website.
+        </p>
         <button
-          class="text-action primary"
-          type="submit"
+          data-site-prompt="Build a professional website for me."
         >
-          Create concept
+          Start building
         </button>
-
-      </form>
-    `
-
-  });
-
-  setTimeout(
-    () => {
-
-      on(
-        $("#imageConceptForm"),
-        "submit",
-        event => {
-
-          event.preventDefault();
-
-          const form =
-            new FormData(
-              event.currentTarget
-            );
-
-          Galaxy.state.images.unshift({
-
-            id:
-              uid("image"),
-
-            prompt:
-              String(
-                form.get("prompt") ||
-                ""
-              ).trim(),
-
-            ratio:
-              form.get("ratio"),
-
-            status: "concept",
-
-            createdAt:
-              now()
-
-          });
-
-          persistAll();
-
-          closeOverlay();
-
-          renderImages();
-
-        }
-      );
-
-    },
-    0
-  );
-
-}
-
-
-function renderImages() {
-
-  renderContentHeader(
-    "Create",
-    "Images",
-    `
-      <button
-        class="text-action"
-        data-action="new-image"
-      >
-        ＋ Create image
-      </button>
-    `
-  );
-
-  renderContentTabs(
-    [
-      ["recent", "Recent"],
-      ["collections", "Collections"],
-      ["references", "References"]
-    ],
-    "recent",
-    "images"
-  );
-
-  const root =
-    $("#contentBody");
-
-  if (!root) {
-    return;
-  }
-
-  root.innerHTML =
-    Galaxy.state.images.length
-
-      ? `
-        <div class="image-concept-grid">
-
-          ${Galaxy.state.images
-            .map(
-              image => `
-              <article class="image-concept-card">
-
-                <div class="image-concept-placeholder">
-                  ◫
-                </div>
-
-                <strong>
-                  ${escapeHTML(
-                    image.prompt.slice(
-                      0,
-                      80
-                    )
-                  )}
-                </strong>
-
-                <span>
-                  ${escapeHTML(image.ratio)}
-                </span>
-
-              </article>
-            `
-            )
-            .join("")}
-
-        </div>
-      `
-
-      : `
-        <div class="empty-panel">
-
-          <span>
-            ◫
-          </span>
-
-          <h3>
-            Create images
-          </h3>
-
-          <p>
-            Image generation is ready for a connected backend.
-          </p>
-
-        </div>
-      `;
-
-}
-
-
-/* =========================================================
-   PACKS SYSTEM
-   ========================================================= */
-
-function installPack(id) {
-
-  const pack =
-    Galaxy.state.packs.find(
-      item =>
-        item.id === id
-    );
-
-  if (!pack) {
-    return;
-  }
-
-  pack.installed = true;
-
-  persistAll();
-
-  renderPacks(
-    Galaxy.state
-      .activePackFilter
-  );
-
-}
-
-
-function removePack(id) {
-
-  const pack =
-    Galaxy.state.packs.find(
-      item =>
-        item.id === id
-    );
-
-  if (!pack) {
-    return;
-  }
-
-  pack.installed = false;
-
-  persistAll();
-
-  renderPacks(
-    Galaxy.state
-      .activePackFilter
-  );
-
-}
-
-
-function togglePackInstall(id) {
-
-  const pack =
-    Galaxy.state.packs.find(
-      item =>
-        item.id === id
-    );
-
-  if (!pack) {
-    return;
-  }
-
-  if (pack.installed) {
-
-    removePack(id);
-
-  } else {
-
-    installPack(id);
-
-  }
-
-}
-
-
-function openPack(id) {
-
-  const pack =
-    Galaxy.state.packs.find(
-      item =>
-        item.id === id
-    );
-
-  if (!pack) {
-    return;
-  }
-
-  renderContentHeader(
-    "Pack",
-    pack.name,
-    `
-      <button
-        class="text-action"
-        data-pack-install-toggle="${pack.id}"
-      >
-        ${
-          pack.installed
-            ? "Remove Pack"
-            : "Install Pack"
-        }
-      </button>
-    `
-  );
-
-  const root =
-    $("#contentBody");
-
-  if (!root) {
-    return;
-  }
-
-  root.innerHTML = `
-    <div class="pack-workflow-list">
-
-      ${pack.items
-        .map(
-          item => `
-          <button
-            class="pack-workflow-row"
-            data-pack-item="${escapeHTML(item)}"
-          >
-
-            <span class="pack-workflow-icon">
-              ✦
-            </span>
-
-            <span>
-              ${escapeHTML(item)}
-            </span>
-
-            <span class="resource-arrow">
-              ›
-            </span>
-
-          </button>
-        `
-        )
-        .join("")}
-
-    </div>
-  `;
-
-}
-
-
-function renderPacks(
-  filter = "all"
-) {
-
-  Galaxy.state.activePackFilter =
-    filter;
-
-  renderContentHeader(
-    "Collections",
-    "Packs"
-  );
-
-  renderContentTabs(
-    [
-      ["all", "All"],
-      ["prompt", "Prompts"],
-      ["website", "Websites"],
-      ["creator", "Creator"],
-      ["productivity", "Productivity"],
-      ["research", "Research"],
-      ["developer", "Developer"],
-      ["design", "Design"],
-      ["video", "Video"],
-      ["startup", "Startup"],
-      ["data", "Data"]
-    ],
-    filter,
-    "packs"
-  );
-
-  const root =
-    $("#contentBody");
-
-  if (!root) {
-    return;
-  }
-
-  const packs =
-    Galaxy.state.packs.filter(
-      pack =>
-        filter ===
-        "all" ||
-        pack.category ===
-        filter
-    );
-
-  root.innerHTML = `
-    <div class="packs-grid">
-
-      ${packs
-        .map(
-          pack => `
-          <article
-            class="pack-card ${
-              pack.featured
-                ? "pack-featured"
-                : ""
-            }"
-          >
-
-            <button
-              class="pack-main"
-              data-open-pack="${pack.id}"
-            >
-
-              <div class="pack-cover">
-
-                <span>
-                  ${pack.icon}
-                </span>
-
-              </div>
-
-              <div class="pack-card-copy">
-
-                <strong>
-                  ${escapeHTML(pack.name)}
-                </strong>
-
-                <p>
-                  ${escapeHTML(pack.description)}
-                </p>
-
-                <div class="pack-meta">
-
-                  <span>
-                    ${pack.items.length} workflows
-                  </span>
-
-                  ${
-                    pack.featured
-                      ? "<span>Featured</span>"
-                      : ""
-                  }
-
-                </div>
-
-              </div>
-
-            </button>
-
-            <button
-              class="text-action"
-              data-pack-install-toggle="${pack.id}"
-            >
-              ${
-                pack.installed
-                  ? "Installed"
-                  : "Install"
-              }
-            </button>
-
-          </article>
-        `
-        )
-        .join("")}
-
-    </div>
-  `;
-
-}
-
-
-/* =========================================================
-   PROMPT TEMPLATES
-   ========================================================= */
-
-function openPromptTemplates() {
-
-  openModal({
-
-    title:
-      "Prompt templates",
-
-    body: `
-      <div class="prompt-template-list">
-
-        ${Galaxy.state.prompts
-          .map(
-            prompt => `
-            <button
-              class="prompt-template"
-              data-use-prompt="${prompt.id}"
-            >
-
-              <div>
-
-                <strong>
-                  ${escapeHTML(prompt.title)}
-                </strong>
-
-                <span>
-                  ${escapeHTML(prompt.category)}
-                </span>
-
-              </div>
-
-              <span>
-                ›
-              </span>
-
-            </button>
-          `
-          )
-          .join("")}
-
-      </div>
-    `
-
-  });
-
-}
-
-
-function usePromptTemplate(id) {
-
-  const prompt =
-    Galaxy.state.prompts.find(
-      item =>
-        item.id === id
-    );
-
-  if (!prompt) {
-    return;
-  }
-
-  closeOverlay();
-
-  switchMode("chat");
-
-  const input =
-    $("#promptInput");
-
-  if (!input) {
-    return;
-  }
-
-  input.value =
-    `${prompt.prompt}\n\n`;
-
-  autoResizeTextarea(input);
-
-  input.focus();
-
-}
-
-
-/* =========================================================
-   WORK MODE
-   ========================================================= */
-
-function ensureWorkDocument() {
-
-  let doc =
-    Galaxy.state.workDocuments.find(
-      item =>
-        item.id ===
-        Galaxy.state
-          .activeWorkDocumentId
-    );
-
-  if (!doc) {
-
-    doc = {
-
-      id:
-        uid("work"),
-
-      title:
-        "Untitled Work",
-
-      content:
-        "# GALAXY Work\n\nStart creating here.",
-
-      createdAt:
-        now(),
-
-      updatedAt:
-        now()
-
-    };
-
-    Galaxy.state.workDocuments.unshift(
-      doc
-    );
-
-    Galaxy.state.activeWorkDocumentId =
-      doc.id;
-
-    persistAll();
-
-  }
-
-  return doc;
-
-}
-
-
-function renderWorkDocument() {
-
-  const doc =
-    ensureWorkDocument();
-
-  const root =
-    $("#previewSurface");
-
-  if (!root) {
-    return;
-  }
-
-  root.innerHTML = `
-    <div class="work-editor-shell">
-
-      <div class="work-editor-toolbar">
-
-        <input
-          id="workDocumentTitle"
-          class="work-title-input"
-          value="${escapeHTML(doc.title)}"
+      </article>
+
+      <article class="card">
+        <div class="game-icon">▣</div>
+        <h3>Landing page</h3>
+        <p>
+          Create a modern landing page.
+        </p>
+        <button
+          data-site-prompt="Create a modern landing page."
         >
+          Create
+        </button>
+      </article>
 
-        <div>
-
-          <button
-            class="text-action"
-            data-work-view="edit"
-          >
-            Edit
-          </button>
-
-          <button
-            class="text-action"
-            data-work-view="preview"
-          >
-            Preview
-          </button>
-
-        </div>
-
-      </div>
-
-      <textarea
-        id="workDocumentEditor"
-        class="work-document-editor"
-      >${escapeHTML(doc.content)}</textarea>
+      <article class="card">
+        <div class="game-icon">◇</div>
+        <h3>Portfolio</h3>
+        <p>
+          Create a personal portfolio website.
+        </p>
+        <button
+          data-site-prompt="Create a professional portfolio website."
+        >
+          Create
+        </button>
+      </article>
 
     </div>
   `;
-
-  on(
-    $("#workDocumentEditor"),
-    "input",
-    event => {
-
-      doc.content =
-        event.target.value;
-
-      doc.updatedAt =
-        now();
-
-      persistAll();
-
-    }
-  );
-
-  on(
-    $("#workDocumentTitle"),
-    "input",
-    event => {
-
-      doc.title =
-        event.target.value;
-
-      doc.updatedAt =
-        now();
-
-      persistAll();
-
-    }
-  );
-
-}
-
-
-function previewWorkDocument() {
-
-  const doc =
-    ensureWorkDocument();
-
-  const root =
-    $("#previewSurface");
-
-  if (root) {
-
-    root.innerHTML = `
-      <article class="work-document-preview">
-        ${renderMarkdown(doc.content)}
-      </article>
-    `;
-
-  }
-
-}
-
-
-async function sendWorkMessage() {
-
-  const input =
-    $("#workPrompt");
-
-  const root =
-    $("#workMessages");
-
-  const text =
-    input?.value.trim();
-
-  if (
-    !input ||
-    !root ||
-    !text
-  ) {
-    return;
-  }
-
-  input.value = "";
-
-  root.insertAdjacentHTML(
-    "beforeend",
-    `
-      <article class="message user">
-
-        <div class="bubble">
-          ${escapeHTML(text)}
-        </div>
-
-      </article>
-    `
-  );
-
-  try {
-
-    const reply =
-      await fetchAIResponse(
-        text,
-        {
-          mode: "work"
-        }
-      );
-
-    root.insertAdjacentHTML(
-      "beforeend",
-      `
-        <article class="message assistant">
-
-          <div class="bubble">
-            ${renderMarkdown(reply)}
-          </div>
-
-        </article>
-      `
-    );
-
-  } catch (error) {
-
-    root.insertAdjacentHTML(
-      "beforeend",
-      `
-        <article class="message assistant">
-
-          <div class="bubble">
-            ${escapeHTML(error.message)}
-          </div>
-
-        </article>
-      `
-    );
-
-  }
-
-}
-
-
-function switchMode(mode) {
-
-  Galaxy.state.mode =
-    mode;
-
-  Galaxy.state.view =
-    mode;
-
-  $$(".mode-tab")
-    .forEach(
-      tab => {
-
-        const active =
-          tab.dataset.mode ===
-          mode;
-
-        tab.classList.toggle(
-          "active",
-          active
-        );
-
-        tab.setAttribute(
-          "aria-selected",
-          String(active)
-        );
-
-      }
-    );
-
-  $("#chatView")
-    ?.classList.toggle(
-      "active-view",
-      mode === "chat"
-    );
-
-  $("#workView")
-    ?.classList.toggle(
-      "active-view",
-      mode === "work"
-    );
-
-  $("#contentView")
-    ?.classList.remove(
-      "active-view"
-    );
-
-  if (mode === "work") {
-    renderWorkDocument();
-  }
-
 }
 
 
@@ -5434,7 +1602,6 @@ function switchMode(mode) {
    ========================================================= */
 
 const GameCenter = {
-
   activeGame: "home",
 
   chess: null,
@@ -5444,237 +1611,74 @@ const GameCenter = {
   connectFour: null,
 
   memory: null
-
 };
 
 
+/* =========================================================
+   GAME HOME
+   ========================================================= */
+
 function renderGames() {
+  GameCenter.activeGame = "home";
 
-  GameCenter.activeGame =
-    "home";
+  $("#contentBody").innerHTML = `
+    ${workspaceHeader(
+      "GALAXY GAMING",
+      "Gaming Center",
+      "Play directly inside GALAXY."
+    )}
 
-  renderContentHeader(
-    "Play",
-    "Gaming Center"
-  );
+    <div class="games-grid">
 
-  renderContentTabs(
-    [
-      ["featured", "Featured"],
-      ["board", "Board"],
-      ["arcade", "Arcade"],
-      ["puzzle", "Puzzle"]
-    ],
-    "featured",
-    "games"
-  );
+      <button
+        class="game-card"
+        data-game-open="chess"
+      >
+        <div class="game-icon">♟</div>
+        <h3>Chess vs GALAXY</h3>
+        <p>Play White against GALAXY.</p>
+      </button>
 
-  const root =
-    $("#contentBody");
+      <button
+        class="game-card"
+        data-game-open="tictactoe"
+      >
+        <div class="game-icon">✕</div>
+        <h3>Tic-Tac-Toe</h3>
+        <p>Play against GALAXY.</p>
+      </button>
 
-  if (!root) {
-    return;
-  }
+      <button
+        class="game-card"
+        data-game-open="connect4"
+      >
+        <div class="game-icon">●</div>
+        <h3>Connect Four</h3>
+        <p>Drop discs and beat GALAXY.</p>
+      </button>
 
-  root.innerHTML = `
-    <section class="games-home">
+      <button
+        class="game-card"
+        data-game-open="memory"
+      >
+        <div class="game-icon">🧠</div>
+        <h3>Memory</h3>
+        <p>Find all matching pairs.</p>
+      </button>
 
-      <div class="games-hero">
-
-        <div>
-
-          <span class="games-kicker">
-            GALAXY GAMING
-          </span>
-
-          <h2>
-            Play directly inside GALAXY
-          </h2>
-
-          <p>
-            Visual games with real boards,
-            pieces, turns and scores.
-          </p>
-
-        </div>
-
-        <div
-          class="games-hero-mark"
-          aria-hidden="true"
-        >
-          ♛
-        </div>
-
-      </div>
-
-
-      <div class="games-grid">
-
-        <button
-          class="game-card game-card-featured"
-          data-game-open="chess"
-        >
-
-          <div class="game-card-visual chess-mini">
-
-            <span>♜</span>
-            <span>♞</span>
-            <span>♝</span>
-            <span>♛</span>
-
-            <span>♙</span>
-            <span>♘</span>
-            <span>♗</span>
-            <span>♕</span>
-
-          </div>
-
-          <div class="game-card-copy">
-
-            <strong>
-              Chess vs GALAXY
-            </strong>
-
-            <span>
-              Play White against GALAXY
-            </span>
-
-          </div>
-
-        </button>
-
-
-        <button
-          class="game-card"
-          data-game-open="tictactoe"
-        >
-
-          <div class="game-card-visual ttt-mini">
-
-            <span>✕</span>
-            <span>○</span>
-            <span>✕</span>
-
-            <span>○</span>
-            <span>✕</span>
-            <span>○</span>
-
-            <span>○</span>
-            <span>✕</span>
-            <span>○</span>
-
-          </div>
-
-          <div class="game-card-copy">
-
-            <strong>
-              Tic-Tac-Toe
-            </strong>
-
-            <span>
-              Fast match against GALAXY
-            </span>
-
-          </div>
-
-        </button>
-
-
-        <button
-          class="game-card"
-          data-game-open="connect4"
-        >
-
-          <div class="game-card-visual connect-mini">
-
-            ${Array.from(
-              { length: 24 },
-              (_, i) => `
-                <span
-                  class="${
-                    [
-                      15,
-                      16,
-                      21,
-                      22,
-                      23
-                    ].includes(i)
-                      ? "filled"
-                      : ""
-                  }"
-                ></span>
-              `
-            ).join("")}
-
-          </div>
-
-          <div class="game-card-copy">
-
-            <strong>
-              Connect Four
-            </strong>
-
-            <span>
-              Drop discs and beat GALAXY
-            </span>
-
-          </div>
-
-        </button>
-
-
-        <button
-          class="game-card"
-          data-game-open="memory"
-        >
-
-          <div class="game-card-visual memory-mini">
-
-            <span>✦</span>
-            <span>?</span>
-            <span>?</span>
-            <span>♞</span>
-
-            <span>?</span>
-            <span>◫</span>
-            <span>?</span>
-            <span>?</span>
-
-          </div>
-
-          <div class="game-card-copy">
-
-            <strong>
-              Memory
-            </strong>
-
-            <span>
-              Match visual pairs
-            </span>
-
-          </div>
-
-        </button>
-
-      </div>
-
-    </section>
+    </div>
   `;
-
 }
 
-
 function gameBackButton() {
-
   return `
     <button
-      class="text-action game-back"
+      class="ghost-btn"
       data-game-back
     >
       ← Gaming Center
     </button>
   `;
-
 }
 
 
@@ -5683,7 +1687,6 @@ function gameBackButton() {
    ========================================================= */
 
 const CHESS_PIECES = {
-
   wr: "♖",
   wn: "♘",
   wb: "♗",
@@ -5697,354 +1700,127 @@ const CHESS_PIECES = {
   bq: "♛",
   bk: "♚",
   bp: "♟"
-
 };
 
-
 function initialChessBoard() {
-
   return [
-
-    [
-      "br",
-      "bn",
-      "bb",
-      "bq",
-      "bk",
-      "bb",
-      "bn",
-      "br"
-    ],
-
-    [
-      "bp",
-      "bp",
-      "bp",
-      "bp",
-      "bp",
-      "bp",
-      "bp",
-      "bp"
-    ],
-
-    [
-      null,
-      null,
-      null,
-      null,
-      null,
-      null,
-      null,
-      null
-    ],
-
-    [
-      null,
-      null,
-      null,
-      null,
-      null,
-      null,
-      null,
-      null
-    ],
-
-    [
-      null,
-      null,
-      null,
-      null,
-      null,
-      null,
-      null,
-      null
-    ],
-
-    [
-      null,
-      null,
-      null,
-      null,
-      null,
-      null,
-      null,
-      null
-    ],
-
-    [
-      "wp",
-      "wp",
-      "wp",
-      "wp",
-      "wp",
-      "wp",
-      "wp",
-      "wp"
-    ],
-
-    [
-      "wr",
-      "wn",
-      "wb",
-      "wq",
-      "wk",
-      "wb",
-      "wn",
-      "wr"
-    ]
-
+    ["br","bn","bb","bq","bk","bb","bn","br"],
+    ["bp","bp","bp","bp","bp","bp","bp","bp"],
+    [null,null,null,null,null,null,null,null],
+    [null,null,null,null,null,null,null,null],
+    [null,null,null,null,null,null,null,null],
+    [null,null,null,null,null,null,null,null],
+    ["wp","wp","wp","wp","wp","wp","wp","wp"],
+    ["wr","wn","wb","wq","wk","wb","wn","wr"]
   ];
-
 }
-
 
 function resetChess() {
-
   GameCenter.chess = {
-
-    board:
-      initialChessBoard(),
-
-    selected:
-      null,
-
-    legal:
-      [],
-
-    turn:
-      "w",
-
-    status:
-      "Your turn",
-
-    gameOver:
-      false,
-
-    moveHistory:
-      []
-
+    board: initialChessBoard(),
+    selected: null,
+    legal: [],
+    turn: "w",
+    status: "Your turn — White",
+    gameOver: false,
+    history: []
   };
-
 }
-
 
 function chessColor(piece) {
-
-  return piece
-    ? piece[0]
-    : null;
-
+  return piece ? piece[0] : null;
 }
-
 
 function chessType(piece) {
-
-  return piece
-    ? piece[1]
-    : null;
-
+  return piece ? piece[1] : null;
 }
 
-
-function inBoard(r, c) {
-
+function insideBoard(r, c) {
   return (
     r >= 0 &&
     r < 8 &&
     c >= 0 &&
     c < 8
   );
-
 }
 
+function chessMovesFor(board, r, c) {
+  const piece = board[r][c];
 
-function chessMovesFor(
-  board,
-  r,
-  c
-) {
+  if (!piece) return [];
 
-  const piece =
-    board[r][c];
-
-  if (!piece) {
-    return [];
-  }
-
-  const color =
-    chessColor(piece);
-
-  const type =
-    chessType(piece);
+  const color = chessColor(piece);
+  const type = chessType(piece);
 
   const enemy =
-    color === "w"
-      ? "b"
-      : "w";
+    color === "w" ? "b" : "w";
 
   const moves = [];
 
-
-  const pushIf = (
-    nr,
-    nc
-  ) => {
-
-    if (
-      !inBoard(
-        nr,
-        nc
-      )
-    ) {
+  function pushSquare(nr, nc) {
+    if (!insideBoard(nr, nc))
       return false;
-    }
 
     const target =
       board[nr][nc];
 
     if (!target) {
-
-      moves.push([
-        nr,
-        nc
-      ]);
-
+      moves.push([nr, nc]);
       return true;
     }
 
     if (
-      chessColor(target) ===
-      enemy
+      chessColor(target) === enemy
     ) {
-
-      moves.push([
-        nr,
-        nc
-      ]);
-
+      moves.push([nr, nc]);
     }
 
     return false;
+  }
 
-  };
+  function slide(directions) {
+    directions.forEach(([dr, dc]) => {
+      let nr = r + dr;
+      let nc = c + dc;
 
+      while (insideBoard(nr, nc)) {
+        if (!pushSquare(nr, nc))
+          break;
 
-  const slide =
-    directions => {
-
-      for (
-        const [
-          dr,
-          dc
-        ]
-        of directions
-      ) {
-
-        let nr =
-          r + dr;
-
-        let nc =
-          c + dc;
-
-        while (
-          inBoard(
-            nr,
-            nc
-          )
-        ) {
-
-          const target =
-            board[nr][nc];
-
-          if (!target) {
-
-            moves.push([
-              nr,
-              nc
-            ]);
-
-          } else {
-
-            if (
-              chessColor(target) ===
-              enemy
-            ) {
-
-              moves.push([
-                nr,
-                nc
-              ]);
-
-            }
-
-            break;
-
-          }
-
-          nr += dr;
-
-          nc += dc;
-
-        }
-
+        nr += dr;
+        nc += dc;
       }
+    });
+  }
 
-    };
-
-
-  if (
-    type === "p"
-  ) {
-
+  if (type === "p") {
     const direction =
-      color === "w"
-        ? -1
-        : 1;
+      color === "w" ? -1 : 1;
 
     const startRow =
-      color === "w"
-        ? 6
-        : 1;
-
+      color === "w" ? 6 : 1;
 
     if (
-      inBoard(
-        r + direction,
-        c
-      ) &&
-      !board[
-        r + direction
-      ][c]
+      insideBoard(r + direction, c) &&
+      !board[r + direction][c]
     ) {
-
       moves.push([
         r + direction,
         c
       ]);
 
-
       if (
         r === startRow &&
-        !board[
-          r + 2 * direction
-        ][c]
+        !board[r + direction * 2][c]
       ) {
-
         moves.push([
-          r + 2 * direction,
+          r + direction * 2,
           c
         ]);
-
       }
-
     }
 
-
-    for (
-      const dc
-      of [-1, 1]
-    ) {
-
+    [-1, 1].forEach(dc => {
       const nr =
         r + direction;
 
@@ -6052,189 +1828,110 @@ function chessMovesFor(
         c + dc;
 
       if (
-        inBoard(
-          nr,
-          nc
-        ) &&
+        insideBoard(nr, nc) &&
         board[nr][nc] &&
-        chessColor(
-          board[nr][nc]
-        ) === enemy
+        chessColor(board[nr][nc]) === enemy
       ) {
-
-        moves.push([
-          nr,
-          nc
-        ]);
-
+        moves.push([nr, nc]);
       }
+    });
+  }
 
-    }
-
-  } else if (
-    type === "r"
-  ) {
-
+  else if (type === "r") {
     slide([
-      [1, 0],
-      [-1, 0],
-      [0, 1],
-      [0, -1]
+      [1,0],
+      [-1,0],
+      [0,1],
+      [0,-1]
     ]);
+  }
 
-  } else if (
-    type === "b"
-  ) {
-
+  else if (type === "b") {
     slide([
-      [1, 1],
-      [1, -1],
-      [-1, 1],
-      [-1, -1]
+      [1,1],
+      [1,-1],
+      [-1,1],
+      [-1,-1]
     ]);
+  }
 
-  } else if (
-    type === "q"
-  ) {
-
+  else if (type === "q") {
     slide([
-      [1, 0],
-      [-1, 0],
-      [0, 1],
-      [0, -1],
-      [1, 1],
-      [1, -1],
-      [-1, 1],
-      [-1, -1]
+      [1,0],
+      [-1,0],
+      [0,1],
+      [0,-1],
+      [1,1],
+      [1,-1],
+      [-1,1],
+      [-1,-1]
     ]);
+  }
 
-  } else if (
-    type === "n"
-  ) {
+  else if (type === "n") {
+    [
+      [2,1],
+      [2,-1],
+      [-2,1],
+      [-2,-1],
+      [1,2],
+      [1,-2],
+      [-1,2],
+      [-1,-2]
+    ].forEach(([dr, dc]) =>
+      pushSquare(r + dr, c + dc)
+    );
+  }
 
-    for (
-      const [
-        dr,
-        dc
-      ]
-      of [
-        [2, 1],
-        [2, -1],
-        [-2, 1],
-        [-2, -1],
-        [1, 2],
-        [1, -2],
-        [-1, 2],
-        [-1, -2]
-      ]
-    ) {
-
-      pushIf(
-        r + dr,
-        c + dc
-      );
-
-    }
-
-  } else if (
-    type === "k"
-  ) {
-
-    for (
-      const [
-        dr,
-        dc
-      ]
-      of [
-        [1, 0],
-        [-1, 0],
-        [0, 1],
-        [0, -1],
-        [1, 1],
-        [1, -1],
-        [-1, 1],
-        [-1, -1]
-      ]
-    ) {
-
-      pushIf(
-        r + dr,
-        c + dc
-      );
-
-    }
-
+  else if (type === "k") {
+    [
+      [1,0],
+      [-1,0],
+      [0,1],
+      [0,-1],
+      [1,1],
+      [1,-1],
+      [-1,1],
+      [-1,-1]
+    ].forEach(([dr, dc]) =>
+      pushSquare(r + dr, c + dc)
+    );
   }
 
   return moves;
-
 }
 
-
-function chessSquareName(
-  r,
-  c
-) {
-
-  return `${
-    "abcdefgh"[c]
-  }${8 - r}`;
-
+function chessSquareName(r, c) {
+  return `${"abcdefgh"[c]}${8 - r}`;
 }
-
 
 function renderChess() {
+  GameCenter.activeGame = "chess";
 
-  GameCenter.activeGame =
-    "chess";
-
-  if (!GameCenter.chess) {
+  if (!GameCenter.chess)
     resetChess();
-  }
-
-  renderContentHeader(
-    "Games",
-    "Chess vs GALAXY"
-  );
-
-  const tabs =
-    $("#contentTabs");
-
-  if (tabs) {
-    tabs.innerHTML = "";
-  }
 
   const game =
     GameCenter.chess;
 
-  const root =
-    $("#contentBody");
+  $("#contentBody").innerHTML = `
+    ${workspaceHeader(
+      "GALAXY GAMING",
+      "Chess vs GALAXY"
+    )}
 
-  if (!root) {
-    return;
-  }
+    <section class="game-shell">
 
-  root.innerHTML = `
-    <section
-      class="game-shell chess-shell"
-    >
-
-      <div class="game-topline">
+      <div class="game-head">
 
         ${gameBackButton()}
 
-        <div
-          class="game-status ${
-            game.gameOver
-              ? "game-over"
-              : ""
-          }"
-        >
+        <strong>
           ${escapeHTML(game.status)}
-        </div>
+        </strong>
 
         <button
-          class="text-action"
+          class="ghost-btn"
           data-chess-reset
         >
           ↻ New game
@@ -6242,380 +1939,146 @@ function renderChess() {
 
       </div>
 
+      <div class="board-wrap">
 
-      <div class="chess-layout">
+        <div class="chess-board">
 
-        <div class="chess-board-wrap">
+          ${game.board.map(
+            (row, r) =>
+              row.map(
+                (piece, c) => {
 
-          <div
-            class="chess-board"
-            role="grid"
-            aria-label="Chess board"
-          >
+                  const selected =
+                    game.selected &&
+                    game.selected[0] === r &&
+                    game.selected[1] === c;
 
-            ${game.board
-              .map(
-                (row, r) =>
-                  row
-                    .map(
-                      (piece, c) => {
+                  const legal =
+                    game.legal.some(
+                      ([lr, lc]) =>
+                        lr === r &&
+                        lc === c
+                    );
 
-                        const selected =
-                          game.selected &&
-                          game.selected[0] === r &&
-                          game.selected[1] === c;
-
-                        const legal =
-                          game.legal.some(
-                            (
-                              [
-                                lr,
-                                lc
-                              ]
-                            ) =>
-                              lr === r &&
-                              lc === c
-                          );
-
-                        const dark =
-                          (
-                            r + c
-                          ) %
-                          2 ===
-                          1;
-
-                        return `
-                          <button
-                            class="
-                              chess-square
-                              ${
-                                dark
-                                  ? "dark"
-                                  : "light"
-                              }
-                              ${
-                                selected
-                                  ? "selected"
-                                  : ""
-                              }
-                              ${
-                                legal
-                                  ? "legal"
-                                  : ""
-                              }
-                            "
-                            data-chess-square="${r},${c}"
-                            aria-label="${
-                              chessSquareName(
-                                r,
-                                c
-                              )
-                            } ${
-                              piece
-                                ? CHESS_PIECES[
-                                    piece
-                                  ]
-                                : "empty"
-                            }"
-                          >
-
-                            ${
-                              piece
-
-                                ? `
-                                  <span
-                                    class="
-                                      chess-piece
-                                      ${
-                                        piece[0] ===
-                                        "w"
-                                          ? "white-piece"
-                                          : "black-piece"
-                                      }
-                                    "
-                                  >
-                                    ${
-                                      CHESS_PIECES[
-                                        piece
-                                      ]
-                                    }
-                                  </span>
-                                `
-
-                                : ""
-                            }
-
-                            ${
-                              legal
-                                ? `
-                                  <span
-                                    class="legal-dot"
-                                  ></span>
-                                `
-                                : ""
-                            }
-
-                          </button>
-                        `;
-
+                  return `
+                    <button
+                      class="
+                        chess-square
+                        ${(r + c) % 2 ? "dark" : "light"}
+                        ${selected ? "selected" : ""}
+                        ${legal ? "legal" : ""}
+                      "
+                      data-chess-square="${r},${c}"
+                    >
+                      ${
+                        piece
+                          ? CHESS_PIECES[piece]
+                          : legal
+                            ? "•"
+                            : ""
                       }
-                    )
-                    .join("")
-              )
-              .join("")}
-
-          </div>
-
-
-          <div class="chess-files">
-
-            ${"abcdefgh"
-              .split("")
-              .map(
-                letter => `
-                  <span>
-                    ${letter}
-                  </span>
-                `
-              )
-              .join("")}
-
-          </div>
+                    </button>
+                  `;
+                }
+              ).join("")
+          ).join("")}
 
         </div>
 
+      </div>
 
-        <aside class="game-side-panel">
+      <div style="
+        max-width:560px;
+        margin:15px auto 0;
+      ">
 
-          <div
-            class="player-card active-player"
-          >
+        <p>
+          You are White. Select a piece,
+          then select a legal square.
+        </p>
 
-            <span class="player-avatar">
-              H
-            </span>
-
-            <div>
-
-              <strong>
-                You
-              </strong>
-
-              <span>
-                White
-              </span>
-
-            </div>
-
-          </div>
-
-
-          <div class="player-card">
-
-            <span
-              class="player-avatar galaxy-avatar"
-            >
-              ✦
-            </span>
-
-            <div>
-
-              <strong>
-                GALAXY
-              </strong>
-
-              <span>
-                Black
-              </span>
-
-            </div>
-
-          </div>
-
-
-          <div class="move-history">
-
-            <strong>
-              Moves
-            </strong>
-
-            <div class="move-history-list">
-
-              ${
-                game.moveHistory.length
-
-                  ? game.moveHistory
-                      .map(
-                        (move, index) => `
-                          <span>
-                            ${
-                              index + 1
-                            }.
-                            ${
-                              escapeHTML(move)
-                            }
-                          </span>
-                        `
-                      )
-                      .join("")
-
-                  : `
-                    <span>
-                      No moves yet
-                    </span>
-                  `
-              }
-
-            </div>
-
-          </div>
-
-
-          <p class="game-note">
-            Click one of your white pieces,
-            then click a highlighted square.
-          </p>
-
-        </aside>
+        <small>
+          Moves:
+          ${
+            game.history.length
+              ? escapeHTML(
+                  game.history.join(" · ")
+                )
+              : "None yet"
+          }
+        </small>
 
       </div>
 
     </section>
   `;
-
 }
 
-
-function chessMove(
+function makeChessMove(
   fromR,
   fromC,
   toR,
   toC,
-  actor
+  color
 ) {
-
   const game =
     GameCenter.chess;
 
-  if (
-    !game ||
-    game.gameOver
-  ) {
-    return;
-  }
-
   const piece =
-    game.board[
-      fromR
-    ][fromC];
+    game.board[fromR][fromC];
 
   const captured =
-    game.board[
-      toR
-    ][toC];
+    game.board[toR][toC];
 
-  game.board[
-    toR
-  ][toC] =
-    piece;
+  game.board[toR][toC] = piece;
+  game.board[fromR][fromC] = null;
 
-  game.board[
-    fromR
-  ][fromC] =
-    null;
-
+  /* pawn promotion */
 
   if (
     piece === "wp" &&
     toR === 0
   ) {
-
-    game.board[
-      toR
-    ][toC] =
-      "wq";
-
+    game.board[toR][toC] = "wq";
   }
-
 
   if (
     piece === "bp" &&
     toR === 7
   ) {
-
-    game.board[
-      toR
-    ][toC] =
-      "bq";
-
+    game.board[toR][toC] = "bq";
   }
 
-
-  game.moveHistory.push(
-    `${
-      actor === "w"
-        ? "You"
-        : "GALAXY"
-    }: ${
-      chessSquareName(
-        fromR,
-        fromC
-      )
-    } → ${
-      chessSquareName(
-        toR,
-        toC
-      )
-    }`
+  game.history.push(
+    `${chessSquareName(fromR, fromC)}-${chessSquareName(toR, toC)}`
   );
-
 
   if (
     captured === "bk"
   ) {
-
     game.gameOver = true;
-
-    game.status =
-      "You win — Black king captured";
-
+    game.status = "You win!";
     return;
-
   }
-
 
   if (
     captured === "wk"
   ) {
-
     game.gameOver = true;
-
-    game.status =
-      "GALAXY wins — White king captured";
-
+    game.status = "GALAXY wins";
     return;
-
   }
 
-
   game.turn =
-    actor === "w"
-      ? "b"
-      : "w";
+    color === "w" ? "b" : "w";
 
   game.status =
     game.turn === "w"
-      ? "Your turn"
+      ? "Your turn — White"
       : "GALAXY is thinking…";
-
 }
 
-
-function handleChessSquare(
-  r,
-  c
-) {
-
+function handleChessSquare(r, c) {
   const game =
     GameCenter.chess;
 
@@ -6623,26 +2086,17 @@ function handleChessSquare(
     !game ||
     game.gameOver ||
     game.turn !== "w"
-  ) {
-    return;
-  }
+  ) return;
 
   const piece =
     game.board[r][c];
 
-
   if (!game.selected) {
-
     if (
       piece &&
-      chessColor(piece) ===
-      "w"
+      chessColor(piece) === "w"
     ) {
-
-      game.selected = [
-        r,
-        c
-      ];
+      game.selected = [r, c];
 
       game.legal =
         chessMovesFor(
@@ -6652,75 +2106,50 @@ function handleChessSquare(
         );
 
       renderChess();
-
     }
 
     return;
-
   }
 
-
-  const [
-    selectedR,
-    selectedC
-  ] =
+  const [sr, sc] =
     game.selected;
 
-
-  const isLegal =
+  const legal =
     game.legal.some(
-      (
-        [
-          legalR,
-          legalC
-        ]
-      ) =>
-        legalR === r &&
-        legalC === c
+      ([lr, lc]) =>
+        lr === r &&
+        lc === c
     );
 
-
-  if (isLegal) {
-
-    chessMove(
-      selectedR,
-      selectedC,
+  if (legal) {
+    makeChessMove(
+      sr,
+      sc,
       r,
       c,
       "w"
     );
 
     game.selected = null;
-
     game.legal = [];
 
     renderChess();
 
-
     if (!game.gameOver) {
-
       setTimeout(
         galaxyChessMove,
-        420
+        400
       );
-
     }
 
     return;
-
   }
-
 
   if (
     piece &&
-    chessColor(piece) ===
-    "w"
+    chessColor(piece) === "w"
   ) {
-
-    game.selected = [
-      r,
-      c
-    ];
+    game.selected = [r, c];
 
     game.legal =
       chessMovesFor(
@@ -6728,22 +2157,17 @@ function handleChessSquare(
         r,
         c
       );
+  }
 
-  } else {
-
+  else {
     game.selected = null;
-
     game.legal = [];
-
   }
 
   renderChess();
-
 }
 
-
 function galaxyChessMove() {
-
   const game =
     GameCenter.chess;
 
@@ -6751,104 +2175,57 @@ function galaxyChessMove() {
     !game ||
     game.gameOver ||
     game.turn !== "b"
-  ) {
-    return;
-  }
+  ) return;
 
-  const options = [];
+  const moves = [];
 
-
-  for (
-    let r = 0;
-    r < 8;
-    r++
-  ) {
-
-    for (
-      let c = 0;
-      c < 8;
-      c++
-    ) {
+  for (let r = 0; r < 8; r++) {
+    for (let c = 0; c < 8; c++) {
 
       const piece =
         game.board[r][c];
 
       if (
         piece &&
-        chessColor(piece) ===
-        "b"
+        chessColor(piece) === "b"
       ) {
-
-        for (
-          const [
-            targetR,
-            targetC
-          ]
-          of chessMovesFor(
-            game.board,
-            r,
-            c
-          )
-        ) {
-
-          options.push([
+        chessMovesFor(
+          game.board,
+          r,
+          c
+        ).forEach(([tr, tc]) => {
+          moves.push([
             r,
             c,
-            targetR,
-            targetC
+            tr,
+            tc
           ]);
-
-        }
-
+        });
       }
-
     }
-
   }
 
-
-  if (!options.length) {
-
+  if (!moves.length) {
     game.gameOver = true;
-
     game.status =
-      "You win — GALAXY has no moves";
+      "You win — GALAXY has no moves.";
 
     renderChess();
-
     return;
-
   }
 
-
   const captures =
-    options.filter(
-      (
-        [
-          ,
-          ,
-          targetR,
-          targetC
-        ]
-      ) =>
-        game.board[
-          targetR
-        ][targetC]
+    moves.filter(
+      ([r,c,tr,tc]) =>
+        game.board[tr][tc]
     );
-
 
   const pool =
     captures.length
       ? captures
-      : options;
+      : moves;
 
-
-  const [
-    r,
-    c,
-    targetR,
-    targetC
-  ] =
+  const move =
     pool[
       Math.floor(
         Math.random() *
@@ -6856,17 +2233,15 @@ function galaxyChessMove() {
       )
     ];
 
-
-  chessMove(
-    r,
-    c,
-    targetR,
-    targetC,
+  makeChessMove(
+    move[0],
+    move[1],
+    move[2],
+    move[3],
     "b"
   );
 
   renderChess();
-
 }
 
 
@@ -6875,129 +2250,72 @@ function galaxyChessMove() {
    ========================================================= */
 
 function resetTicTacToe() {
-
   GameCenter.ticTacToe = {
-
-    board:
-      Array(9).fill(""),
-
-    turn:
-      "X",
-
-    status:
-      "Your turn",
-
-    gameOver:
-      false
-
+    board: Array(9).fill(""),
+    turn: "X",
+    status: "Your turn",
+    gameOver: false
   };
-
 }
 
-
 function tttWinner(board) {
-
   const lines = [
-
-    [0, 1, 2],
-
-    [3, 4, 5],
-
-    [6, 7, 8],
-
-    [0, 3, 6],
-
-    [1, 4, 7],
-
-    [2, 5, 8],
-
-    [0, 4, 8],
-
-    [2, 4, 6]
-
+    [0,1,2],
+    [3,4,5],
+    [6,7,8],
+    [0,3,6],
+    [1,4,7],
+    [2,5,8],
+    [0,4,8],
+    [2,4,6]
   ];
 
-
   for (
-    const [
-      a,
-      b,
-      c
-    ]
-    of lines
+    const [a,b,c] of lines
   ) {
-
     if (
       board[a] &&
       board[a] === board[b] &&
       board[a] === board[c]
     ) {
-
       return board[a];
-
     }
-
   }
 
+  if (board.every(Boolean))
+    return "draw";
 
-  return board.every(Boolean)
-    ? "draw"
-    : null;
-
+  return null;
 }
 
-
 function renderTicTacToe() {
-
   GameCenter.activeGame =
     "tictactoe";
 
-  if (!GameCenter.ticTacToe) {
+  if (!GameCenter.ticTacToe)
     resetTicTacToe();
-  }
-
-
-  renderContentHeader(
-    "Games",
-    "Tic-Tac-Toe"
-  );
-
-
-  const tabs =
-    $("#contentTabs");
-
-  if (tabs) {
-    tabs.innerHTML = "";
-  }
-
 
   const game =
     GameCenter.ticTacToe;
 
+  $("#contentBody").innerHTML = `
+    ${workspaceHeader(
+      "GALAXY GAMING",
+      "Tic-Tac-Toe"
+    )}
 
-  const root =
-    $("#contentBody");
+    <section class="game-shell">
 
-  if (!root) {
-    return;
-  }
-
-
-  root.innerHTML = `
-    <section
-      class="game-shell small-game-shell"
-    >
-
-      <div class="game-topline">
+      <div class="game-head">
 
         ${gameBackButton()}
 
-        <div class="game-status">
+        <strong>
           ${escapeHTML(game.status)}
-        </div>
+        </strong>
 
         <button
-          class="text-action"
+          class="ghost-btn"
           data-ttt-reset
         >
           ↻ New game
@@ -7005,24 +2323,16 @@ function renderTicTacToe() {
 
       </div>
 
+      <div class="board-wrap">
 
-      <div class="ttt-board">
+        <div class="ttt-board">
 
-        ${game.board
-          .map(
+          ${game.board.map(
             (value, index) => `
               <button
-                class="
-                  ttt-cell
-                  ${
-                    value
-                      ? "filled"
-                      : ""
-                  }
-                "
+                class="ttt-cell"
                 data-ttt-cell="${index}"
               >
-
                 ${
                   value === "X"
                     ? "✕"
@@ -7030,22 +2340,19 @@ function renderTicTacToe() {
                       ? "○"
                       : ""
                 }
-
               </button>
             `
-          )
-          .join("")}
+          ).join("")}
+
+        </div>
 
       </div>
 
     </section>
   `;
-
 }
 
-
-function handleTttCell(index) {
-
+function handleTtt(index) {
   const game =
     GameCenter.ticTacToe;
 
@@ -7054,111 +2361,134 @@ function handleTttCell(index) {
     game.gameOver ||
     game.turn !== "X" ||
     game.board[index]
-  ) {
-    return;
-  }
+  ) return;
 
-
-  game.board[index] =
-    "X";
-
+  game.board[index] = "X";
 
   let winner =
     tttWinner(game.board);
 
-
   if (winner) {
-
     game.gameOver = true;
 
     game.status =
       winner === "draw"
         ? "Draw"
-        : "You win";
+        : "You win!";
 
     renderTicTacToe();
-
     return;
-
   }
 
-
-  game.turn =
-    "O";
-
+  game.turn = "O";
   game.status =
     "GALAXY is thinking…";
 
   renderTicTacToe();
 
+  setTimeout(() => {
+    galaxyTttMove();
+  }, 350);
+}
 
-  setTimeout(
-    () => {
+function galaxyTttMove() {
+  const game =
+    GameCenter.ticTacToe;
 
-      const empty =
-        game.board
-          .map(
-            (value, index) =>
-              value
-                ? null
-                : index
-          )
-          .filter(
-            value =>
-              value !== null
-          );
+  if (
+    !game ||
+    game.gameOver
+  ) return;
 
+  const empty =
+    game.board
+      .map((value, index) =>
+        value ? null : index
+      )
+      .filter(
+        value => value !== null
+      );
 
-      if (!empty.length) {
-        return;
+  /* try winning move */
+
+  let choice = null;
+
+  for (const index of empty) {
+    const test =
+      [...game.board];
+
+    test[index] = "O";
+
+    if (
+      tttWinner(test) === "O"
+    ) {
+      choice = index;
+      break;
+    }
+  }
+
+  /* block player */
+
+  if (choice === null) {
+    for (const index of empty) {
+      const test =
+        [...game.board];
+
+      test[index] = "X";
+
+      if (
+        tttWinner(test) === "X"
+      ) {
+        choice = index;
+        break;
       }
+    }
+  }
 
+  /* center */
 
-      const choice =
-        empty[
-          Math.floor(
-            Math.random() *
-            empty.length
-          )
-        ];
+  if (
+    choice === null &&
+    !game.board[4]
+  ) {
+    choice = 4;
+  }
 
+  /* random */
 
-      game.board[choice] =
-        "O";
+  if (choice === null) {
+    choice =
+      empty[
+        Math.floor(
+          Math.random() *
+          empty.length
+        )
+      ];
+  }
 
+  if (choice === undefined)
+    return;
 
-      winner =
-        tttWinner(
-          game.board
-        );
+  game.board[choice] = "O";
 
+  const winner =
+    tttWinner(game.board);
 
-      if (winner) {
+  if (winner) {
+    game.gameOver = true;
 
-        game.gameOver = true;
+    game.status =
+      winner === "draw"
+        ? "Draw"
+        : "GALAXY wins";
+  }
 
-        game.status =
-          winner === "draw"
-            ? "Draw"
-            : "GALAXY wins";
+  else {
+    game.turn = "X";
+    game.status = "Your turn";
+  }
 
-      } else {
-
-        game.turn =
-          "X";
-
-        game.status =
-          "Your turn";
-
-      }
-
-
-      renderTicTacToe();
-
-    },
-    350
-  );
-
+  renderTicTacToe();
 }
 
 
@@ -7167,212 +2497,116 @@ function handleTttCell(index) {
    ========================================================= */
 
 function resetConnectFour() {
-
   GameCenter.connectFour = {
-
     board:
       Array.from(
         { length: 6 },
-        () =>
-          Array(7).fill("")
+        () => Array(7).fill("")
       ),
 
-    turn:
-      "R",
-
-    status:
-      "Your turn",
-
-    gameOver:
-      false
-
+    turn: "R",
+    status: "Your turn",
+    gameOver: false
   };
-
 }
 
+function connectWinner(board, player) {
+  const directions = [
+    [0,1],
+    [1,0],
+    [1,1],
+    [1,-1]
+  ];
 
-function inBoardConnect(
-  r,
-  c
-) {
+  for (let r = 0; r < 6; r++) {
+    for (let c = 0; c < 7; c++) {
 
+      if (
+        board[r][c] !== player
+      ) continue;
+
+      for (
+        const [dr,dc] of directions
+      ) {
+        let count = 1;
+
+        for (
+          let step = 1;
+          step < 4;
+          step++
+        ) {
+          const nr =
+            r + dr * step;
+
+          const nc =
+            c + dc * step;
+
+          if (
+            !insideConnect(nr,nc) ||
+            board[nr][nc] !== player
+          ) break;
+
+          count++;
+        }
+
+        if (count >= 4)
+          return true;
+      }
+    }
+  }
+
+  return false;
+}
+
+function insideConnect(r,c) {
   return (
     r >= 0 &&
     r < 6 &&
     c >= 0 &&
     c < 7
   );
-
 }
 
-
-function connectWinner(board) {
-
-  for (
-    let r = 0;
-    r < 6;
-    r++
-  ) {
-
-    for (
-      let c = 0;
-      c < 7;
-      c++
-    ) {
-
-      const piece =
-        board[r][c];
-
-      if (!piece) {
-        continue;
-      }
-
-
-      for (
-        const [
-          dr,
-          dc
-        ]
-        of [
-          [0, 1],
-          [1, 0],
-          [1, 1],
-          [1, -1]
-        ]
-      ) {
-
-        let ok = true;
-
-
-        for (
-          let k = 1;
-          k < 4;
-          k++
-        ) {
-
-          const nr =
-            r +
-            dr * k;
-
-          const nc =
-            c +
-            dc * k;
-
-
-          if (
-            !inBoardConnect(
-              nr,
-              nc
-            ) ||
-            board[nr][nc] !==
-            piece
-          ) {
-
-            ok = false;
-
-            break;
-
-          }
-
-        }
-
-
-        if (ok) {
-          return piece;
-        }
-
-      }
-
-    }
-
-  }
-
-  return null;
-
-}
-
-
-function dropConnect(
+function connectDropRow(
   board,
-  column,
-  piece
+  column
 ) {
-
-  for (
-    let r = 5;
-    r >= 0;
-    r--
-  ) {
-
-    if (
-      !board[r][column]
-    ) {
-
-      board[r][column] =
-        piece;
-
+  for (let r = 5; r >= 0; r--) {
+    if (!board[r][column])
       return r;
-
-    }
-
   }
 
   return -1;
-
 }
 
-
 function renderConnectFour() {
-
   GameCenter.activeGame =
     "connect4";
 
-  if (!GameCenter.connectFour) {
+  if (!GameCenter.connectFour)
     resetConnectFour();
-  }
-
-
-  renderContentHeader(
-    "Games",
-    "Connect Four"
-  );
-
-
-  const tabs =
-    $("#contentTabs");
-
-  if (tabs) {
-    tabs.innerHTML = "";
-  }
-
 
   const game =
     GameCenter.connectFour;
 
+  $("#contentBody").innerHTML = `
+    ${workspaceHeader(
+      "GALAXY GAMING",
+      "Connect Four"
+    )}
 
-  const root =
-    $("#contentBody");
+    <section class="game-shell">
 
-  if (!root) {
-    return;
-  }
-
-
-  root.innerHTML = `
-    <section
-      class="game-shell connect-shell"
-    >
-
-      <div class="game-topline">
+      <div class="game-head">
 
         ${gameBackButton()}
 
-        <div class="game-status">
+        <strong>
           ${escapeHTML(game.status)}
-        </div>
+        </strong>
 
         <button
-          class="text-action"
+          class="ghost-btn"
           data-connect-reset
         >
           ↻ New game
@@ -7380,91 +2614,40 @@ function renderConnectFour() {
 
       </div>
 
+      <div class="board-wrap">
 
-      <div class="connect-columns">
+        <div class="connect-board">
 
-        ${Array.from(
-          { length: 7 },
-          (_, column) => `
-            <button
-              data-connect-column="${column}"
-              aria-label="Drop in column ${column + 1}"
-            >
-              ↓
-            </button>
-          `
-        ).join("")}
-
-      </div>
-
-
-      <div class="connect-board">
-
-        ${game.board
-          .map(
+          ${game.board.map(
             row =>
-              row
-                .map(
-                  cell => `
-                    <div class="connect-cell">
+              row.map(
+                (value, column) => `
+                  <button
+                    class="
+                      connect-cell
+                      ${
+                        value === "R"
+                          ? "red"
+                          : value === "Y"
+                            ? "yellow"
+                            : ""
+                      }
+                    "
+                    data-connect-column="${column}"
+                  ></button>
+                `
+              ).join("")
+          ).join("")}
 
-                      <span
-                        class="
-                          connect-disc
-                          ${
-                            cell === "R"
-                              ? "player"
-                              : cell === "Y"
-                                ? "galaxy"
-                                : ""
-                          }
-                        "
-                      ></span>
-
-                    </div>
-                  `
-                )
-                .join("")
-          )
-          .join("")}
-
-      </div>
-
-
-      <div class="connect-legend">
-
-        <span>
-
-          <i
-            class="legend-disc player"
-          ></i>
-
-          You
-
-        </span>
-
-        <span>
-
-          <i
-            class="legend-disc galaxy"
-          ></i>
-
-          GALAXY
-
-        </span>
+        </div>
 
       </div>
 
     </section>
   `;
-
 }
 
-
-function handleConnectColumn(
-  column
-) {
-
+function handleConnect(column) {
   const game =
     GameCenter.connectFour;
 
@@ -7472,138 +2655,177 @@ function handleConnectColumn(
     !game ||
     game.gameOver ||
     game.turn !== "R"
-  ) {
-    return;
-  }
+  ) return;
 
-
-  if (
-    dropConnect(
+  const row =
+    connectDropRow(
       game.board,
-      column,
-      "R"
-    ) <
-    0
-  ) {
-    return;
-  }
-
-
-  let winner =
-    connectWinner(
-      game.board
+      column
     );
 
+  if (row < 0) return;
 
-  if (winner) {
+  game.board[row][column] = "R";
 
-    game.gameOver =
-      true;
-
-    game.status =
-      "You win";
+  if (
+    connectWinner(
+      game.board,
+      "R"
+    )
+  ) {
+    game.gameOver = true;
+    game.status = "You win!";
 
     renderConnectFour();
-
     return;
-
   }
 
+  if (
+    game.board.every(
+      row => row.every(Boolean)
+    )
+  ) {
+    game.gameOver = true;
+    game.status = "Draw";
 
-  game.turn =
-    "Y";
+    renderConnectFour();
+    return;
+  }
 
+  game.turn = "Y";
   game.status =
     "GALAXY is thinking…";
 
   renderConnectFour();
 
-
   setTimeout(
-    () => {
+    galaxyConnectMove,
+    350
+  );
+}
 
-      const openColumns = [];
+function galaxyConnectMove() {
+  const game =
+    GameCenter.connectFour;
 
+  if (
+    !game ||
+    game.gameOver
+  ) return;
 
-      for (
-        let c = 0;
-        c < 7;
-        c++
-      ) {
+  const valid = [];
 
-        if (
-          !game.board[0][c]
-        ) {
-
-          openColumns.push(c);
-
-        }
-
-      }
-
-
-      if (!openColumns.length) {
-
-        game.gameOver =
-          true;
-
-        game.status =
-          "Draw";
-
-        renderConnectFour();
-
-        return;
-
-      }
-
-
-      const chosenColumn =
-        openColumns[
-          Math.floor(
-            Math.random() *
-            openColumns.length
-          )
-        ];
-
-
-      dropConnect(
+  for (let c = 0; c < 7; c++) {
+    if (
+      connectDropRow(
         game.board,
-        chosenColumn,
+        c
+      ) >= 0
+    ) {
+      valid.push(c);
+    }
+  }
+
+  if (!valid.length)
+    return;
+
+  let column = null;
+
+  /* GALAXY tries to win */
+
+  for (const c of valid) {
+    const row =
+      connectDropRow(
+        game.board,
+        c
+      );
+
+    game.board[row][c] = "Y";
+
+    const wins =
+      connectWinner(
+        game.board,
         "Y"
       );
 
+    game.board[row][c] = "";
 
-      winner =
-        connectWinner(
-          game.board
+    if (wins) {
+      column = c;
+      break;
+    }
+  }
+
+  /* block player */
+
+  if (column === null) {
+    for (const c of valid) {
+      const row =
+        connectDropRow(
+          game.board,
+          c
         );
 
+      game.board[row][c] = "R";
 
-      if (winner) {
+      const wins =
+        connectWinner(
+          game.board,
+          "R"
+        );
 
-        game.gameOver =
-          true;
+      game.board[row][c] = "";
 
-        game.status =
-          "GALAXY wins";
-
-      } else {
-
-        game.turn =
-          "R";
-
-        game.status =
-          "Your turn";
-
+      if (wins) {
+        column = c;
+        break;
       }
+    }
+  }
 
+  /* prefer center */
 
-      renderConnectFour();
+  if (
+    column === null &&
+    valid.includes(3)
+  ) {
+    column = 3;
+  }
 
-    },
-    350
-  );
+  if (column === null) {
+    column =
+      valid[
+        Math.floor(
+          Math.random() *
+          valid.length
+        )
+      ];
+  }
 
+  const row =
+    connectDropRow(
+      game.board,
+      column
+    );
+
+  game.board[row][column] = "Y";
+
+  if (
+    connectWinner(
+      game.board,
+      "Y"
+    )
+  ) {
+    game.gameOver = true;
+    game.status = "GALAXY wins";
+  }
+
+  else {
+    game.turn = "R";
+    game.status = "Your turn";
+  }
+
+  renderConnectFour();
 }
 
 
@@ -7611,117 +2833,95 @@ function handleConnectColumn(
    MEMORY
    ========================================================= */
 
-function resetMemory() {
+const MEMORY_SYMBOLS = [
+  "✦",
+  "♞",
+  "◈",
+  "◇",
+  "◎",
+  "▣",
+  "☄",
+  "★"
+];
 
-  const values = [
-    "♛",
-    "♞",
-    "✦",
-    "◫",
-    "⌘",
-    "♜",
-    "◇",
-    "◉"
-  ];
+function shuffle(array) {
+  const result = [...array];
 
+  for (
+    let i = result.length - 1;
+    i > 0;
+    i--
+  ) {
+    const j =
+      Math.floor(
+        Math.random() *
+        (i + 1)
+      );
 
-  const cards = [
-    ...values,
-    ...values
-  ]
-    .map(
-      (value, index) => ({
-        id: index,
-        value,
-        revealed: false,
-        matched: false
-      })
-    )
-    .sort(
-      () =>
-        Math.random() -
-        0.5
-    );
+    [
+      result[i],
+      result[j]
+    ] = [
+      result[j],
+      result[i]
+    ];
+  }
 
-
-  GameCenter.memory = {
-
-    cards,
-
-    first:
-      null,
-
-    locked:
-      false,
-
-    moves:
-      0,
-
-    matches:
-      0,
-
-    status:
-      "Find all matching pairs"
-
-  };
-
+  return result;
 }
 
+function resetMemory() {
+  const cards =
+    shuffle([
+      ...MEMORY_SYMBOLS,
+      ...MEMORY_SYMBOLS
+    ]).map(
+      (symbol, index) => ({
+        id: index,
+        symbol,
+        flipped: false,
+        matched: false
+      })
+    );
+
+  GameCenter.memory = {
+    cards,
+    selected: [],
+    moves: 0,
+    locked: false,
+    status: "Find all matching pairs"
+  };
+}
 
 function renderMemory() {
-
   GameCenter.activeGame =
     "memory";
 
-  if (!GameCenter.memory) {
+  if (!GameCenter.memory)
     resetMemory();
-  }
-
-
-  renderContentHeader(
-    "Games",
-    "Memory"
-  );
-
-
-  const tabs =
-    $("#contentTabs");
-
-  if (tabs) {
-    tabs.innerHTML = "";
-  }
-
 
   const game =
     GameCenter.memory;
 
+  $("#contentBody").innerHTML = `
+    ${workspaceHeader(
+      "GALAXY GAMING",
+      "Memory"
+    )}
 
-  const root =
-    $("#contentBody");
+    <section class="game-shell">
 
-  if (!root) {
-    return;
-  }
-
-
-  root.innerHTML = `
-    <section
-      class="game-shell memory-shell"
-    >
-
-      <div class="game-topline">
+      <div class="game-head">
 
         ${gameBackButton()}
 
-        <div class="game-status">
+        <strong>
           ${escapeHTML(game.status)}
-          ·
-          ${game.moves}
-          moves
-        </div>
+          · Moves ${game.moves}
+        </strong>
 
         <button
-          class="text-action"
+          class="ghost-btn"
           data-memory-reset
         >
           ↻ New game
@@ -7729,1125 +2929,195 @@ function renderMemory() {
 
       </div>
 
+      <div class="board-wrap">
 
-      <div class="memory-board">
+        <div class="memory-board">
 
-        ${game.cards
-          .map(
-            (card, index) => `
-              <button
-                class="
-                  memory-card
-                  ${
-                    card.revealed ||
-                    card.matched
-                      ? "revealed"
-                      : ""
-                  }
-                  ${
-                    card.matched
-                      ? "matched"
-                      : ""
-                  }
-                "
-                data-memory-card="${index}"
-              >
+          ${game.cards.map(card => `
+            <button
+              class="
+                memory-card
+                ${
+                  card.flipped
+                    ? "flipped"
+                    : ""
+                }
+                ${
+                  card.matched
+                    ? "matched"
+                    : ""
+                }
+              "
+              data-memory-card="${card.id}"
+            >
+              ${
+                card.flipped ||
+                card.matched
+                  ? card.symbol
+                  : "?"
+              }
+            </button>
+          `).join("")}
 
-                <span class="memory-card-back">
-                  ✦
-                </span>
-
-                <span class="memory-card-front">
-                  ${escapeHTML(card.value)}
-                </span>
-
-              </button>
-            `
-          )
-          .join("")}
+        </div>
 
       </div>
 
     </section>
   `;
-
 }
 
-
-function handleMemoryCard(index) {
-
+function handleMemory(index) {
   const game =
     GameCenter.memory;
 
   if (
     !game ||
     game.locked
-  ) {
-    return;
-  }
-
+  ) return;
 
   const card =
     game.cards[index];
 
-
   if (
     !card ||
-    card.revealed ||
+    card.flipped ||
     card.matched
-  ) {
-    return;
-  }
+  ) return;
 
+  card.flipped = true;
 
-  card.revealed =
-    true;
-
-
-  if (
-    game.first ===
-    null
-  ) {
-
-    game.first =
-      index;
-
-    renderMemory();
-
-    return;
-
-  }
-
-
-  game.moves++;
-
-
-  const first =
-    game.cards[
-      game.first
-    ];
-
-
-  if (
-    first.value ===
-    card.value
-  ) {
-
-    first.matched =
-      true;
-
-    card.matched =
-      true;
-
-    game.matches++;
-
-    game.first =
-      null;
-
-
-    game.status =
-      game.matches === 8
-        ? "Perfect — all pairs matched!"
-        : "Match found";
-
-
-    renderMemory();
-
-    return;
-
-  }
-
-
-  const previous =
-    game.first;
-
-
-  game.first =
-    null;
-
-  game.locked =
-    true;
-
-  game.status =
-    "Try again";
-
+  game.selected.push(index);
 
   renderMemory();
 
+  if (
+    game.selected.length < 2
+  ) return;
 
-  setTimeout(
-    () => {
+  game.moves++;
 
-      game.cards[
-        previous
-      ].revealed =
-        false;
+  const [
+    firstIndex,
+    secondIndex
+  ] = game.selected;
 
+  const first =
+    game.cards[firstIndex];
 
-      game.cards[
-        index
-      ].revealed =
-        false;
-
-
-      game.locked =
-        false;
-
-
-      game.status =
-        "Find all matching pairs";
-
-
-      renderMemory();
-
-    },
-    650
-  );
-
-}
-
-
-function openGame(name) {
+  const second =
+    game.cards[secondIndex];
 
   if (
-    name === "chess"
+    first.symbol ===
+    second.symbol
   ) {
+    first.matched = true;
+    second.matched = true;
 
-    renderChess();
+    game.selected = [];
 
-  } else if (
-    name === "tictactoe"
-  ) {
-
-    renderTicTacToe();
-
-  } else if (
-    name === "connect4"
-  ) {
-
-    renderConnectFour();
-
-  } else if (
-    name === "memory"
-  ) {
+    if (
+      game.cards.every(
+        card => card.matched
+      )
+    ) {
+      game.status =
+        `You won in ${game.moves} moves!`;
+    }
 
     renderMemory();
-
   }
 
+  else {
+    game.locked = true;
+
+    setTimeout(() => {
+      first.flipped = false;
+      second.flipped = false;
+
+      game.selected = [];
+      game.locked = false;
+
+      renderMemory();
+    }, 650);
+  }
 }
 
 
 /* =========================================================
-   TOOLS
+   FILE UPLOAD
    ========================================================= */
 
-function renderTools() {
+function openFilePicker(target = "assets") {
+  const input =
+    $("#fileInput");
 
-  renderContentHeader(
-    "Power",
-    "Tools"
-  );
+  if (!input) return;
 
-  renderContentTabs(
-    [
-      ["all", "All"],
-      ["developer", "Developer"],
-      ["creative", "Creative"],
-      ["utilities", "Utilities"]
-    ],
-    "all",
-    "tools"
-  );
+  input.dataset.target = target;
 
-  const root =
-    $("#contentBody");
-
-  if (!root) {
-    return;
-  }
-
-  const tools = [
-
-    [
-      "⌘",
-      "Command Palette",
-      "command"
-    ],
-
-    [
-      "✦",
-      "Prompt Templates",
-      "prompt-templates"
-    ],
-
-    [
-      "{}",
-      "JSON Viewer",
-      "json-viewer"
-    ],
-
-    [
-      "⇄",
-      "Diff Viewer",
-      "diff-viewer"
-    ],
-
-    [
-      "▦",
-      "Scratchpad",
-      "scratchpad"
-    ],
-
-    [
-      "◌",
-      "Focus Mode",
-      "focus"
-    ]
-
-  ];
-
-  root.innerHTML = `
-    <div class="resource-grid">
-
-      ${tools
-        .map(
-          ([icon, name, action]) => `
-          <button
-            class="resource-card"
-            data-tool-action="${action}"
-          >
-
-            <div class="resource-icon">
-              ${icon}
-            </div>
-
-            <div class="resource-copy">
-
-              <strong>
-                ${escapeHTML(name)}
-              </strong>
-
-              <span>
-                Open tool
-              </span>
-
-            </div>
-
-            <span class="resource-arrow">
-              ›
-            </span>
-
-          </button>
-        `
-        )
-        .join("")}
-
-    </div>
-  `;
-
+  input.click();
 }
 
+function handleFiles(files) {
+  const input =
+    $("#fileInput");
 
-/* =========================================================
-   VIEW ROUTER
-   ========================================================= */
+  const target =
+    input?.dataset.target ||
+    "assets";
 
-function openWorkspaceView(view) {
+  [...files].forEach(file => {
 
-  Galaxy.state.view =
-    view;
+    const asset = {
+      id: uid("asset"),
+      name: file.name,
+      type: file.type,
+      size: file.size,
+      createdAt: Date.now()
+    };
 
-  $("#chatView")
-    ?.classList.remove(
-      "active-view"
-    );
+    Galaxy.state.assets.unshift(asset);
 
-  $("#workView")
-    ?.classList.remove(
-      "active-view"
-    );
-
-  $("#contentView")
-    ?.classList.add(
-      "active-view"
-    );
-
-  $$(".nav-row, .menu-row")
-    .forEach(
-      item =>
-        item.classList.toggle(
-          "active",
-          item.dataset.view ===
-            view
-        )
-    );
-
-  const routes = {
-
-    projects:
-      renderProjects,
-
-    library:
-      renderLibrary,
-
-    scheduled:
-      renderScheduled,
-
-    plugins:
-      renderPlugins,
-
-    packs:
-      renderPacks,
-
-    images:
-      renderImages,
-
-    sites:
-      renderSites,
-
-    gpts:
-      renderAgents,
-
-    games:
-      renderGames,
-
-    tools:
-      renderTools
-
-  };
-
-  routes[view]?.();
-
-}
-
-
-/* =========================================================
-   SEARCH
-   ========================================================= */
-
-function searchEverything(query) {
-
-  const q =
-    query
-      .trim()
-      .toLowerCase();
-
-  if (!q) {
-    return [];
-  }
-
-  const results = [];
-
-
-  Galaxy.state.chats.forEach(
-    chat => {
-
-      if (
-        chat.title
-          .toLowerCase()
-          .includes(q) ||
-
-        chat.messages
-          .some(
-            message =>
-              String(
-                message.text
-              )
-                .toLowerCase()
-                .includes(q)
-          )
-      ) {
-
-        results.push({
-
-          type:
-            "chat",
-
-          id:
-            chat.id,
-
-          title:
-            chat.title,
-
-          icon:
-            "◌"
-
-        });
-
-      }
-
+    if (target === "studio") {
+      Galaxy.state.studioReferences.push(asset);
     }
-  );
-
-
-  Galaxy.state.projects
-    .forEach(
-      project => {
-
-        if (
-          project.name
-            .toLowerCase()
-            .includes(q)
-        ) {
-
-          results.push({
-
-            type:
-              "project",
-
-            id:
-              project.id,
-
-            title:
-              project.name,
-
-            icon:
-              "▱"
-
-          });
-
-        }
-
-      }
-    );
-
-
-  Galaxy.state.packs
-    .forEach(
-      pack => {
-
-        if (
-          pack.name
-            .toLowerCase()
-            .includes(q) ||
-
-          pack.items.some(
-            item =>
-              item
-                .toLowerCase()
-                .includes(q)
-          )
-        ) {
-
-          results.push({
-
-            type:
-              "pack",
-
-            id:
-              pack.id,
-
-            title:
-              pack.name,
-
-            icon:
-              pack.icon
-
-          });
-
-        }
-
-      }
-    );
-
-
-  Galaxy.state.library
-    .forEach(
-      item => {
-
-        if (
-          item.name
-            .toLowerCase()
-            .includes(q)
-        ) {
-
-          results.push({
-
-            type:
-              "library",
-
-            id:
-              item.id,
-
-            title:
-              item.name,
-
-            icon:
-              item.type ===
-              "image"
-                ? "◫"
-                : item.type ===
-                  "video"
-                  ? "▷"
-                  : "▱"
-
-          });
-
-        }
-
-      }
-    );
-
-
-  Galaxy.state.agents
-    .forEach(
-      agent => {
-
-        if (
-          agent.name
-            .toLowerCase()
-            .includes(q)
-        ) {
-
-          results.push({
-
-            type:
-              "agent",
-
-            id:
-              agent.id,
-
-            title:
-              agent.name,
-
-            icon:
-              "✧"
-
-          });
-
-        }
-
-      }
-    );
-
-
-  return results.slice(
-    0,
-    80
-  );
-
-}
-
-
-/* =========================================================
-   COMMAND PALETTE
-   ========================================================= */
-
-const COMMANDS = [
-
-  {
-    name:
-      "New chat",
-
-    shortcut:
-      "Ctrl N",
-
-    run:
-      newChat
-  },
-
-  {
-    name:
-      "Search",
-
-    shortcut:
-      "Ctrl K",
-
-    run:
-      openSearch
-  },
-
-  {
-    name:
-      "Projects",
-
-    run:
-      () =>
-        openWorkspaceView(
-          "projects"
-        )
-  },
-
-  {
-    name:
-      "Library",
-
-    run:
-      () =>
-        openWorkspaceView(
-          "library"
-        )
-  },
-
-  {
-    name:
-      "Packs",
-
-    run:
-      () =>
-        openWorkspaceView(
-          "packs"
-        )
-  },
-
-  {
-    name:
-      "Gaming Center",
-
-    run:
-      () =>
-        openWorkspaceView(
-          "games"
-        )
-  },
-
-  {
-    name:
-      "Scheduled",
-
-    run:
-      () =>
-        openWorkspaceView(
-          "scheduled"
-        )
-  },
-
-  {
-    name:
-      "Plugins",
-
-    run:
-      () =>
-        openWorkspaceView(
-          "plugins"
-        )
-  },
-
-  {
-    name:
-      "Images",
-
-    run:
-      () =>
-        openWorkspaceView(
-          "images"
-        )
-  },
-
-  {
-    name:
-      "Sites",
-
-    run:
-      () =>
-        openWorkspaceView(
-          "sites"
-        )
-  },
-
-  {
-    name:
-      "GPTs",
-
-    run:
-      () =>
-        openWorkspaceView(
-          "gpts"
-        )
-  },
-
-  {
-    name:
-      "Prompt templates",
-
-    run:
-      openPromptTemplates
-  },
-
-  {
-    name:
-      "Chat mode",
-
-    shortcut:
-      "Alt 1",
-
-    run:
-      () =>
-        switchMode(
-          "chat"
-        )
-  },
-
-  {
-    name:
-      "Work mode",
-
-    shortcut:
-      "Alt 2",
-
-    run:
-      () =>
-        switchMode(
-          "work"
-        )
-  },
-
-  {
-    name:
-      "Focus mode",
-
-    shortcut:
-      "Ctrl .",
-
-    run:
-      toggleFocusMode
-  },
-
-  {
-    name:
-      "Toggle theme",
-
-    shortcut:
-      "Ctrl /",
-
-    run:
-      toggleTheme
-  },
-
-  {
-    name:
-      "Settings",
-
-    run:
-      openSettings
+  });
+
+  saveState();
+
+  if (target === "studio") {
+    const zone =
+      $("#referenceZone");
+
+    if (zone) {
+      zone.innerHTML = `
+        <b>
+          ${Galaxy.state.studioReferences.length}
+          reference(s) added
+        </b>
+        <span>
+          Click to add more
+        </span>
+      `;
+    }
+
+    toast("Reference added.");
   }
 
-];
+  else {
+    toast("File added to Library.");
 
-
-function openCommandPalette(
-  mode = "command"
-) {
-
-  const root =
-    $("#overlayRoot");
-
-  if (!root) {
-    return;
+    if (
+      Galaxy.state.view === "assets"
+    ) {
+      renderAssets();
+    }
   }
 
-  root.innerHTML = `
-    <div class="overlay">
-
-      <section
-        class="command-palette"
-        role="dialog"
-        aria-modal="true"
-      >
-
-        <input
-          id="commandInput"
-          class="command-input"
-          placeholder="${
-            mode ===
-            "search"
-              ? "Search chats, projects, Packs, files..."
-              : "Type a command..."
-          }"
-          autocomplete="off"
-          data-command-mode="${mode}"
-        >
-
-        <div
-          id="commandList"
-          class="command-list"
-        ></div>
-
-      </section>
-
-    </div>
-  `;
-
-  renderCommandResults(
-    "",
-    mode
-  );
-
-  setTimeout(
-    () =>
-      $("#commandInput")
-        ?.focus(),
-    0
-  );
-
-}
-
-
-function openSearch() {
-
-  openCommandPalette(
-    "search"
-  );
-
-}
-
-
-function renderCommandResults(
-  query,
-  mode
-) {
-
-  const root =
-    $("#commandList");
-
-  if (!root) {
-    return;
-  }
-
-
-  if (
-    mode === "search"
-  ) {
-
-    const results =
-      searchEverything(
-        query
-      );
-
-
-    root.innerHTML =
-      query
-
-        ? results.length
-
-          ? results
-              .map(
-                item => `
-                <button
-                  class="command-row"
-                  data-search-result="${item.type}"
-                  data-search-id="${item.id}"
-                >
-
-                  <span class="command-icon">
-                    ${item.icon}
-                  </span>
-
-                  <span>
-                    ${escapeHTML(item.title)}
-                  </span>
-
-                  <small>
-                    ${escapeHTML(item.type)}
-                  </small>
-
-                </button>
-              `
-              )
-              .join("")
-
-          : `
-            <div class="empty-panel">
-              No results.
-            </div>
-          `
-
-        : `
-          <div class="command-hint">
-            Start typing to search GALAXY AI.
-          </div>
-        `;
-
-    return;
-
-  }
-
-
-  const q =
-    query.toLowerCase();
-
-
-  root.innerHTML =
-    COMMANDS
-
-      .filter(
-        item =>
-          item.name
-            .toLowerCase()
-            .includes(q)
-      )
-
-      .map(
-        item => `
-          <button
-            class="command-row"
-            data-command-name="${escapeHTML(item.name)}"
-          >
-
-            <span>
-              ${escapeHTML(item.name)}
-            </span>
-
-            ${
-              item.shortcut
-
-                ? `
-                  <kbd>
-                    ${escapeHTML(item.shortcut)}
-                  </kbd>
-                `
-
-                : ""
-            }
-
-          </button>
-        `
-      )
-
-      .join("");
-
-}
-
-
-function openSearchResult(
-  type,
-  id
-) {
-
-  closeOverlay();
-
-
-  if (
-    type === "chat"
-  ) {
-
-    Galaxy.state.currentChatId =
-      id;
-
-    persistAll();
-
-    switchMode(
-      "chat"
-    );
-
-    renderChat();
-
-    renderRecentChats();
-
-    return;
-
-  }
-
-
-  if (
-    type === "project"
-  ) {
-
-    openWorkspaceView(
-      "projects"
-    );
-
-    return;
-
-  }
-
-
-  if (
-    type === "pack"
-  ) {
-
-    openWorkspaceView(
-      "packs"
-    );
-
-    setTimeout(
-      () =>
-        openPack(id),
-      0
-    );
-
-    return;
-
-  }
-
-
-  if (
-    type === "library"
-  ) {
-
-    openWorkspaceView(
-      "library"
-    );
-
-    setTimeout(
-      () =>
-        previewLibraryItem(id),
-      0
-    );
-
-    return;
-
-  }
-
-
-  if (
-    type === "agent"
-  ) {
-
-    openWorkspaceView(
-      "gpts"
-    );
-
-  }
-
-}
-
-
-/* =========================================================
-   WEB SEARCH STATE
-   ========================================================= */
-
-function toggleWebSearch() {
-
-  Galaxy.state.webSearchState =
-    Galaxy.state.webSearchState ===
-    "off"
-      ? "ready"
-      : "off";
-
-  persistAll();
-
-  renderWebSearchState();
-
-  toast(
-    Galaxy.state.webSearchState ===
-    "ready"
-      ? "Web search enabled"
-      : "Web search disabled"
-  );
-
-}
-
-
-function renderWebSearchState() {
-
-  const button =
-    $('[data-action="web-search"]');
-
-  if (!button) {
-    return;
-  }
-
-  button.classList.toggle(
-    "active",
-    Galaxy.state.webSearchState ===
-      "ready"
-  );
-
-  button.dataset.state =
-    Galaxy.state.webSearchState;
-
+  if (input)
+    input.value = "";
 }
 
 
@@ -8855,34 +3125,14 @@ function renderWebSearchState() {
    VOICE
    ========================================================= */
 
-function toggleVoiceRecording() {
-
-  if (
-    Galaxy.state.voiceState ===
-    "recording"
-  ) {
-
-    stopVoiceRecording();
-
-  } else {
-
-    startVoiceRecording();
-
-  }
-
-}
-
-
-function startVoiceRecording() {
-
+function startVoice() {
   const Recognition =
     window.SpeechRecognition ||
     window.webkitSpeechRecognition;
 
   if (!Recognition) {
-
     toast(
-      "Voice recognition is not supported."
+      "Voice recognition is not supported by this browser."
     );
 
     return;
@@ -8891,2792 +3141,820 @@ function startVoiceRecording() {
   const recognition =
     new Recognition();
 
-  recognition.lang =
-    Galaxy.state.settings
-      .voiceLanguage;
+  recognition.lang = "en-US";
 
-  recognition.continuous =
-    true;
+  recognition.interimResults = false;
 
-  recognition.interimResults =
-    true;
+  recognition.onstart = () =>
+    toast("Listening…");
 
-  Galaxy.state.voiceRecognition =
-    recognition;
-
-  Galaxy.state.voiceState =
-    "recording";
-
-  renderVoiceState();
-
-
-  recognition.onresult =
-    event => {
-
-      let transcript = "";
-
-
-      for (
-        let i =
-          event.resultIndex;
-
-        i <
-        event.results.length;
-
-        i++
-      ) {
-
-        transcript +=
-          event.results[
-            i
-          ][0].transcript;
-
-      }
-
-
-      const input =
-        $("#promptInput");
-
-
-      if (input) {
-
-        input.value =
-          transcript;
-
-        autoResizeTextarea(input);
-
-      }
-
-    };
-
-
-  recognition.onerror =
-    event => {
-
-      Galaxy.state.voiceState =
-        "error";
-
-      renderVoiceState();
-
-      toast(
-        `Voice error: ${event.error}`,
-        "error"
-      );
-
-    };
-
-
-  recognition.onend =
-    () => {
-
-      Galaxy.state.voiceState =
-        "idle";
-
-      renderVoiceState();
-
-    };
-
-
-  recognition.start();
-
-}
-
-
-function stopVoiceRecording() {
-
-  Galaxy.state
-    .voiceRecognition
-    ?.stop();
-
-  Galaxy.state.voiceRecognition =
-    null;
-
-  Galaxy.state.voiceState =
-    "idle";
-
-  renderVoiceState();
-
-}
-
-
-function renderVoiceState() {
-
-  const button =
-    $('[data-action="voice"]');
-
-  if (!button) {
-    return;
-  }
-
-  button.classList.toggle(
-    "recording",
-    Galaxy.state.voiceState ===
-      "recording"
-  );
-
-}
-
-
-/* =========================================================
-   TOOL ACTIVITY
-   ========================================================= */
-
-function showToolActivity(text) {
-
-  const root =
-    $("#toolActivity");
-
-  if (!root) {
-    return;
-  }
-
-  root.hidden = false;
-
-  const label =
-    $("#toolActivityText");
-
-  if (label) {
-    label.textContent =
-      text;
-  }
-
-}
-
-
-function hideToolActivity() {
-
-  const root =
-    $("#toolActivity");
-
-  if (root) {
-    root.hidden = true;
-  }
-
-}
-
-
-/* =========================================================
-   SEND / STOP STATE
-   ========================================================= */
-
-function updateSendButtonState() {
-
-  const button =
-    $("#sendButton");
-
-  if (!button) {
-    return;
-  }
-
-  button.classList.toggle(
-    "is-stop",
-    Galaxy.state.generation
-      .active
-  );
-
-  button.textContent =
-    Galaxy.state.generation.active
-      ? "■"
-      : "↑";
-
-  button.setAttribute(
-    "aria-label",
-    Galaxy.state.generation.active
-      ? "Stop"
-      : "Send"
-  );
-
-}
-
-
-function stopGeneration() {
-
-  Galaxy.state.generation.stopped =
-    true;
-
-  Galaxy.state.generation
-    .controller
-    ?.abort();
-
-  Galaxy.state.generation.active =
-    false;
-
-  updateSendButtonState();
-
-  hideToolActivity();
-
-}
-
-
-/* =========================================================
-   REAL AI BACKEND
-   ========================================================= */
-
-async function fetchAIResponse(
-  prompt,
-  extra = {}
-) {
-
-  const provider =
-    $("#aiProvider")?.value ||
-    "openai";
-
-
-  const endpoint =
-    provider === "gemini"
-      ? "/api/gemini"
-      : "/api/chat";
-
-
-  const response =
-    await fetch(
-      endpoint,
-      {
-
-        method:
-          "POST",
-
-        headers: {
-
-          "Content-Type":
-            "application/json"
-
-        },
-
-        body:
-          JSON.stringify({
-
-            message:
-              prompt,
-
-            provider,
-
-            webSearch:
-              Galaxy.state.webSearchState ===
-              "ready",
-
-            mode:
-              extra.mode ||
-              Galaxy.state.mode,
-
-            history:
-              getCurrentChat()
-                ?.messages
-                ?.slice(-20)
-                .map(
-                  item => ({
-
-                    role:
-                      item.role,
-
-                    content:
-                      item.text
-
-                  })
-                ) ||
-              []
-
-          }),
-
-        signal:
-          Galaxy.state.generation
-            .controller
-            ?.signal
-
-      }
-    );
-
-
-  let data;
-
-
-  try {
-
-    data =
-      await response.json();
-
-  } catch {
-
-    throw new Error(
-      "GALAXY received an invalid response."
-    );
-
-  }
-
-
-  if (!response.ok) {
-
-    throw new Error(
-      data.error ||
-      `AI request failed (${response.status})`
-    );
-
-  }
-
-
-  return (
-    data.reply ||
-    data.message ||
-    data.output ||
-    data.text ||
-    "No response received."
-  );
-
-}
-
-
-/* =========================================================
-   AI GENERATION
-   ========================================================= */
-
-async function generateAssistantReply(
-  prompt
-) {
-
-  const chat =
-    ensureCurrentChat();
-
-
-  Galaxy.state.generation.active =
-    true;
-
-
-  Galaxy.state.generation.stopped =
-    false;
-
-
-  Galaxy.state.generation.controller =
-    new AbortController();
-
-
-  const message = {
-
-    id:
-      uid("msg"),
-
-    role:
-      "assistant",
-
-    text: "",
-
-    createdAt:
-      now(),
-
-    updatedAt:
-      now()
-
-  };
-
-
-  Galaxy.state.generation.messageId =
-    message.id;
-
-
-  chat.messages.push(message);
-
-
-  renderChat();
-
-
-  updateSendButtonState();
-
-
-  showToolActivity(
-    Galaxy.state.webSearchState ===
-    "ready"
-      ? "Searching and thinking…"
-      : "Thinking…"
-  );
-
-
-  try {
-
-    const fullText =
-      await fetchAIResponse(
-        prompt
-      );
-
-
-    if (
-      !Galaxy.state.settings
-        .streaming
-    ) {
-
-      message.text =
-        fullText;
-
-    } else {
-
-      const chunks =
-        fullText.match(
-          /.{1,12}/gs
-        ) ||
-        [fullText];
-
-
-      for (
-        const chunk
-        of chunks
-      ) {
-
-        if (
-          Galaxy.state.generation
-            .stopped
-        ) {
-          break;
-        }
-
-
-        message.text +=
-          chunk;
-
-
-        message.updatedAt =
-          now();
-
-
-        renderChat();
-
-
-        await sleep(
-          Galaxy.state.settings
-            .streamSpeed
-        );
-
-      }
-
-    }
-
-
-    chat.updatedAt =
-      now();
-
-
-    persistAll();
-
-  } catch (error) {
-
-    if (
-      error.name !==
-      "AbortError"
-    ) {
-
-      message.text = `
-I couldn't reach the GALAXY AI backend.
-
-${error.message}
-
-Make sure your selected Vercel AI route is deployed: **/api/chat** for OpenAI or **/api/gemini** for Gemini.
-`.trim();
-
-
-      handleError(
-        error,
-        "AI"
-      );
-
-    }
-
-  } finally {
-
-    Galaxy.state.generation.active =
-      false;
-
-
-    Galaxy.state.generation.controller =
-      null;
-
-
-    hideToolActivity();
-
-
-    updateSendButtonState();
-
-
-    renderChat();
-
-
-    persistAll();
-
-  }
-
-}
-
-
-/* =========================================================
-   SEND MESSAGE
-   ========================================================= */
-
-async function sendMessage() {
-
-  if (
-    Galaxy.state.generation.active
-  ) {
-
-    stopGeneration();
-
-    return;
-  }
-
-
-  const input =
-    $("#promptInput");
-
-
-  if (!input) {
-    return;
-  }
-
-
-  const text =
-    input.value.trim();
-
-
-  if (
-    !text &&
-    !Galaxy.state.attachments
-      .length
-  ) {
-    return;
-  }
-
-
-  const chat =
-    ensureCurrentChat();
-
-
-  const messageText =
-    text ||
-    describeAttachments();
-
-
-  chat.messages.push({
-
-    id:
-      uid("msg"),
-
-    role:
-      "user",
-
-    text:
-      messageText,
-
-    createdAt:
-      now(),
-
-    updatedAt:
-      now()
-
-  });
-
-
-  if (
-    chat.title ===
-    "New conversation"
-  ) {
-
-    chat.title =
-      messageText.slice(
-        0,
-        48
-      );
-
-  }
-
-
-  chat.updatedAt =
-    now();
-
-
-  input.value = "";
-
-
-  autoResizeTextarea(input);
-
-
-  DB.remove("draft");
-
-
-  Galaxy.state.attachments =
-    [];
-
-
-  renderAttachments();
-
-
-  persistAll();
-
-
-  renderRecentChats();
-
-
-  renderChat();
-
-
-  await generateAssistantReply(
-    messageText
-  );
-
-}
-
-
-/* =========================================================
-   SIDEBAR
-   ========================================================= */
-
-function toggleSidebar() {
-
-  const app =
-    $("#app");
-
-  if (!app) {
-    return;
-  }
-
-  if (
-    window.innerWidth <= 900
-  ) {
-
-    app.classList.toggle(
-      "mobile-sidebar-open"
-    );
-
-  } else {
-
-    app.classList.toggle(
-      "sidebar-collapsed"
-    );
-
-  }
-
-}
-
-
-/* =========================================================
-   SHARE
-   ========================================================= */
-
-function shareWorkspace() {
-
-  if (navigator.share) {
-
-    navigator.share({
-
-      title:
-        "GALAXY AI",
-
-      text:
-        "GALAXY AI Workspace",
-
-      url:
-        location.href
-
-    })
-    .catch(
-      () => {}
-    );
-
-  } else {
-
-    copyText(
-      location.href
-    );
-
-  }
-
-}
-
-
-/* =========================================================
-   JSON VIEWER
-   ========================================================= */
-
-function openJSONViewer() {
-
-  openModal({
-
-    title:
-      "JSON Viewer",
-
-    body: `
-      <div class="form-stack">
-
-        <textarea
-          id="jsonViewerInput"
-          class="field textarea-field"
-          placeholder='{"hello":"GALAXY"}'
-        ></textarea>
-
-        <button
-          id="formatJSONButton"
-          class="text-action primary"
-        >
-          Format JSON
-        </button>
-
-        <pre
-          id="jsonViewerOutput"
-          class="code-block"
-        ></pre>
-
-      </div>
-    `
-
-  });
-
-
-  setTimeout(
-    () => {
-
-      on(
-        $("#formatJSONButton"),
-        "click",
-        () => {
-
-          try {
-
-            $("#jsonViewerOutput")
-              .textContent =
-              JSON.stringify(
-                JSON.parse(
-                  $("#jsonViewerInput")
-                    .value
-                ),
-                null,
-                2
-              );
-
-          } catch (error) {
-
-            $("#jsonViewerOutput")
-              .textContent =
-              `Invalid JSON: ${error.message}`;
-
-          }
-
-        }
-      );
-
-    },
-    0
-  );
-
-}
-
-
-/* =========================================================
-   DIFF VIEWER
-   ========================================================= */
-
-function openDiffViewer() {
-
-  openModal({
-
-    title:
-      "Diff Viewer",
-
-    width:
-      "900px",
-
-    body: `
-      <div class="diff-grid">
-
-        <textarea
-          id="diffLeft"
-          class="field textarea-field"
-          placeholder="Original text"
-        ></textarea>
-
-        <textarea
-          id="diffRight"
-          class="field textarea-field"
-          placeholder="Changed text"
-        ></textarea>
-
-      </div>
-
-      <button
-        id="compareDiffButton"
-        class="text-action primary"
-      >
-        Compare
-      </button>
-
-      <div
-        id="diffOutput"
-        class="diff-output"
-      ></div>
-    `
-
-  });
-
-
-  setTimeout(
-    () => {
-
-      on(
-        $("#compareDiffButton"),
-        "click",
-        () => {
-
-          const left =
-            $("#diffLeft")
-              ?.value ||
-            "";
-
-
-          const right =
-            $("#diffRight")
-              ?.value ||
-            "";
-
-
-          $("#diffOutput")
-            .innerHTML =
-            left === right
-
-              ? `
-                <div class="empty-panel">
-                  Text is identical.
-                </div>
-              `
-
-              : `
-                <div class="diff-result">
-
-                  <div>
-
-                    <strong>
-                      Original
-                    </strong>
-
-                    <pre>${escapeHTML(left)}</pre>
-
-                  </div>
-
-                  <div>
-
-                    <strong>
-                      Changed
-                    </strong>
-
-                    <pre>${escapeHTML(right)}</pre>
-
-                  </div>
-
-                </div>
-              `;
-
-        }
-      );
-
-    },
-    0
-  );
-
-}
-
-
-/* =========================================================
-   SCRATCHPAD
-   ========================================================= */
-
-function openScratchpad() {
-
-  openModal({
-
-    title:
-      "Scratchpad",
-
-    body: `
-      <textarea
-        id="scratchpadInput"
-        class="field textarea-field scratchpad-field"
-        placeholder="Write anything..."
-      >${escapeHTML(
-        DB.get(
-          "scratchpad",
-          ""
-        )
-      )}</textarea>
-    `
-
-  });
-
-
-  setTimeout(
-    () => {
-
-      on(
-        $("#scratchpadInput"),
-        "input",
-        event => {
-
-          DB.set(
-            "scratchpad",
-            event.target.value
-          );
-
-        }
-      );
-
-    },
-    0
-  );
-
-}
-
-
-function handleToolAction(action) {
-
-  if (
-    action === "command"
-  ) {
-
-    openCommandPalette();
-
-  } else if (
-    action ===
-    "prompt-templates"
-  ) {
-
-    openPromptTemplates();
-
-  } else if (
-    action ===
-    "json-viewer"
-  ) {
-
-    openJSONViewer();
-
-  } else if (
-    action ===
-    "diff-viewer"
-  ) {
-
-    openDiffViewer();
-
-  } else if (
-    action ===
-    "scratchpad"
-  ) {
-
-    openScratchpad();
-
-  } else if (
-    action ===
-    "focus"
-  ) {
-
-    toggleFocusMode();
-
-  }
-
-}
-
-
-/* =========================================================
-   CONTEXT MENU
-   ========================================================= */
-
-function closeContextMenu() {
-
-  $$(".context-menu")
-    .forEach(
-      menu =>
-        menu.remove()
-    );
-
-}
-
-
-function openContextMenu(
-  type,
-  id,
-  x,
-  y
-) {
-
-  closeContextMenu();
-
-
-  const menu =
-    document.createElement(
-      "div"
-    );
-
-
-  menu.className =
-    "context-menu";
-
-
-  menu.style.left =
-    `${x}px`;
-
-
-  menu.style.top =
-    `${y}px`;
-
-
-  if (
-    type === "chat"
-  ) {
-
-    const chat =
-      Galaxy.state.chats.find(
-        item =>
-          item.id === id
-      );
-
-
-    if (!chat) {
-      return;
-    }
-
-
-    menu.innerHTML = `
-      <button
-        class="context-row"
-        data-context-action="rename-chat"
-        data-context-id="${id}"
-      >
-        ✎
-        <span>
-          Rename
-        </span>
-      </button>
-
-      <button
-        class="context-row"
-        data-context-action="pin-chat"
-        data-context-id="${id}"
-      >
-        ◉
-        <span>
-          ${
-            chat.pinned
-              ? "Unpin"
-              : "Pin"
-          }
-        </span>
-      </button>
-
-      <button
-        class="context-row"
-        data-context-action="archive-chat"
-        data-context-id="${id}"
-      >
-        ▱
-        <span>
-          ${
-            chat.archived
-              ? "Restore"
-              : "Archive"
-          }
-        </span>
-      </button>
-
-      <button
-        class="context-row"
-        data-context-action="export-chat"
-        data-context-id="${id}"
-      >
-        ↗
-        <span>
-          Export
-        </span>
-      </button>
-
-      <button
-        class="context-row danger"
-        data-context-action="delete-chat"
-        data-context-id="${id}"
-      >
-        ×
-        <span>
-          Delete
-        </span>
-      </button>
-    `;
-
-  }
-
-
-  if (
-    type === "project"
-  ) {
-
-    menu.innerHTML = `
-      <button
-        class="context-row"
-        data-context-action="edit-project"
-        data-context-id="${id}"
-      >
-        ✎
-        <span>
-          Edit
-        </span>
-      </button>
-
-      <button
-        class="context-row danger"
-        data-context-action="delete-project"
-        data-context-id="${id}"
-      >
-        ×
-        <span>
-          Delete
-        </span>
-      </button>
-    `;
-
-  }
-
-
-  document.body.appendChild(
-    menu
-  );
-
-}
-
-
-function handleContextAction(
-  action,
-  id
-) {
-
-  closeContextMenu();
-
-
-  if (
-    action ===
-    "rename-chat"
-  ) {
-
-    renameChat(id);
-
-  } else if (
-    action ===
-    "pin-chat"
-  ) {
-
-    togglePinChat(id);
-
-  } else if (
-    action ===
-    "archive-chat"
-  ) {
-
-    toggleArchiveChat(id);
-
-  } else if (
-    action ===
-    "export-chat"
-  ) {
-
-    exportConversation(id);
-
-  } else if (
-    action ===
-    "delete-chat"
-  ) {
-
-    deleteChat(id);
-
-  } else if (
-    action ===
-    "edit-project"
-  ) {
-
-    editProject(id);
-
-  } else if (
-    action ===
-    "delete-project"
-  ) {
-
-    deleteProject(id);
-
-  }
-
-}
-
-
-/* =========================================================
-   CONTENT TABS
-   ========================================================= */
-
-function handleContentTab(
-  group,
-  tab
-) {
-
-  if (
-    group === "library"
-  ) {
-
-    renderLibrary(tab);
-
-  } else if (
-    group === "packs"
-  ) {
-
-    renderPacks(tab);
-
-  }
-
-
-  $$(".flat-tab")
-    .forEach(
-      button =>
-        button.classList.toggle(
-          "active",
-          button.dataset.contentTab ===
-            tab
-        )
-    );
-
-}
-
-
-/* =========================================================
-   FILE INPUTS
-   ========================================================= */
-
-function bindFileInputs() {
-
-  on(
-    $("#fileInput"),
-    "change",
-    event => {
-
-      addFiles(
-        event.target.files
-      );
-
-      event.target.value = "";
-
-    }
-  );
-
-
-  on(
-    $("#imageInput"),
-    "change",
-    event => {
-
-      addFiles(
-        event.target.files
-      );
-
-
-      Array.from(
-        event.target.files ||
-        []
-      )
-        .forEach(
-          addLibraryFile
-        );
-
-
-      event.target.value =
-        "";
-
-    }
-  );
-
-
-  on(
-    $("#videoInput"),
-    "change",
-    event => {
-
-      addFiles(
-        event.target.files
-      );
-
-
-      Array.from(
-        event.target.files ||
-        []
-      )
-        .forEach(
-          addLibraryFile
-        );
-
-
-      event.target.value =
-        "";
-
-    }
-  );
-
-
-  on(
-    $("#libraryInput"),
-    "change",
-    event => {
-
-      Array.from(
-        event.target.files ||
-        []
-      )
-        .forEach(
-          addLibraryFile
-        );
-
-
-      event.target.value =
-        "";
-
-    }
-  );
-
-
-  on(
-    $("#conversationImportInput"),
-    "change",
-    event => {
-
-      const file =
-        event.target.files?.[0];
-
-
-      if (file) {
-
-        importConversation(file);
-
-      }
-
-
-      event.target.value =
-        "";
-
-    }
-  );
-
-}
-
-
-/* =========================================================
-   CLICK ROUTER
-   ========================================================= */
-
-function handleClick(event) {
-
-  const action =
-    event.target.closest(
-      "[data-action]"
-    )?.dataset.action;
-
-
-  const view =
-    event.target.closest(
-      "[data-view]"
-    )?.dataset.view;
-
-
-  const chatOpen =
-    event.target.closest(
-      "[data-chat-open]"
-    )?.dataset.chatOpen;
-
-
-  const contextOpen =
-    event.target.closest(
-      "[data-context-open]"
-    );
-
-
-  const contextAction =
-    event.target.closest(
-      "[data-context-action]"
-    );
-
-
-  const contentTab =
-    event.target.closest(
-      "[data-content-tab]"
-    );
-
-
-  const searchResult =
-    event.target.closest(
-      "[data-search-result]"
-    );
-
-
-  const command =
-    event.target.closest(
-      "[data-command-name]"
-    );
-
-
-  const toolAction =
-    event.target.closest(
-      "[data-tool-action]"
-    )?.dataset.toolAction;
-
-
-  const copyCode =
-    event.target.closest(
-      "[data-copy-code]"
-    )?.dataset.copyCode;
-
-
-  const copyMessage =
-    event.target.closest(
-      "[data-copy-message]"
-    )?.dataset.copyMessage;
-
-
-  const editMessageId =
-    event.target.closest(
-      "[data-edit-message]"
-    )?.dataset.editMessage;
-
-
-  const retryMessageId =
-    event.target.closest(
-      "[data-retry-message]"
-    )?.dataset.retryMessage;
-
-
-  const readMessageId =
-    event.target.closest(
-      "[data-read-message]"
-    )?.dataset.readMessage;
-
-
-  const branchMessageId =
-    event.target.closest(
-      "[data-branch-message]"
-    )?.dataset.branchMessage;
-
-
-  const removeAttachmentId =
-    event.target.closest(
-      "[data-remove-attachment]"
-    )?.dataset.removeAttachment;
-
-
-  const previewLibraryId =
-    event.target.closest(
-      "[data-preview-library]"
-    )?.dataset.previewLibrary;
-
-
-  const favoriteId =
-    event.target.closest(
-      "[data-library-favorite]"
-    )?.dataset.libraryFavorite;
-
-
-  const deleteLibraryId =
-    event.target.closest(
-      "[data-delete-library]"
-    )?.dataset.deleteLibrary;
-
-
-  const editProjectId =
-    event.target.closest(
-      "[data-edit-project]"
-    )?.dataset.editProject;
-
-
-  const toggleScheduledId =
-    event.target.closest(
-      "[data-toggle-scheduled]"
-    )?.dataset.toggleScheduled;
-
-
-  const deleteScheduledId =
-    event.target.closest(
-      "[data-delete-scheduled]"
-    )?.dataset.deleteScheduled;
-
-
-  const pluginInstallId =
-    event.target.closest(
-      "[data-plugin-install]"
-    )?.dataset.pluginInstall;
-
-
-  const pluginConnectId =
-    event.target.closest(
-      "[data-plugin-connect]"
-    )?.dataset.pluginConnect;
-
-
-  const editAgentId =
-    event.target.closest(
-      "[data-edit-agent]"
-    )?.dataset.editAgent;
-
-
-  const openSiteId =
-    event.target.closest(
-      "[data-open-site]"
-    )?.dataset.openSite;
-
-
-  const siteTab =
-    event.target.closest(
-      "[data-site-tab]"
-    )?.dataset.siteTab;
-
-
-  const openPackId =
-    event.target.closest(
-      "[data-open-pack]"
-    )?.dataset.openPack;
-
-
-  const packInstallId =
-    event.target.closest(
-      "[data-pack-install-toggle]"
-    )?.dataset.packInstallToggle;
-
-
-  const packItem =
-    event.target.closest(
-      "[data-pack-item]"
-    )?.dataset.packItem;
-
-
-  const promptId =
-    event.target.closest(
-      "[data-use-prompt]"
-    )?.dataset.usePrompt;
-
-
-  const workView =
-    event.target.closest(
-      "[data-work-view]"
-    )?.dataset.workView;
-
-
-  const gameOpen =
-    event.target.closest(
-      "[data-game-open]"
-    )?.dataset.gameOpen;
-
-
-  const gameBack =
-    event.target.closest(
-      "[data-game-back]"
-    );
-
-
-  const chessSquare =
-    event.target.closest(
-      "[data-chess-square]"
-    )?.dataset.chessSquare;
-
-
-  const tttCell =
-    event.target.closest(
-      "[data-ttt-cell]"
-    )?.dataset.tttCell;
-
-
-  const connectColumn =
-    event.target.closest(
-      "[data-connect-column]"
-    )?.dataset.connectColumn;
-
-
-  const memoryCard =
-    event.target.closest(
-      "[data-memory-card]"
-    )?.dataset.memoryCard;
-
-
-  const chessReset =
-    event.target.closest(
-      "[data-chess-reset]"
-    );
-
-
-  const tttReset =
-    event.target.closest(
-      "[data-ttt-reset]"
-    );
-
-
-  const connectReset =
-    event.target.closest(
-      "[data-connect-reset]"
-    );
-
-
-  const memoryReset =
-    event.target.closest(
-      "[data-memory-reset]"
-    );
-
-
-  if (
-    event.target
-      .classList
-      .contains(
-        "overlay"
-      )
-  ) {
-
-    closeOverlay();
-
-  }
-
-
-  if (view) {
-
-    openWorkspaceView(view);
-
-  }
-
-
-  if (chatOpen) {
-
-    Galaxy.state.currentChatId =
-      chatOpen;
-
-    persistAll();
-
-    switchMode("chat");
-
-    renderRecentChats();
-
-    renderChat();
-
-  }
-
-
-  if (contextOpen) {
-
-    const rect =
-      contextOpen
-        .getBoundingClientRect();
-
-    openContextMenu(
-      contextOpen.dataset
-        .contextOpen,
-      contextOpen.dataset
-        .contextId,
-      rect.right,
-      rect.bottom
-    );
-
-  }
-
-
-  if (contextAction) {
-
-    handleContextAction(
-      contextAction.dataset
-        .contextAction,
-      contextAction.dataset
-        .contextId
-    );
-
-  }
-
-
-  if (contentTab) {
-
-    handleContentTab(
-      contentTab.dataset
-        .contentGroup,
-      contentTab.dataset
-        .contentTab
-    );
-
-  }
-
-
-  if (searchResult) {
-
-    openSearchResult(
-      searchResult.dataset
-        .searchResult,
-      searchResult.dataset
-        .searchId
-    );
-
-  }
-
-
-  if (command) {
-
-    const item =
-      COMMANDS.find(
-        entry =>
-          entry.name ===
-          command.dataset
-            .commandName
-      );
-
-    closeOverlay();
-
-    item?.run?.();
-
-  }
-
-
-  if (toolAction) {
-
-    handleToolAction(
-      toolAction
-    );
-
-  }
-
-
-  if (copyCode) {
-
-    copyText(
-      decodeURIComponent(
-        copyCode
-      )
-    );
-
-  }
-
-
-  if (copyMessage) {
-
-    const message =
-      getCurrentChat()
-        ?.messages
-        .find(
-          item =>
-            item.id ===
-            copyMessage
-        );
-
-    if (message) {
-      copyText(message.text);
-    }
-
-  }
-
-
-  if (editMessageId) {
-    editMessage(editMessageId);
-  }
-
-
-  if (retryMessageId) {
-    retryMessage(retryMessageId);
-  }
-
-
-  if (readMessageId) {
-    readAloud(readMessageId);
-  }
-
-
-  if (branchMessageId) {
-    branchConversation(
-      branchMessageId
-    );
-  }
-
-
-  if (removeAttachmentId) {
-    removeAttachment(
-      removeAttachmentId
-    );
-  }
-
-
-  if (previewLibraryId) {
-    previewLibraryItem(
-      previewLibraryId
-    );
-  }
-
-
-  if (favoriteId) {
-    toggleLibraryFavorite(
-      favoriteId
-    );
-  }
-
-
-  if (deleteLibraryId) {
-    deleteLibraryItem(
-      deleteLibraryId
-    );
-  }
-
-
-  if (editProjectId) {
-    editProject(
-      editProjectId
-    );
-  }
-
-
-  if (toggleScheduledId) {
-    toggleScheduledTask(
-      toggleScheduledId
-    );
-  }
-
-
-  if (deleteScheduledId) {
-    deleteScheduledTask(
-      deleteScheduledId
-    );
-  }
-
-
-  if (pluginInstallId) {
-    togglePluginInstall(
-      pluginInstallId
-    );
-  }
-
-
-  if (pluginConnectId) {
-    togglePluginConnection(
-      pluginConnectId
-    );
-  }
-
-
-  if (editAgentId) {
-
-    const agent =
-      Galaxy.state.agents.find(
-        item =>
-          item.id ===
-          editAgentId
-      );
-
-    if (agent) {
-      openAgentEditor(agent);
-    }
-
-  }
-
-
-  if (openSiteId) {
-    openSiteEditor(openSiteId);
-  }
-
-
-  if (siteTab) {
-    switchSiteEditorTab(
-      siteTab
-    );
-  }
-
-
-  if (openPackId) {
-    openPack(openPackId);
-  }
-
-
-  if (packInstallId) {
-    togglePackInstall(
-      packInstallId
-    );
-  }
-
-
-  if (packItem) {
-
-    switchMode("chat");
+  recognition.onresult = event => {
+    const text =
+      event.results[0][0]
+        .transcript;
 
     const input =
       $("#promptInput");
 
     if (input) {
+      input.value = text;
+      resizePrompt();
+    }
+  };
+
+  recognition.onerror = () =>
+    toast("Voice recognition stopped.");
+
+  recognition.start();
+}
+
+
+/* =========================================================
+   GLOBAL CLICK HANDLER
+   ========================================================= */
+
+document.addEventListener(
+  "click",
+  event => {
+
+    const viewButton =
+      event.target.closest(
+        "[data-view]"
+      );
+
+    if (viewButton) {
+      openView(
+        viewButton.dataset.view
+      );
+
+      return;
+    }
+
+
+    const starter =
+      event.target.closest(
+        "[data-starter]"
+      );
+
+    if (starter) {
+      const input =
+        $("#promptInput");
+
+      if (input) {
+        input.value =
+          starter.dataset.starter;
+
+        resizePrompt();
+        input.focus();
+      }
+
+      return;
+    }
+
+
+    const studioTab =
+      event.target.closest(
+        "[data-studio]"
+      );
+
+    if (studioTab) {
+      setStudioMode(
+        studioTab.dataset.studio
+      );
+
+      return;
+    }
+
+
+    const camera =
+      event.target.closest(
+        "#cameraChips button"
+      );
+
+    if (camera) {
+      selectCamera(camera);
+      return;
+    }
+
+
+    const game =
+      event.target.closest(
+        "[data-game-open]"
+      );
+
+    if (game) {
+      const name =
+        game.dataset.gameOpen;
+
+      if (name === "chess")
+        renderChess();
+
+      if (name === "tictactoe")
+        renderTicTacToe();
+
+      if (name === "connect4")
+        renderConnectFour();
+
+      if (name === "memory")
+        renderMemory();
+
+      return;
+    }
+
+
+    if (
+      event.target.closest(
+        "[data-game-back]"
+      )
+    ) {
+      renderGames();
+      return;
+    }
+
+
+    const chessSquare =
+      event.target.closest(
+        "[data-chess-square]"
+      );
+
+    if (chessSquare) {
+      const [r,c] =
+        chessSquare.dataset
+          .chessSquare
+          .split(",")
+          .map(Number);
+
+      handleChessSquare(r,c);
+
+      return;
+    }
+
+
+    if (
+      event.target.closest(
+        "[data-chess-reset]"
+      )
+    ) {
+      resetChess();
+      renderChess();
+      return;
+    }
+
+
+    const tttCell =
+      event.target.closest(
+        "[data-ttt-cell]"
+      );
+
+    if (tttCell) {
+      handleTtt(
+        Number(
+          tttCell.dataset.tttCell
+        )
+      );
+
+      return;
+    }
+
+
+    if (
+      event.target.closest(
+        "[data-ttt-reset]"
+      )
+    ) {
+      resetTicTacToe();
+      renderTicTacToe();
+      return;
+    }
+
+
+    const connectCell =
+      event.target.closest(
+        "[data-connect-column]"
+      );
+
+    if (connectCell) {
+      handleConnect(
+        Number(
+          connectCell.dataset
+            .connectColumn
+        )
+      );
+
+      return;
+    }
+
+
+    if (
+      event.target.closest(
+        "[data-connect-reset]"
+      )
+    ) {
+      resetConnectFour();
+      renderConnectFour();
+      return;
+    }
+
+
+    const memoryCard =
+      event.target.closest(
+        "[data-memory-card]"
+      );
+
+    if (memoryCard) {
+      handleMemory(
+        Number(
+          memoryCard.dataset
+            .memoryCard
+        )
+      );
+
+      return;
+    }
+
+
+    if (
+      event.target.closest(
+        "[data-memory-reset]"
+      )
+    ) {
+      resetMemory();
+      renderMemory();
+      return;
+    }
+
+
+    const reuse =
+      event.target.closest(
+        "[data-generation-reuse]"
+      );
+
+    if (reuse) {
+      const generation =
+        Galaxy.state.generations.find(
+          item =>
+            item.id ===
+            reuse.dataset
+              .generationReuse
+        );
+
+      if (generation) {
+        $("#studioPrompt").value =
+          generation.prompt;
+
+        toast("Prompt restored.");
+      }
+
+      return;
+    }
+
+
+    const deleteGeneration =
+      event.target.closest(
+        "[data-generation-delete]"
+      );
+
+    if (deleteGeneration) {
+      Galaxy.state.generations =
+        Galaxy.state.generations.filter(
+          item =>
+            item.id !==
+            deleteGeneration.dataset
+              .generationDelete
+        );
+
+      saveState();
+      renderGenerations();
+
+      return;
+    }
+
+
+    const chatButton =
+      event.target.closest(
+        "[data-chat-id]"
+      );
+
+    if (chatButton) {
+      Galaxy.state.activeChatId =
+        chatButton.dataset.chatId;
+
+      saveState();
+
+      openView("chat");
+
+      return;
+    }
+
+
+    const deleteProject =
+      event.target.closest(
+        "[data-delete-project]"
+      );
+
+    if (deleteProject) {
+      Galaxy.state.projects =
+        Galaxy.state.projects.filter(
+          project =>
+            project.id !==
+            deleteProject.dataset
+              .deleteProject
+        );
+
+      saveState();
+      renderProjects();
+
+      return;
+    }
+
+
+    const deleteAsset =
+      event.target.closest(
+        "[data-delete-asset]"
+      );
+
+    if (deleteAsset) {
+      Galaxy.state.assets =
+        Galaxy.state.assets.filter(
+          asset =>
+            asset.id !==
+            deleteAsset.dataset
+              .deleteAsset
+        );
+
+      saveState();
+      renderAssets();
+
+      return;
+    }
+
+
+    const deleteScene =
+      event.target.closest(
+        "[data-delete-scene]"
+      );
+
+    if (deleteScene) {
+      scenes =
+        scenes.filter(
+          scene =>
+            scene.id !==
+            deleteScene.dataset
+              .deleteScene
+        );
+
+      Storage.set(
+        "scenes",
+        scenes
+      );
+
+      renderSceneList();
+
+      return;
+    }
+
+
+    const deleteTask =
+      event.target.closest(
+        "[data-delete-task]"
+      );
+
+    if (deleteTask) {
+      Galaxy.state.scheduled =
+        Galaxy.state.scheduled.filter(
+          task =>
+            task.id !==
+            deleteTask.dataset
+              .deleteTask
+        );
+
+      saveState();
+      renderScheduled();
+
+      return;
+    }
+
+
+    const usePack =
+      event.target.closest(
+        "[data-use-pack]"
+      );
+
+    if (usePack) {
+      openView("chat");
+
+      const input =
+        $("#promptInput");
 
       input.value =
-        packItem;
-
-      autoResizeTextarea(input);
+        `Use the ${usePack.dataset.usePack} for this task: `;
 
       input.focus();
 
+      resizePrompt();
+
+      return;
+    }
+
+
+    const agent =
+      event.target.closest(
+        "[data-agent]"
+      );
+
+    if (agent) {
+      openView("chat");
+
+      const input =
+        $("#promptInput");
+
+      input.value =
+        `Act as my ${agent.dataset.agent}. `;
+
+      input.focus();
+
+      return;
+    }
+
+
+    const plugin =
+      event.target.closest(
+        "[data-plugin]"
+      );
+
+    if (plugin) {
+      toast(
+        `${plugin.dataset.plugin} connection requires backend integration.`
+      );
+
+      return;
+    }
+
+
+    const site =
+      event.target.closest(
+        "[data-site-prompt]"
+      );
+
+    if (site) {
+      openView("chat");
+
+      const input =
+        $("#promptInput");
+
+      input.value =
+        site.dataset.sitePrompt;
+
+      input.focus();
+
+      return;
+    }
+
+
+    const actionButton =
+      event.target.closest(
+        "[data-action]"
+      );
+
+    if (!actionButton)
+      return;
+
+    const action =
+      actionButton.dataset.action;
+
+
+    if (action === "toggle-sidebar") {
+      $("#sidebar")
+        ?.classList.toggle("open");
+    }
+
+
+    else if (action === "new-chat") {
+      createChat();
+    }
+
+
+    else if (action === "upload") {
+      openFilePicker("assets");
+    }
+
+
+    else if (
+      action === "studio-upload"
+    ) {
+      studioUpload();
+    }
+
+
+    else if (
+      action === "web-search"
+    ) {
+      Galaxy.state.webSearch =
+        !Galaxy.state.webSearch;
+
+      actionButton.classList.toggle(
+        "active",
+        Galaxy.state.webSearch
+      );
+
+      toast(
+        Galaxy.state.webSearch
+          ? "Web search enabled."
+          : "Web search disabled."
+      );
+    }
+
+
+    else if (
+      action === "image-create"
+    ) {
+      openView("create");
+      setStudioMode("image");
+    }
+
+
+    else if (
+      action === "video-create"
+    ) {
+      openView("create");
+      setStudioMode("text-video");
+    }
+
+
+    else if (action === "voice") {
+      startVoice();
+    }
+
+
+    else if (action === "run-work") {
+      runWork();
+    }
+
+
+    else if (
+      action === "clear-preview"
+    ) {
+      const output =
+        $("#workOutput");
+
+      if (output)
+        output.textContent =
+          "Your result will appear here.";
+    }
+
+
+    else if (
+      action ===
+      "new-creative-project"
+    ) {
+      newCreativeProject();
+    }
+
+
+    else if (
+      action === "studio-generate"
+    ) {
+      generateStudioContent();
+    }
+
+
+    else if (
+      action === "create-project"
+    ) {
+      createProject();
+    }
+
+
+    else if (
+      action === "add-scene"
+    ) {
+      addScene();
+    }
+
+
+    else if (
+      action === "new-scheduled"
+    ) {
+      createScheduledTask();
+    }
+
+
+    else if (action === "share") {
+      if (
+        navigator.share
+      ) {
+        navigator.share({
+          title: "GALAXY AI",
+          text: "GALAXY AI"
+        }).catch(() => {});
+      }
+
+      else {
+        navigator.clipboard
+          ?.writeText(
+            location.href
+          );
+
+        toast("Link copied.");
+      }
     }
 
   }
+);
 
 
-  if (promptId) {
-    usePromptTemplate(
-      promptId
-    );
+/* =========================================================
+   INPUT EVENTS
+   ========================================================= */
+
+$("#composer")?.addEventListener(
+  "submit",
+  event => {
+    event.preventDefault();
+    sendChatMessage();
   }
+);
 
+$("#promptInput")?.addEventListener(
+  "input",
+  resizePrompt
+);
 
-  if (
-    workView ===
-    "preview"
-  ) {
-
-    previewWorkDocument();
-
-  }
-
-
-  if (
-    workView ===
-    "edit"
-  ) {
-
-    renderWorkDocument();
-
-  }
-
-
-  if (gameOpen) {
-
-    openGame(gameOpen);
-
-  }
-
-
-  if (gameBack) {
-
-    renderGames();
-
-  }
-
-
-  if (chessSquare) {
-
-    const [r, c] =
-      chessSquare
-        .split(",")
-        .map(Number);
-
-    handleChessSquare(
-      r,
-      c
-    );
-
-  }
-
-
-  if (
-    tttCell !== undefined
-  ) {
-
-    handleTttCell(
-      Number(tttCell)
-    );
-
-  }
-
-
-  if (
-    connectColumn !== undefined
-  ) {
-
-    handleConnectColumn(
-      Number(connectColumn)
-    );
-
-  }
-
-
-  if (
-    memoryCard !== undefined
-  ) {
-
-    handleMemoryCard(
-      Number(memoryCard)
-    );
-
-  }
-
-
-  if (chessReset) {
-
-    resetChess();
-
-    renderChess();
-
-  }
-
-
-  if (tttReset) {
-
-    resetTicTacToe();
-
-    renderTicTacToe();
-
-  }
-
-
-  if (connectReset) {
-
-    resetConnectFour();
-
-    renderConnectFour();
-
-  }
-
-
-  if (memoryReset) {
-
-    resetMemory();
-
-    renderMemory();
-
-  }
-
-
-  if (action) {
+$("#promptInput")?.addEventListener(
+  "keydown",
+  event => {
 
     if (
-      action === "home"
+      event.key === "Enter" &&
+      !event.shiftKey
     ) {
+      event.preventDefault();
 
-      switchMode("chat");
+      sendChatMessage();
+    }
+  }
+);
 
-    } else if (
-      action === "new-chat"
+$("#aiProvider")?.addEventListener(
+  "change",
+  event => {
+    Galaxy.state.provider =
+      event.target.value;
+
+    saveState();
+
+    toast(
+      event.target.value === "gemini"
+        ? "Gemini selected."
+        : "OpenAI selected."
+    );
+  }
+);
+
+$("#fileInput")?.addEventListener(
+  "change",
+  event => {
+    handleFiles(
+      event.target.files
+    );
+  }
+);
+
+document.addEventListener(
+  "input",
+  event => {
+
+    if (
+      event.target.id ===
+      "workspaceSearch"
     ) {
-
-      newChat();
-
-    } else if (
-      action === "search"
-    ) {
-
-      openSearch();
-
-    } else if (
-      action === "command"
-    ) {
-
-      openCommandPalette();
-
-    } else if (
-      action ===
-      "toggle-sidebar"
-    ) {
-
-      toggleSidebar();
-
-    } else if (
-      action ===
-      "toggle-more"
-    ) {
-
-      const menu =
-        $("#moreMenu");
-
-      if (menu) {
-        menu.hidden =
-          !menu.hidden;
-      }
-
-    } else if (
-      action === "attach"
-    ) {
-
-      $("#fileInput")
-        ?.click();
-
-    } else if (
-      action === "image"
-    ) {
-
-      $("#imageInput")
-        ?.click();
-
-    } else if (
-      action === "video"
-    ) {
-
-      $("#videoInput")
-        ?.click();
-
-    } else if (
-      action === "voice"
-    ) {
-
-      toggleVoiceRecording();
-
-    } else if (
-      action ===
-      "web-search"
-    ) {
-
-      toggleWebSearch();
-
-    } else if (
-      action === "send"
-    ) {
-
-      sendMessage();
-
-    } else if (
-      action ===
-      "send-work"
-    ) {
-
-      sendWorkMessage();
-
-    } else if (
-      action === "focus"
-    ) {
-
-      toggleFocusMode();
-
-    } else if (
-      action ===
-      "notifications"
-    ) {
-
-      openNotifications();
-
-    } else if (
-      action ===
-      "settings"
-    ) {
-
-      openSettings();
-
-    } else if (
-      action === "share"
-    ) {
-
-      shareWorkspace();
-
-    } else if (
-      action ===
-      "close-overlay"
-    ) {
-
-      closeOverlay();
-
-    } else if (
-      action ===
-      "new-project"
-    ) {
-
-      createProject();
-
-    } else if (
-      action ===
-      "new-scheduled"
-    ) {
-
-      createScheduledTask();
-
-    } else if (
-      action ===
-      "new-agent"
-    ) {
-
-      createAgent();
-
-    } else if (
-      action ===
-      "new-site"
-    ) {
-
-      createSite();
-
-    } else if (
-      action ===
-      "new-image"
-    ) {
-
-      createImageConcept();
-
-    } else if (
-      action ===
-      "save-site"
-    ) {
-
-      saveActiveSite();
-
-    } else if (
-      action ===
-      "preview-site"
-    ) {
-
-      previewActiveSite();
-
-    } else if (
-      action ===
-      "prompt-templates"
-    ) {
-
-      openPromptTemplates();
-
-    } else if (
-      action ===
-      "library-upload"
-    ) {
-
-      $("#libraryInput")
-        ?.click();
-
-    } else if (
-      action ===
-      "refresh-preview"
-    ) {
-
-      renderWorkDocument();
-
-    } else if (
-      action ===
-      "fullscreen-preview"
-    ) {
-
-      $("#previewSurface")
-        ?.requestFullscreen
-        ?.();
-
-    } else if (
-      action ===
-      "reset-data"
-    ) {
-
-      confirmAction({
-
-        title:
-          "Reset GALAXY",
-
-        message:
-          "Delete all locally saved GALAXY data?",
-
-        confirmLabel:
-          "Reset",
-
-        onConfirm() {
-
-          DB.clear();
-
-          location.reload();
-
-        }
-
-      });
-
+      runWorkspaceSearch(
+        event.target.value
+      );
     }
 
   }
-
-}
+);
 
 
 /* =========================================================
-   EVENTS
+   KEYBOARD SHORTCUTS
    ========================================================= */
 
-function bindEvents() {
+document.addEventListener(
+  "keydown",
+  event => {
 
-  document.addEventListener(
-    "click",
-    handleClick
-  );
-
-
-  document.addEventListener(
-    "contextmenu",
-    event => {
-
-      const target =
-        event.target.closest(
-          "[data-context-type]"
-        );
-
-      if (!target) {
-        return;
-      }
-
+    if (
+      (event.ctrlKey || event.metaKey) &&
+      event.key.toLowerCase() === "k"
+    ) {
       event.preventDefault();
 
-      openContextMenu(
-        target.dataset
-          .contextType,
-        target.dataset
-          .contextId,
-        event.clientX,
-        event.clientY
-      );
+      openView("search");
 
+      setTimeout(() => {
+        $("#workspaceSearch")
+          ?.focus();
+      }, 50);
     }
-  );
 
 
-  document.addEventListener(
-    "input",
-    event => {
-
-      if (
-        event.target.id ===
-        "promptInput"
-      ) {
-
-        autoResizeTextarea(
-          event.target
-        );
-
-        if (
-          Galaxy.state.settings
-            .autosave
-        ) {
-
-          clearTimeout(
-            bindEvents.draftTimer
-          );
-
-          bindEvents.draftTimer =
-            setTimeout(
-              () => {
-
-                DB.set(
-                  "draft",
-                  event.target.value
-                );
-
-              },
-              Galaxy.state.settings
-                .autosaveDelay
-            );
-
-        }
-
-      }
-
-
-      if (
-        event.target.id ===
-        "commandInput"
-      ) {
-
-        renderCommandResults(
-          event.target.value,
-          event.target.dataset
-            .commandMode
-        );
-
-      }
-
-    }
-  );
-
-
-  document.addEventListener(
-    "change",
-    event => {
-
-      const select =
-        event.target.closest(
-          "[data-setting-select]"
-        );
-
-      if (!select) {
-        return;
-      }
-
-      Galaxy.state.settings[
-        select.dataset
-          .settingSelect
-      ] =
-        select.value;
-
-      persistAll();
-
-      applyTheme();
-
-    }
-  );
-
-
-  document.addEventListener(
-    "click",
-    event => {
-
-      const toggle =
-        event.target.closest(
-          "[data-setting-toggle]"
-        );
-
-      if (!toggle) {
-        return;
-      }
-
-      const key =
-        toggle.dataset
-          .settingToggle;
-
-      Galaxy.state.settings[
-        key
-      ] =
-        !Galaxy.state.settings[
-          key
-        ];
-
-      persistAll();
-
-      applyTheme();
-
-      toggle.classList.toggle(
-        "active",
-        !!Galaxy.state.settings[
-          key
-        ]
-      );
-
-    }
-  );
-
-
-  document.addEventListener(
-    "keydown",
-    event => {
-
-      if (
-        event.target.id ===
-        "promptInput" &&
-        event.key ===
-        "Enter" &&
-        !event.shiftKey &&
-        Galaxy.state.settings
-          .enterToSend
-      ) {
-
-        event.preventDefault();
-
-        sendMessage();
-
-        return;
-      }
-
-
-      const mod =
-        event.ctrlKey ||
-        event.metaKey;
-
-
-      if (
-        event.key ===
-        "Escape"
-      ) {
-
-        closeOverlay();
-
-        closeContextMenu();
-
-      } else if (
-        mod &&
-        event.key
-          .toLowerCase() ===
-        "k"
-      ) {
-
-        event.preventDefault();
-
-        openSearch();
-
-      } else if (
-        mod &&
-        event.key
-          .toLowerCase() ===
-        "n"
-      ) {
-
-        event.preventDefault();
-
-        newChat();
-
-      } else if (
-        mod &&
-        event.key === "."
-      ) {
-
-        event.preventDefault();
-
-        toggleFocusMode();
-
-      } else if (
-        mod &&
-        event.key === "/"
-      ) {
-
-        event.preventDefault();
-
-        toggleTheme();
-
-      } else if (
-        event.altKey &&
-        event.key === "1"
-      ) {
-
-        event.preventDefault();
-
-        switchMode("chat");
-
-      } else if (
-        event.altKey &&
-        event.key === "2"
-      ) {
-
-        event.preventDefault();
-
-        switchMode("work");
-
-      }
-
-    }
-  );
-
-
-  $$(".mode-tab")
-    .forEach(
-      tab => {
-
-        on(
-          tab,
-          "click",
-          () =>
-            switchMode(
-              tab.dataset.mode
-            )
-        );
-
-      }
-    );
-
-
-  [
-    "dragenter",
-    "dragover"
-  ]
-    .forEach(
-      type => {
-
-        document.addEventListener(
-          type,
-          event => {
-
-            event.preventDefault();
-
-            Galaxy.state.dragCounter++;
-
-            document.body
-              .classList
-              .add(
-                "dragging"
-              );
-
-          }
-        );
-
-      }
-    );
-
-
-  document.addEventListener(
-    "dragleave",
-    event => {
-
+    if (
+      (event.ctrlKey || event.metaKey) &&
+      event.shiftKey &&
+      event.key.toLowerCase() === "o"
+    ) {
       event.preventDefault();
 
-      Galaxy.state.dragCounter =
-        Math.max(
-          0,
-          Galaxy.state.dragCounter -
-          1
-        );
-
-      if (
-        !Galaxy.state.dragCounter
-      ) {
-
-        document.body
-          .classList
-          .remove(
-            "dragging"
-          );
-
-      }
-
+      createChat();
     }
-  );
 
-
-  document.addEventListener(
-    "drop",
-    event => {
-
-      event.preventDefault();
-
-      Galaxy.state.dragCounter =
-        0;
-
-      document.body
-        .classList
-        .remove(
-          "dragging"
-        );
-
-      if (
-        event.dataTransfer
-          ?.files
-          ?.length
-      ) {
-
-        addFiles(
-          event.dataTransfer
-            .files
-        );
-
-      }
-
-    }
-  );
-
-
-  window.addEventListener(
-    "resize",
-    () => {
-
-      if (
-        window.innerWidth >
-        900
-      ) {
-
-        $("#app")
-          ?.classList
-          .remove(
-            "mobile-sidebar-open"
-          );
-
-      }
-
-    }
-  );
-
-
-  window.addEventListener(
-    "blur",
-    closeContextMenu
-  );
-
-
-  bindFileInputs();
-
-}
+  }
+);
 
 
 /* =========================================================
-   START
+   DRAG AND DROP
    ========================================================= */
 
-function initGalaxy() {
+document.addEventListener(
+  "dragover",
+  event => {
+    event.preventDefault();
+  }
+);
 
-  seedData();
+document.addEventListener(
+  "drop",
+  event => {
 
-  applyTheme();
+    event.preventDefault();
 
-
-  if (
-    Galaxy.state.currentChatId &&
-    !Galaxy.state.chats.some(
-      chat =>
-        chat.id ===
-        Galaxy.state.currentChatId
-    )
-  ) {
-
-    Galaxy.state.currentChatId =
-      null;
+    if (
+      event.dataTransfer?.files?.length
+    ) {
+      handleFiles(
+        event.dataTransfer.files
+      );
+    }
 
   }
+);
 
 
-  if (
-    !Galaxy.state.currentChatId &&
-    Galaxy.state.chats.length
-  ) {
+/* =========================================================
+   INITIALIZATION
+   ========================================================= */
 
-    Galaxy.state.currentChatId =
-      Galaxy.state.chats[0].id;
+function initializeGalaxy() {
+  const provider =
+    $("#aiProvider");
 
+  if (provider) {
+    provider.value =
+      Galaxy.state.provider;
   }
-
-
-  const draft =
-    DB.get(
-      "draft",
-      ""
-    );
-
-
-  const input =
-    $("#promptInput");
-
-
-  if (input) {
-
-    input.value =
-      draft;
-
-    autoResizeTextarea(input);
-
-  }
-
 
   renderRecentChats();
 
+  renderGenerations();
+
+  setStudioMode(
+    Galaxy.state.selectedStudioMode
+  );
+
+  if (
+    !Galaxy.state.activeChatId &&
+    Galaxy.state.chats.length
+  ) {
+    Galaxy.state.activeChatId =
+      Galaxy.state.chats[0].id;
+  }
 
   renderChat();
 
-
-  renderWebSearchState();
-
-
-  renderVoiceState();
-
-
-  updateNotificationIndicator();
-
-
-  updateSendButtonState();
-
-
-  bindEvents();
-
-
-  switchMode("chat");
-
+  resizePrompt();
 
   console.log(
     `GALAXY AI ${Galaxy.version} ready`
   );
-
 }
 
 
-if (
-  document.readyState ===
-  "loading"
-) {
+/* =========================================================
+   START GALAXY
+   ========================================================= */
 
+if (
+  document.readyState === "loading"
+) {
   document.addEventListener(
     "DOMContentLoaded",
-    initGalaxy,
-    {
-      once: true
-    }
+    initializeGalaxy
   );
+}
 
-} else {
-
-  initGalaxy();
-
+else {
+  initializeGalaxy();
 }
