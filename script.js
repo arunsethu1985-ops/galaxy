@@ -2,32 +2,144 @@
 
 /* =========================================================
    GALAXY AI
-   FINAL FRONTEND SCRIPT
-   index.html + style.css + script.js
-
-   IMPORTANT:
-   API KEYS MUST NEVER BE PUT IN THIS FILE.
-
-   Backend endpoints:
-   OpenAI -> /api/chat
-   Gemini -> /api/gemini
-   Image  -> /api/image
-   Video  -> /api/video
+   Created by Harshavardhan
+   Main Application + Gaming Center
    ========================================================= */
+
+const $ = (selector, root = document) => root.querySelector(selector);
+const $$ = (selector, root = document) =>
+  Array.from(root.querySelectorAll(selector));
+
+const GALAXY_LEVELS = [
+  { name: "Casual", elo: 100 },
+  { name: "Normal", elo: 200 },
+  { name: "Fun", elo: 500 },
+  { name: "Master", elo: 800 },
+  { name: "GM", elo: 1000 },
+  { name: "Player", elo: 1200 }
+];
+
+const App = {
+  currentView: "chat",
+  generating: false,
+  controller: null,
+  messages: [],
+  attachments: [],
+  searchEnabled: false
+};
+
+const Games = {
+  current: null,
+
+  chess: {
+    mode: "galaxy",
+    elo: 500,
+    board: [],
+    turn: "w",
+    selected: null,
+    legal: [],
+    history: [],
+    snapshots: [],
+    finished: false,
+    winner: null,
+    hints: 0,
+    reviewOpen: false
+  },
+
+  ttt: {
+    mode: "galaxy",
+    elo: 500,
+    board: Array(9).fill(""),
+    turn: "X",
+    history: [],
+    finished: false,
+    winner: null,
+    hints: 0,
+    reviewOpen: false
+  },
+
+  connect: {
+    mode: "galaxy",
+    elo: 500,
+    board: Array.from({ length: 6 }, () => Array(7).fill("")),
+    turn: "P",
+    history: [],
+    finished: false,
+    winner: null,
+    hints: 0,
+    reviewOpen: false
+  },
+
+  memory: {
+    mode: "galaxy",
+    elo: 500,
+    cards: [],
+    revealed: [],
+    matched: new Set(),
+    turn: "player",
+    playerScore: 0,
+    opponentScore: 0,
+    history: [],
+    known: {},
+    busy: false,
+    finished: false,
+    hints: 0,
+    reviewOpen: false,
+    playerAttempts: 0,
+    playerMatches: 0
+  },
+
+  shooter: {
+    mode: "galaxy",
+    elo: 500,
+    running: false,
+    finished: false,
+    time: 30,
+    playerScore: 0,
+    opponentScore: 0,
+    shots: 0,
+    hits: 0,
+    misses: 0,
+    streak: 0,
+    bestStreak: 0,
+    target: null,
+    timer: null,
+    galaxyTimer: null,
+    friendTurn: 1,
+    friendScores: [0, 0],
+    friendStats: [
+      { shots: 0, hits: 0, misses: 0, bestStreak: 0 },
+      { shots: 0, hits: 0, misses: 0, bestStreak: 0 }
+    ],
+    reviewOpen: false
+  }
+};
 
 
 /* =========================================================
-   HELPERS
+   BASIC UI
    ========================================================= */
 
-const $ = (selector, root = document) =>
-  root.querySelector(selector);
+function toast(message, type = "") {
+  let root = $("#toastRoot");
 
-const $$ = (selector, root = document) =>
-  [...root.querySelectorAll(selector)];
+  if (!root) {
+    root = document.createElement("div");
+    root.id = "toastRoot";
+    root.className = "toast-root";
+    document.body.appendChild(root);
+  }
 
-const uid = (prefix = "galaxy") =>
-  `${prefix}_${Date.now()}_${Math.random().toString(36).slice(2, 9)}`;
+  const item = document.createElement("div");
+  item.className = `toast ${type}`.trim();
+  item.textContent = message;
+
+  root.appendChild(item);
+
+  setTimeout(() => {
+    item.remove();
+  }, 2800);
+}
 
 function escapeHTML(value = "") {
   return String(value)
@@ -38,248 +150,76 @@ function escapeHTML(value = "") {
     .replaceAll("'", "&#039;");
 }
 
-function formatTime(date = new Date()) {
-  return date.toLocaleTimeString([], {
-    hour: "2-digit",
-    minute: "2-digit"
-  });
-}
-
 function delay(ms) {
   return new Promise(resolve => setTimeout(resolve, ms));
 }
 
-
-/* =========================================================
-   LOCAL STORAGE
-   ========================================================= */
-
-const Storage = {
-  prefix: "galaxy.ai.final.",
-
-  get(key, fallback = null) {
-    try {
-      const raw = localStorage.getItem(this.prefix + key);
-      return raw === null ? fallback : JSON.parse(raw);
-    } catch {
-      return fallback;
-    }
-  },
-
-  set(key, value) {
-    try {
-      localStorage.setItem(
-        this.prefix + key,
-        JSON.stringify(value)
-      );
-    } catch (error) {
-      console.warn("GALAXY storage error:", error);
-    }
-  },
-
-  remove(key) {
-    localStorage.removeItem(this.prefix + key);
-  }
-};
-
-
-/* =========================================================
-   MAIN STATE
-   ========================================================= */
-
-const Galaxy = {
-  version: "5.0.0",
-
-  state: {
-    view: "chat",
-    provider: Storage.get("provider", "openai"),
-    webSearch: false,
-    generating: false,
-
-    chats: Storage.get("chats", []),
-
-    activeChatId:
-      Storage.get("activeChatId", null),
-
-    projects:
-      Storage.get("projects", []),
-
-    assets:
-      Storage.get("assets", []),
-
-    generations:
-      Storage.get("generations", []),
-
-    creativeProjects:
-      Storage.get("creativeProjects", []),
-
-    scheduled:
-      Storage.get("scheduled", []),
-
-    selectedStudioMode: "text-video",
-    selectedCamera: "Static",
-
-    studioReferences: []
-  }
-};
-
-
-/* =========================================================
-   DEFAULT DATA
-   ========================================================= */
-
-const DEFAULT_PACKS = [
-  {
-    icon: "⌕",
-    name: "Research Pack",
-    description:
-      "Research topics, compare sources and organize findings."
-  },
-  {
-    icon: "✎",
-    name: "Writing Pack",
-    description:
-      "Draft, rewrite, summarize and improve written content."
-  },
-  {
-    icon: "▣",
-    name: "Developer Pack",
-    description:
-      "Build websites, apps and software projects."
-  },
-  {
-    icon: "◈",
-    name: "Design Pack",
-    description:
-      "Plan interfaces, visuals and creative projects."
-  },
-  {
-    icon: "▷",
-    name: "Video Pack",
-    description:
-      "Develop scenes, prompts, shots and video concepts."
-  },
-  {
-    icon: "▤",
-    name: "Data Pack",
-    description:
-      "Analyze structured information and reports."
-  }
-];
-
-const DEFAULT_AGENTS = [
-  {
-    icon: "◇",
-    name: "Research Agent",
-    description:
-      "Investigates topics and organizes findings."
-  },
-  {
-    icon: "⌘",
-    name: "Coding Agent",
-    description:
-      "Helps build, debug and improve software."
-  },
-  {
-    icon: "✦",
-    name: "Creative Agent",
-    description:
-      "Creates visual concepts, prompts and stories."
-  },
-  {
-    icon: "▣",
-    name: "Project Agent",
-    description:
-      "Plans projects, milestones and tasks."
-  }
-];
-
-const DEFAULT_PLUGINS = [
-  {
-    icon: "✉",
-    name: "Mail",
-    description:
-      "Connect email workflows."
-  },
-  {
-    icon: "◷",
-    name: "Calendar",
-    description:
-      "Work with schedules and events."
-  },
-  {
-    icon: "▤",
-    name: "Drive",
-    description:
-      "Work with cloud files."
-  },
-  {
-    icon: "⌘",
-    name: "GitHub",
-    description:
-      "Work with repositories and code."
-  },
-  {
-    icon: "◇",
-    name: "Slack",
-    description:
-      "Work with team conversations."
-  }
-];
-
-
-/* =========================================================
-   SAVE STATE
-   ========================================================= */
-
-function saveState() {
-  Storage.set("provider", Galaxy.state.provider);
-  Storage.set("chats", Galaxy.state.chats);
-  Storage.set("activeChatId", Galaxy.state.activeChatId);
-  Storage.set("projects", Galaxy.state.projects);
-  Storage.set("assets", Galaxy.state.assets);
-  Storage.set("generations", Galaxy.state.generations);
-  Storage.set(
-    "creativeProjects",
-    Galaxy.state.creativeProjects
-  );
-  Storage.set("scheduled", Galaxy.state.scheduled);
+function randomItem(array) {
+  return array[Math.floor(Math.random() * array.length)];
 }
 
-
-/* =========================================================
-   TOAST
-   ========================================================= */
-
-function toast(message) {
-  const root = $("#toastRoot");
-
-  if (!root) return;
-
-  const item = document.createElement("div");
-
-  item.className = "toast";
-  item.textContent = message;
-
-  root.appendChild(item);
-
-  setTimeout(() => {
-    item.remove();
-  }, 2800);
+function clone(value) {
+  return JSON.parse(JSON.stringify(value));
 }
 
+function levelOptions(selected) {
+  return GALAXY_LEVELS.map(level => {
+    const isSelected = Number(selected) === level.elo ? "selected" : "";
 
-/* =========================================================
-   VIEW ROUTING
-   ========================================================= */
-
-function hideAllViews() {
-  $$(".view").forEach(view =>
-    view.classList.remove("active-view")
-  );
+    return `
+      <option value="${level.elo}" ${isSelected}>
+        ${level.name} — ${level.elo} ELO
+      </option>
+    `;
+  }).join("");
 }
 
-function updateNavigation(view) {
+function modeOptions(selected) {
+  return `
+    <option value="galaxy" ${selected === "galaxy" ? "selected" : ""}>
+      You vs GALAXY
+    </option>
+
+    <option value="friend" ${selected === "friend" ? "selected" : ""}>
+      You vs Friend
+    </option>
+  `;
+}
+
+function opponentName(mode) {
+  return mode === "galaxy" ? "GALAXY" : "Friend";
+}
+
+function setContent(title, eyebrow, html) {
+  const contentView = $("#contentView");
+  const titleEl = $("#contentTitle");
+  const eyebrowEl = $("#contentEyebrow");
+  const body = $("#contentBody");
+
+  if (!contentView || !body) return;
+
+  if (titleEl) titleEl.textContent = title;
+  if (eyebrowEl) eyebrowEl.textContent = eyebrow;
+  body.innerHTML = html;
+}
+
+function switchView(view) {
+  App.currentView = view;
+
+  $$(".view").forEach(el => el.classList.remove("active-view"));
+
+  const chat = $("#chatView");
+  const work = $("#workView");
+  const content = $("#contentView");
+
+  if (view === "chat" && chat) {
+    chat.classList.add("active-view");
+  } else if (view === "work" && work) {
+    work.classList.add("active-view");
+  } else if (content) {
+    content.classList.add("active-view");
+  }
+
   $$("[data-view]").forEach(button => {
     button.classList.toggle(
       "active",
@@ -287,39 +227,46 @@ function updateNavigation(view) {
     );
   });
 
-  $$(".mode").forEach(button => {
-    button.classList.toggle(
-      "active",
-      button.dataset.view === view
+  if (view === "games") {
+    renderGamesHome();
+  }
+
+  if (view === "projects") {
+    renderSimplePage(
+      "Projects",
+      "GALAXY PROJECTS",
+      "Create and manage your GALAXY AI projects."
     );
-  });
+  }
+
+  if (view === "library") {
+    renderSimplePage(
+      "Library",
+      "GALAXY LIBRARY",
+      "Your images, videos, files and generated assets."
+    );
+  }
+
+  if (view === "studio") {
+    renderSimplePage(
+      "Create Studio",
+      "GALAXY CREATIVE",
+      "Image generation, video generation and creative tools."
+    );
+  }
 }
 
-function openView(view) {
-  Galaxy.state.view = view;
-
-  hideAllViews();
-  updateNavigation(view);
-
-  if (view === "chat") {
-    $("#chatView")?.classList.add("active-view");
-    renderChat();
-  }
-
-  else if (view === "work") {
-    $("#workView")?.classList.add("active-view");
-  }
-
-  else if (view === "create") {
-    $("#createView")?.classList.add("active-view");
-  }
-
-  else {
-    $("#contentView")?.classList.add("active-view");
-    renderWorkspace(view);
-  }
-
-  $("#sidebar")?.classList.remove("open");
+function renderSimplePage(title, eyebrow, description) {
+  setContent(
+    title,
+    eyebrow,
+    `
+      <div class="panel">
+        <h3>${escapeHTML(title)}</h3>
+        <p>${escapeHTML(description)}</p>
+      </div>
+    `
+  );
 }
 
 
@@ -327,200 +274,88 @@ function openView(view) {
    CHAT
    ========================================================= */
 
-function getActiveChat() {
-  return Galaxy.state.chats.find(
-    chat => chat.id === Galaxy.state.activeChatId
-  );
-}
-
-function createChat() {
-  const chat = {
-    id: uid("chat"),
-    title: "New chat",
-    createdAt: Date.now(),
-    messages: []
-  };
-
-  Galaxy.state.chats.unshift(chat);
-  Galaxy.state.activeChatId = chat.id;
-
-  saveState();
-  renderRecentChats();
-  openView("chat");
-
-  setTimeout(() => {
-    $("#promptInput")?.focus();
-  }, 50);
-}
-
-function ensureChat() {
-  let chat = getActiveChat();
-
-  if (!chat) {
-    createChat();
-    chat = getActiveChat();
-  }
-
-  return chat;
-}
-
-function renderRecentChats() {
-  const root = $("#recentChats");
-
-  if (!root) return;
-
-  const chats = Galaxy.state.chats.slice(0, 15);
-
-  if (!chats.length) {
-    root.innerHTML = "";
-    return;
-  }
-
-  root.innerHTML = chats.map(chat => `
-    <button
-      class="recent-btn"
-      data-chat-id="${chat.id}"
-      title="${escapeHTML(chat.title)}"
-    >
-      ${escapeHTML(chat.title)}
-    </button>
-  `).join("");
-}
-
-function renderChat() {
-  const messagesRoot = $("#messages");
+function updateEmptyState() {
   const empty = $("#chatEmpty");
 
-  if (!messagesRoot || !empty) return;
+  if (!empty) return;
 
-  const chat = getActiveChat();
+  empty.style.display =
+    App.messages.length === 0 ? "" : "none";
+}
 
-  if (!chat || !chat.messages.length) {
-    messagesRoot.innerHTML = "";
-    empty.style.display = "";
-    return;
-  }
+function renderMessages() {
+  const container = $("#messages");
 
-  empty.style.display = "none";
+  if (!container) return;
 
-  messagesRoot.innerHTML =
-    chat.messages.map(message => `
-      <article class="message ${message.role}">
-        <div class="bubble">
-          ${
-            message.role === "assistant"
-              ? renderMarkdown(message.content)
-              : escapeHTML(message.content)
-          }
-        </div>
+  container.innerHTML = App.messages.map(message => `
+    <div class="message ${message.role}">
+      <div class="bubble">${escapeHTML(message.content)}</div>
+    </div>
+  `).join("");
 
-        <div class="message-meta">
-          ${escapeHTML(message.time || "")}
-        </div>
-      </article>
-    `).join("");
+  updateEmptyState();
 
-  requestAnimationFrame(() => {
-    messagesRoot.lastElementChild?.scrollIntoView({
-      behavior: "smooth",
-      block: "end"
+  container.scrollTop = container.scrollHeight;
+
+  window.requestAnimationFrame(() => {
+    window.scrollTo({
+      top: document.body.scrollHeight,
+      behavior: "smooth"
     });
   });
 }
 
-function addMessage(role, content) {
-  const chat = ensureChat();
+function updateSendButtonState() {
+  const button = $("#sendButton");
 
-  chat.messages.push({
-    id: uid("message"),
-    role,
-    content,
-    time: formatTime()
-  });
+  if (!button) return;
 
-  if (
-    role === "user" &&
-    (
-      chat.title === "New chat" ||
-      !chat.title
-    )
-  ) {
-    chat.title =
-      content.length > 38
-        ? content.slice(0, 38) + "…"
-        : content;
+  button.textContent = App.generating ? "■" : "↑";
+  button.classList.toggle("is-stop", App.generating);
+
+  button.setAttribute(
+    "aria-label",
+    App.generating ? "Stop generating" : "Send"
+  );
+}
+
+function autoResizePrompt() {
+  const input = $("#promptInput");
+
+  if (!input) return;
+
+  input.style.height = "auto";
+  input.style.height =
+    `${Math.min(input.scrollHeight, 180)}px`;
+}
+
+function addRecentChat(text) {
+  const root = $("#recentChats");
+
+  if (!root || !text.trim()) return;
+
+  const button = document.createElement("button");
+  button.className = "recent-item";
+  button.textContent =
+    text.length > 32 ? `${text.slice(0, 32)}…` : text;
+
+  root.prepend(button);
+
+  while (root.children.length > 8) {
+    root.lastElementChild.remove();
   }
-
-  saveState();
-  renderChat();
-  renderRecentChats();
 }
 
-
-/* =========================================================
-   BASIC MARKDOWN
-   ========================================================= */
-
-function renderMarkdown(text = "") {
-  let output = escapeHTML(text);
-
-  output = output.replace(
-    /```([\s\S]*?)```/g,
-    "<pre><code>$1</code></pre>"
-  );
-
-  output = output.replace(
-    /\*\*(.*?)\*\*/g,
-    "<strong>$1</strong>"
-  );
-
-  output = output.replace(
-    /^### (.*)$/gm,
-    "<h3>$1</h3>"
-  );
-
-  output = output.replace(
-    /^## (.*)$/gm,
-    "<h2>$1</h2>"
-  );
-
-  output = output.replace(
-    /^# (.*)$/gm,
-    "<h1>$1</h1>"
-  );
-
-  output = output.replace(/\n/g, "<br>");
-
-  return output;
-}
-
-
-/* =========================================================
-   BACKEND AI
-   ========================================================= */
-
-async function fetchAIResponse(prompt) {
-  const provider =
-    $("#aiProvider")?.value ||
-    Galaxy.state.provider ||
-    "openai";
-
-  Galaxy.state.provider = provider;
-
-  saveState();
+async function fetchAIResponse(messageText) {
+  const provider = $("#aiProvider")?.value || "gemini";
 
   const endpoint =
-    provider === "gemini"
-      ? "/api/gemini"
-      : "/api/chat";
+    provider === "openai"
+      ? "/api/chat"
+      : "/api/gemini";
 
-  const chat = getActiveChat();
-
-  const messages =
-    chat?.messages.map(message => ({
-      role: message.role,
-      content: message.content
-    })) || [];
+  App.controller = new AbortController();
 
   const response = await fetch(endpoint, {
     method: "POST",
@@ -529,1719 +364,1224 @@ async function fetchAIResponse(prompt) {
       "Content-Type": "application/json"
     },
 
+    signal: App.controller.signal,
+
     body: JSON.stringify({
-      prompt,
-      messages,
-      webSearch: Galaxy.state.webSearch
+      message: messageText,
+      messages: App.messages.map(message => ({
+        role: message.role,
+        content: message.content
+      }))
     })
   });
 
-  if (!response.ok) {
-    let message =
-      `GALAXY API error (${response.status})`;
+  let data = {};
 
-    try {
-      const data = await response.json();
-
-      message =
-        data.error ||
-        data.message ||
-        message;
-    } catch {}
-
-    throw new Error(message);
+  try {
+    data = await response.json();
+  } catch {
+    data = {};
   }
 
-  const data = await response.json();
+  if (!response.ok) {
+    throw new Error(
+      data.error ||
+      data.message ||
+      `GALAXY backend returned ${response.status}`
+    );
+  }
 
   return (
     data.reply ||
     data.text ||
     data.output ||
-    data.output_text ||
     data.message ||
-    "GALAXY received an empty response."
+    "GALAXY did not return a response."
   );
 }
 
-async function sendChatMessage() {
-  if (Galaxy.state.generating) return;
+async function sendMessage() {
+  if (App.generating) {
+    if (App.controller) {
+      App.controller.abort();
+    }
 
-  const input = $("#promptInput");
-
-  if (!input) return;
-
-  const prompt = input.value.trim();
-
-  if (!prompt) return;
-
-  input.value = "";
-  resizePrompt();
-
-  addMessage("user", prompt);
-
-  Galaxy.state.generating = true;
-
-  $("#sendBtn")?.setAttribute("disabled", "");
-
-  try {
-    const reply =
-      await fetchAIResponse(prompt);
-
-    addMessage("assistant", reply);
-  }
-
-  catch (error) {
-    addMessage(
-      "assistant",
-      `I couldn't reach the GALAXY backend.\n\n${error.message}`
-    );
-  }
-
-  finally {
-    Galaxy.state.generating = false;
-
-    $("#sendBtn")?.removeAttribute("disabled");
-  }
-}
-
-function resizePrompt() {
-  const input = $("#promptInput");
-
-  if (!input) return;
-
-  input.style.height = "auto";
-
-  input.style.height =
-    Math.min(input.scrollHeight, 180) + "px";
-}
-
-
-/* =========================================================
-   WORK
-   ========================================================= */
-
-async function runWork() {
-  const input = $("#workPrompt");
-  const output = $("#workOutput");
-
-  if (!input || !output) return;
-
-  const prompt = input.value.trim();
-
-  if (!prompt) {
-    toast("Describe the work first.");
+    App.generating = false;
+    updateSendButtonState();
     return;
   }
 
-  output.textContent =
-    "GALAXY is working…";
+  const input = $("#promptInput");
 
-  try {
-    const reply =
-      await fetchAIResponse(
-        `Work task:\n${prompt}`
-      );
-
-    output.textContent = reply;
+  if (!input) {
+    toast("Prompt input was not found.", "error");
+    return;
   }
 
-  catch (error) {
-    output.textContent =
-      error.message;
+  const messageText = input.value.trim();
+
+  if (!messageText && App.attachments.length === 0) {
+    return;
   }
-}
 
+  const firstMessage = App.messages.length === 0;
 
-/* =========================================================
-   CREATE STUDIO
-   ========================================================= */
-
-function setStudioMode(mode) {
-  Galaxy.state.selectedStudioMode = mode;
-
-  $$("[data-studio]").forEach(button => {
-    button.classList.toggle(
-      "active",
-      button.dataset.studio === mode
-    );
+  App.messages.push({
+    role: "user",
+    content: messageText || "Uploaded files"
   });
 
-  const prompt = $("#studioPrompt");
-
-  if (!prompt) return;
-
-  const placeholders = {
-    "text-video":
-      "Describe the scene, subject, motion, camera, lighting and audio…",
-
-    "frames-video":
-      "Describe how the start frame should transition into the end frame…",
-
-    ingredients:
-      "Describe how GALAXY should combine your characters, objects and references…",
-
-    image:
-      "Describe the image you want to create…",
-
-    character:
-      "Describe the character, appearance, clothing and personality…",
-
-    avatar:
-      "Describe the avatar, speaking style, appearance and scene…"
-  };
-
-  prompt.placeholder =
-    placeholders[mode] ||
-    "Describe what you want to create…";
-}
-
-function selectCamera(button) {
-  $$("#cameraChips button").forEach(item =>
-    item.classList.remove("active")
-  );
-
-  button.classList.add("active");
-
-  Galaxy.state.selectedCamera =
-    button.textContent.trim();
-}
-
-function newCreativeProject() {
-  const project = {
-    id: uid("creative"),
-    name:
-      `Creative Project ${Galaxy.state.creativeProjects.length + 1}`,
-    createdAt: Date.now()
-  };
-
-  Galaxy.state.creativeProjects.unshift(project);
-
-  saveState();
-
-  $("#studioPrompt").value = "";
-
-  Galaxy.state.studioReferences = [];
-
-  toast("New creative project created.");
-}
-
-function studioUpload() {
-  const input = $("#fileInput");
-
-  if (!input) return;
-
-  input.dataset.target = "studio";
-  input.click();
-}
-
-async function generateStudioContent() {
-  const prompt =
-    $("#studioPrompt")?.value.trim();
-
-  if (!prompt) {
-    toast("Enter a creative prompt first.");
-    return;
+  if (firstMessage) {
+    addRecentChat(messageText || "Uploaded files");
   }
 
-  const mode =
-    Galaxy.state.selectedStudioMode;
+  input.value = "";
+  autoResizePrompt();
+  renderMessages();
 
-  const camera =
-    Galaxy.state.selectedCamera;
+  App.generating = true;
+  updateSendButtonState();
 
-  const model =
-    $("#studioModel")?.value || "";
+  const draftState = $("#draftState");
 
-  const aspect =
-    $("#studioAspect")?.value || "16:9";
-
-  const duration =
-    $("#studioDuration")?.value || "";
-
-  const quality =
-    $("#studioQuality")?.value || "";
-
-  const generation = {
-    id: uid("generation"),
-    mode,
-    prompt,
-    camera,
-    model,
-    aspect,
-    duration,
-    quality,
-    status: "generating",
-    createdAt: Date.now(),
-    url: null
-  };
-
-  Galaxy.state.generations.unshift(generation);
-
-  saveState();
-  renderGenerations();
-
-  const endpoint =
-    mode === "image"
-      ? "/api/image"
-      : "/api/video";
+  if (draftState) {
+    draftState.textContent = "GALAXY is thinking…";
+  }
 
   try {
-    const response = await fetch(endpoint, {
-      method: "POST",
+    const reply = await fetchAIResponse(messageText);
 
-      headers: {
-        "Content-Type": "application/json"
-      },
-
-      body: JSON.stringify({
-        prompt,
-        mode,
-        camera,
-        model,
-        aspect,
-        duration,
-        quality
-      })
+    App.messages.push({
+      role: "assistant",
+      content: reply
     });
-
-    if (!response.ok)
-      throw new Error("Media API not connected");
-
-    const data = await response.json();
-
-    generation.status = "ready";
-
-    generation.url =
-      data.url ||
-      data.image ||
-      data.video ||
-      null;
-  }
-
-  catch {
-    /*
-       Frontend still works without media API.
-       It creates a draft generation card.
-    */
-
-    await delay(700);
-
-    generation.status = "draft";
-  }
-
-  saveState();
-  renderGenerations();
-}
-
-function renderGenerations() {
-  const root = $("#generationGrid");
-
-  if (!root) return;
-
-  const generations =
-    Galaxy.state.generations.slice(0, 12);
-
-  if (!generations.length) {
-    root.innerHTML = `
-      <div class="empty-card">
-        <span>✦</span>
-        <b>Your generations appear here</b>
-        <small>
-          Connect /api/image and /api/video
-          for real media generation.
-        </small>
-      </div>
-    `;
-
-    return;
-  }
-
-  root.innerHTML =
-    generations.map(item => `
-      <article class="generation-card">
-
-        <div class="generation-preview">
-
-          ${
-            item.url &&
-            item.mode === "image"
-              ? `<img src="${escapeHTML(item.url)}" alt="">`
-              : item.url
-                ? `<video src="${escapeHTML(item.url)}" controls></video>`
-                : item.mode === "image"
-                  ? "▧"
-                  : "▷"
-          }
-
-        </div>
-
-        <div class="generation-body">
-
-          <b>
-            ${escapeHTML(
-              item.mode.replaceAll("-", " ")
-            )}
-          </b>
-
-          <p>
-            ${escapeHTML(item.prompt)}
-          </p>
-
-          <small>
-            ${escapeHTML(item.status)}
-          </small>
-
-          <br><br>
-
-          <button
-            data-generation-reuse="${item.id}"
-          >
-            Reuse prompt
-          </button>
-
-          <button
-            data-generation-delete="${item.id}"
-          >
-            Delete
-          </button>
-
-        </div>
-
-      </article>
-    `).join("");
-}
-
-
-/* =========================================================
-   WORKSPACE HEADER
-   ========================================================= */
-
-function workspaceHeader(
-  eyebrow,
-  title,
-  description = ""
-) {
-  return `
-    <div class="page-head">
-
-      <div>
-        <span class="eyebrow">
-          ${escapeHTML(eyebrow)}
-        </span>
-
-        <h1>
-          ${escapeHTML(title)}
-        </h1>
-
-        ${
-          description
-            ? `<p>${escapeHTML(description)}</p>`
-            : ""
-        }
-      </div>
-
-    </div>
-  `;
-}
-
-
-/* =========================================================
-   WORKSPACE ROUTER
-   ========================================================= */
-
-function renderWorkspace(view) {
-  const root = $("#contentBody");
-
-  if (!root) return;
-
-  switch (view) {
-    case "search":
-      renderSearch();
-      break;
-
-    case "projects":
-      renderProjects();
-      break;
-
-    case "assets":
-      renderAssets();
-      break;
-
-    case "scenes":
-      renderScenes();
-      break;
-
-    case "games":
-      renderGames();
-      break;
-
-    case "packs":
-      renderPacks();
-      break;
-
-    case "agents":
-      renderAgents();
-      break;
-
-    case "plugins":
-      renderPlugins();
-      break;
-
-    case "scheduled":
-      renderScheduled();
-      break;
-
-    case "sites":
-      renderSites();
-      break;
-
-    default:
-      root.innerHTML =
-        workspaceHeader(
-          "GALAXY",
-          "Workspace"
-        );
-  }
-}
-
-
-/* =========================================================
-   SEARCH
-   ========================================================= */
-
-function renderSearch() {
-  $("#contentBody").innerHTML = `
-    ${workspaceHeader(
-      "GALAXY SEARCH",
-      "Search",
-      "Search across your GALAXY workspace."
-    )}
-
-    <div class="panel">
-
-      <input
-        id="workspaceSearch"
-        placeholder="Search chats, projects and assets…"
-        style="
-          width:100%;
-          padding:14px;
-          border:1px solid var(--line, #3a3a3a);
-          background:transparent;
-          color:inherit;
-          border-radius:12px;
-        "
-      >
-
-      <div
-        id="workspaceSearchResults"
-        class="cards"
-        style="margin-top:15px"
-      ></div>
-
-    </div>
-  `;
-}
-
-function runWorkspaceSearch(query) {
-  const root =
-    $("#workspaceSearchResults");
-
-  if (!root) return;
-
-  const q =
-    query.toLowerCase().trim();
-
-  if (!q) {
-    root.innerHTML = "";
-    return;
-  }
-
-  const results = [];
-
-  Galaxy.state.chats.forEach(chat => {
-    if (
-      chat.title.toLowerCase().includes(q)
-    ) {
-      results.push({
-        type: "Chat",
-        name: chat.title
+  } catch (error) {
+    if (error.name !== "AbortError") {
+      App.messages.push({
+        role: "assistant",
+        content:
+          `GALAXY backend error: ${error.message}`
       });
-    }
-  });
 
-  Galaxy.state.projects.forEach(project => {
-    if (
-      project.name.toLowerCase().includes(q)
-    ) {
-      results.push({
-        type: "Project",
-        name: project.name
-      });
+      toast(error.message, "error");
     }
-  });
+  } finally {
+    App.generating = false;
+    App.controller = null;
 
-  Galaxy.state.assets.forEach(asset => {
-    if (
-      asset.name.toLowerCase().includes(q)
-    ) {
-      results.push({
-        type: "Asset",
-        name: asset.name
-      });
+    updateSendButtonState();
+    renderMessages();
+
+    if (draftState) {
+      draftState.textContent = "Ready";
     }
-  });
+  }
+}
 
-  root.innerHTML =
-    results.length
-      ? results.map(item => `
-          <div class="card">
-            <small>${item.type}</small>
-            <h3>${escapeHTML(item.name)}</h3>
-          </div>
-        `).join("")
-      : `
-        <div class="card">
-          <p>No results found.</p>
-        </div>
-      `;
+function newChat() {
+  if (App.generating && App.controller) {
+    App.controller.abort();
+  }
+
+  App.messages = [];
+  App.attachments = [];
+  App.generating = false;
+  App.controller = null;
+
+  const input = $("#promptInput");
+
+  if (input) {
+    input.value = "";
+    autoResizePrompt();
+  }
+
+  const tray = $("#attachmentTray");
+
+  if (tray) tray.innerHTML = "";
+
+  renderMessages();
+  updateSendButtonState();
+  switchView("chat");
+}
+
+function handleFiles(files) {
+  const list = Array.from(files || []);
+
+  if (!list.length) return;
+
+  App.attachments.push(...list);
+
+  const tray = $("#attachmentTray");
+
+  if (!tray) return;
+
+  tray.innerHTML = App.attachments.map(file => `
+    <div class="attachment-chip">
+      ${escapeHTML(file.name)}
+    </div>
+  `).join("");
+
+  toast(`${list.length} file(s) added`, "success");
 }
 
 
 /* =========================================================
-   PROJECTS
+   GAMING CENTER HOME
    ========================================================= */
 
-function renderProjects() {
-  const projects =
-    Galaxy.state.projects;
+function renderGamesHome() {
+  Games.current = null;
 
-  $("#contentBody").innerHTML = `
-    ${workspaceHeader(
-      "WORKSPACE",
-      "Projects",
-      "Organize chats, files and work."
-    )}
+  setContent(
+    "Gaming Center",
+    "GALAXY GAMES",
+    `
+      <div class="games-home">
 
-    <button
-      class="primary"
-      data-action="create-project"
-    >
-      ＋ New project
-    </button>
+        <div class="games-hero">
+          <div>
+            <span class="eyebrow">PLAY WITH GALAXY OR A FRIEND</span>
+            <h2>GALAXY Gaming Center</h2>
 
-    <div class="cards" style="margin-top:18px">
-
-      ${
-        projects.length
-          ? projects.map(project => `
-              <article class="card">
-
-                <h3>
-                  ${escapeHTML(project.name)}
-                </h3>
-
-                <p>
-                  GALAXY project workspace
-                </p>
-
-                <button
-                  data-delete-project="${project.id}"
-                >
-                  Delete
-                </button>
-
-              </article>
-            `).join("")
-          : `
-            <article class="card">
-              <h3>No projects yet</h3>
-              <p>Create your first GALAXY project.</p>
-            </article>
-          `
-      }
-
-    </div>
-  `;
-}
-
-function createProject() {
-  const name =
-    prompt("Project name:");
-
-  if (!name?.trim()) return;
-
-  Galaxy.state.projects.unshift({
-    id: uid("project"),
-    name: name.trim(),
-    createdAt: Date.now()
-  });
-
-  saveState();
-  renderProjects();
-}
-
-
-/* =========================================================
-   ASSETS
-   ========================================================= */
-
-function renderAssets() {
-  $("#contentBody").innerHTML = `
-    ${workspaceHeader(
-      "LIBRARY",
-      "Library / Assets",
-      "Images, videos and uploaded files."
-    )}
-
-    <button
-      class="primary"
-      data-action="upload"
-    >
-      ＋ Upload
-    </button>
-
-    <div class="cards" style="margin-top:18px">
-
-      ${
-        Galaxy.state.assets.length
-          ? Galaxy.state.assets.map(asset => `
-              <article class="card">
-                <div class="game-icon">
-                  ${
-                    asset.type?.startsWith("image/")
-                      ? "▧"
-                      : asset.type?.startsWith("video/")
-                        ? "▷"
-                        : "▤"
-                  }
-                </div>
-
-                <h3>
-                  ${escapeHTML(asset.name)}
-                </h3>
-
-                <p>
-                  ${escapeHTML(asset.type || "File")}
-                </p>
-
-                <button
-                  data-delete-asset="${asset.id}"
-                >
-                  Delete
-                </button>
-              </article>
-            `).join("")
-          : `
-            <article class="card">
-              <h3>No assets yet</h3>
-              <p>Upload images, videos or files.</p>
-            </article>
-          `
-      }
-
-    </div>
-  `;
-}
-
-
-/* =========================================================
-   SCENEBUILDER
-   ========================================================= */
-
-function renderScenes() {
-  $("#contentBody").innerHTML = `
-    ${workspaceHeader(
-      "GALAXY CREATE",
-      "Scenebuilder",
-      "Build your story shot by shot."
-    )}
-
-    <div class="panel">
-
-      <textarea
-        id="scenePrompt"
-        class="studio-prompt"
-        placeholder="Describe a scene…"
-      ></textarea>
-
-      <button
-        class="primary"
-        data-action="add-scene"
-        style="margin-top:12px"
-      >
-        ＋ Add scene
-      </button>
-
-      <div
-        id="sceneList"
-        class="cards"
-        style="margin-top:18px"
-      ></div>
-
-    </div>
-  `;
-
-  renderSceneList();
-}
-
-let scenes =
-  Storage.get("scenes", []);
-
-function renderSceneList() {
-  const root = $("#sceneList");
-
-  if (!root) return;
-
-  root.innerHTML =
-    scenes.length
-      ? scenes.map((scene, index) => `
-          <article class="card">
-            <small>SCENE ${index + 1}</small>
-            <h3>
-              ${escapeHTML(scene.title)}
-            </h3>
             <p>
-              ${escapeHTML(scene.prompt)}
+              Choose a game, challenge GALAXY,
+              or play locally with a friend.
             </p>
-            <button
-              data-delete-scene="${scene.id}"
-            >
-              Delete
-            </button>
-          </article>
-        `).join("")
-      : `
-        <article class="card">
-          <h3>No scenes</h3>
-          <p>Add your first scene.</p>
-        </article>
-      `;
-}
-
-function addScene() {
-  const input = $("#scenePrompt");
-
-  const promptText =
-    input?.value.trim();
-
-  if (!promptText) return;
-
-  scenes.push({
-    id: uid("scene"),
-    title: `Scene ${scenes.length + 1}`,
-    prompt: promptText
-  });
-
-  Storage.set("scenes", scenes);
-
-  input.value = "";
-
-  renderSceneList();
-}
-
-
-/* =========================================================
-   PACKS
-   ========================================================= */
-
-function renderPacks() {
-  $("#contentBody").innerHTML = `
-    ${workspaceHeader(
-      "EXPLORE",
-      "Packs",
-      "Ready-made GALAXY workflows."
-    )}
-
-    <div class="cards">
-
-      ${DEFAULT_PACKS.map(pack => `
-        <article class="card">
-
-          <div class="game-icon">
-            ${pack.icon}
           </div>
 
-          <h3>
-            ${escapeHTML(pack.name)}
-          </h3>
+          <div class="games-hero-mark">♛</div>
+        </div>
 
-          <p>
-            ${escapeHTML(pack.description)}
-          </p>
+        <div class="games-grid">
 
-          <button
-            data-use-pack="${escapeHTML(pack.name)}"
-          >
-            Use pack
-          </button>
+          ${gameCard(
+            "chess",
+            "♟",
+            "Chess",
+            "Play against GALAXY or a friend."
+          )}
 
-        </article>
-      `).join("")}
+          ${gameCard(
+            "tictactoe",
+            "✕○",
+            "Tic-Tac-Toe",
+            "Quick strategy against GALAXY or a friend."
+          )}
 
-    </div>
-  `;
+          ${gameCard(
+            "connect4",
+            "●●",
+            "Connect Four",
+            "Connect four before your opponent."
+          )}
+
+          ${gameCard(
+            "memory",
+            "✦?",
+            "Memory",
+            "Find more matching pairs than your opponent."
+          )}
+
+          ${gameCard(
+            "shooter",
+            "◎",
+            "GALAXY Shooting",
+            "Arcade target challenge against GALAXY or a friend."
+          )}
+
+        </div>
+      </div>
+    `
+  );
 }
 
-
-/* =========================================================
-   AGENTS
-   ========================================================= */
-
-function renderAgents() {
-  $("#contentBody").innerHTML = `
-    ${workspaceHeader(
-      "GALAXY",
-      "GPTs / Agents",
-      "Specialized AI assistants."
-    )}
-
-    <div class="cards">
-
-      ${DEFAULT_AGENTS.map(agent => `
-        <article class="card">
-
-          <div class="game-icon">
-            ${agent.icon}
-          </div>
-
-          <h3>
-            ${escapeHTML(agent.name)}
-          </h3>
-
-          <p>
-            ${escapeHTML(agent.description)}
-          </p>
-
-          <button
-            data-agent="${escapeHTML(agent.name)}"
-          >
-            Start
-          </button>
-
-        </article>
-      `).join("")}
-
-    </div>
-  `;
-}
-
-
-/* =========================================================
-   PLUGINS
-   ========================================================= */
-
-function renderPlugins() {
-  $("#contentBody").innerHTML = `
-    ${workspaceHeader(
-      "TOOLS",
-      "Plugins",
-      "Connect GALAXY with external services."
-    )}
-
-    <div class="cards">
-
-      ${DEFAULT_PLUGINS.map(plugin => `
-        <article class="card">
-
-          <div class="game-icon">
-            ${plugin.icon}
-          </div>
-
-          <h3>
-            ${escapeHTML(plugin.name)}
-          </h3>
-
-          <p>
-            ${escapeHTML(plugin.description)}
-          </p>
-
-          <button
-            data-plugin="${escapeHTML(plugin.name)}"
-          >
-            Connect
-          </button>
-
-        </article>
-      `).join("")}
-
-    </div>
-  `;
-}
-
-
-/* =========================================================
-   SCHEDULED
-   ========================================================= */
-
-function renderScheduled() {
-  $("#contentBody").innerHTML = `
-    ${workspaceHeader(
-      "AUTOMATION",
-      "Scheduled",
-      "Tasks GALAXY can run later."
-    )}
-
-    <button
-      class="primary"
-      data-action="new-scheduled"
-    >
-      ＋ New task
-    </button>
-
-    <div class="cards" style="margin-top:18px">
-
-      ${
-        Galaxy.state.scheduled.length
-          ? Galaxy.state.scheduled.map(task => `
-              <article class="card">
-                <h3>${escapeHTML(task.name)}</h3>
-                <p>${escapeHTML(task.schedule)}</p>
-                <button
-                  data-delete-task="${task.id}"
-                >
-                  Delete
-                </button>
-              </article>
-            `).join("")
-          : `
-            <article class="card">
-              <h3>No scheduled tasks</h3>
-              <p>Create a scheduled GALAXY task.</p>
-            </article>
-          `
-      }
-
-    </div>
-  `;
-}
-
-function createScheduledTask() {
-  const name =
-    prompt("Task name:");
-
-  if (!name?.trim()) return;
-
-  const schedule =
-    prompt(
-      "When should it run?",
-      "Every day"
-    );
-
-  Galaxy.state.scheduled.push({
-    id: uid("task"),
-    name: name.trim(),
-    schedule: schedule || "Not set"
-  });
-
-  saveState();
-  renderScheduled();
-}
-
-
-/* =========================================================
-   SITES
-   ========================================================= */
-
-function renderSites() {
-  $("#contentBody").innerHTML = `
-    ${workspaceHeader(
-      "BUILD",
-      "Sites",
-      "Build websites with GALAXY."
-    )}
-
-    <div class="cards">
-
-      <article class="card">
-        <div class="game-icon">◎</div>
-        <h3>New website</h3>
-        <p>
-          Ask GALAXY to design and build a website.
-        </p>
-        <button
-          data-site-prompt="Build a professional website for me."
-        >
-          Start building
-        </button>
-      </article>
-
-      <article class="card">
-        <div class="game-icon">▣</div>
-        <h3>Landing page</h3>
-        <p>
-          Create a modern landing page.
-        </p>
-        <button
-          data-site-prompt="Create a modern landing page."
-        >
-          Create
-        </button>
-      </article>
-
-      <article class="card">
-        <div class="game-icon">◇</div>
-        <h3>Portfolio</h3>
-        <p>
-          Create a personal portfolio website.
-        </p>
-        <button
-          data-site-prompt="Create a professional portfolio website."
-        >
-          Create
-        </button>
-      </article>
-
-    </div>
-  `;
-}
-
-
-/* =========================================================
-   GAMING CENTER
-   ========================================================= */
-
-const GameCenter = {
-  activeGame: "home",
-
-  chess: null,
-
-  ticTacToe: null,
-
-  connectFour: null,
-
-  memory: null
-};
-
-
-/* =========================================================
-   GAME HOME
-   ========================================================= */
-
-function renderGames() {
-  GameCenter.activeGame = "home";
-
-  $("#contentBody").innerHTML = `
-    ${workspaceHeader(
-      "GALAXY GAMING",
-      "Gaming Center",
-      "Play directly inside GALAXY."
-    )}
-
-    <div class="games-grid">
-
-      <button
-        class="game-card"
-        data-game-open="chess"
-      >
-        <div class="game-icon">♟</div>
-        <h3>Chess vs GALAXY</h3>
-        <p>Play White against GALAXY.</p>
-      </button>
-
-      <button
-        class="game-card"
-        data-game-open="tictactoe"
-      >
-        <div class="game-icon">✕</div>
-        <h3>Tic-Tac-Toe</h3>
-        <p>Play against GALAXY.</p>
-      </button>
-
-      <button
-        class="game-card"
-        data-game-open="connect4"
-      >
-        <div class="game-icon">●</div>
-        <h3>Connect Four</h3>
-        <p>Drop discs and beat GALAXY.</p>
-      </button>
-
-      <button
-        class="game-card"
-        data-game-open="memory"
-      >
-        <div class="game-icon">🧠</div>
-        <h3>Memory</h3>
-        <p>Find all matching pairs.</p>
-      </button>
-
-    </div>
-  `;
-}
-
-function gameBackButton() {
+function gameCard(id, icon, title, description) {
   return `
     <button
-      class="ghost-btn"
-      data-game-back
+      class="game-card"
+      data-game-open="${id}"
+      type="button"
     >
-      ← Gaming Center
+      <div class="game-card-visual">${icon}</div>
+
+      <div class="game-card-copy">
+        <strong>${escapeHTML(title)}</strong>
+        <span>${escapeHTML(description)}</span>
+      </div>
+    </button>
+  `;
+}
+
+function gameHeader(title, status, toolbar) {
+  return `
+    <div class="game-topline">
+
+      <button
+        class="secondary-btn"
+        data-game-back
+        type="button"
+      >
+        ← Games
+      </button>
+
+      <div class="game-status">
+        ${escapeHTML(status)}
+      </div>
+
+      <div class="game-toolbar">
+        ${toolbar}
+      </div>
+
+    </div>
+
+    <h2>${escapeHTML(title)}</h2>
+  `;
+}
+
+function gameModeSelector(game) {
+  return `
+    <select
+      data-game-mode="${game}"
+      aria-label="Game mode"
+    >
+      ${modeOptions(Games[game].mode)}
+    </select>
+  `;
+}
+
+function gameLevelSelector(game) {
+  if (Games[game].mode !== "galaxy") {
+    return "";
+  }
+
+  return `
+    <select
+      data-game-level="${game}"
+      aria-label="GALAXY difficulty"
+    >
+      ${levelOptions(Games[game].elo)}
+    </select>
+  `;
+}
+
+function commonGameButtons(game, options = {}) {
+  const {
+    hint = true,
+    undo = true,
+    resign = true,
+    review = true
+  } = options;
+
+  return `
+    ${hint ? `
+      <button
+        class="secondary-btn"
+        data-game-command="${game}:hint"
+        type="button"
+      >Hint</button>
+    ` : ""}
+
+    ${undo ? `
+      <button
+        class="secondary-btn"
+        data-game-command="${game}:undo"
+        type="button"
+      >Undo</button>
+    ` : ""}
+
+    ${resign ? `
+      <button
+        class="secondary-btn"
+        data-game-command="${game}:resign"
+        type="button"
+      >Resign</button>
+    ` : ""}
+
+    ${review ? `
+      <button
+        class="secondary-btn"
+        data-game-command="${game}:review"
+        type="button"
+      >Review</button>
+    ` : ""}
+
+    <button
+      class="primary-btn"
+      data-game-command="${game}:reset"
+      type="button"
+    >
+      New Game
     </button>
   `;
 }
 
 
+/* =========================================================
+   OPEN GAME
+   ========================================================= */
+
+function openGame(name) {
+  Games.current = name;
+
+  if (name === "chess") {
+    resetChess(false);
+    return;
+  }
+
+  if (name === "tictactoe") {
+    resetTTT(false);
+    return;
+  }
+
+  if (name === "connect4") {
+    resetConnect(false);
+    return;
+  }
+
+  if (name === "memory") {
+    resetMemory(false);
+    return;
+  }
+
+  if (name === "shooter") {
+    resetShooter(false);
+  }
+}
 /* =========================================================
    CHESS
    ========================================================= */
 
-const CHESS_PIECES = {
-  wr: "♖",
-  wn: "♘",
-  wb: "♗",
-  wq: "♕",
-  wk: "♔",
-  wp: "♙",
+const CHESS_START = [
+  ["r","n","b","q","k","b","n","r"],
+  ["p","p","p","p","p","p","p","p"],
+  ["","","","","","","",""],
+  ["","","","","","","",""],
+  ["","","","","","","",""],
+  ["","","","","","","",""],
+  ["P","P","P","P","P","P","P","P"],
+  ["R","N","B","Q","K","B","N","R"]
+];
 
-  br: "♜",
-  bn: "♞",
-  bb: "♝",
-  bq: "♛",
-  bk: "♚",
-  bp: "♟"
+const CHESS_ICONS = {
+  K: "♔",
+  Q: "♕",
+  R: "♖",
+  B: "♗",
+  N: "♘",
+  P: "♙",
+  k: "♚",
+  q: "♛",
+  r: "♜",
+  b: "♝",
+  n: "♞",
+  p: "♟"
 };
 
-function initialChessBoard() {
-  return [
-    ["br","bn","bb","bq","bk","bb","bn","br"],
-    ["bp","bp","bp","bp","bp","bp","bp","bp"],
-    [null,null,null,null,null,null,null,null],
-    [null,null,null,null,null,null,null,null],
-    [null,null,null,null,null,null,null,null],
-    [null,null,null,null,null,null,null,null],
-    ["wp","wp","wp","wp","wp","wp","wp","wp"],
-    ["wr","wn","wb","wq","wk","wb","wn","wr"]
-  ];
-}
+const CHESS_VALUES = {
+  p: 1,
+  n: 3,
+  b: 3,
+  r: 5,
+  q: 9,
+  k: 100
+};
 
-function resetChess() {
-  GameCenter.chess = {
-    board: initialChessBoard(),
-    selected: null,
-    legal: [],
-    turn: "w",
-    status: "Your turn — White",
-    gameOver: false,
-    history: []
-  };
+function resetChess(render = true) {
+  const game = Games.chess;
+
+  game.board = clone(CHESS_START);
+  game.turn = "w";
+  game.selected = null;
+  game.legal = [];
+  game.history = [];
+  game.snapshots = [];
+  game.finished = false;
+  game.winner = null;
+  game.hints = 0;
+  game.reviewOpen = false;
+
+  if (render) renderChess();
+  else renderChess();
 }
 
 function chessColor(piece) {
-  return piece ? piece[0] : null;
+  if (!piece) return null;
+  return piece === piece.toUpperCase() ? "w" : "b";
 }
 
-function chessType(piece) {
-  return piece ? piece[1] : null;
+function chessOpponent(color) {
+  return color === "w" ? "b" : "w";
 }
 
-function insideBoard(r, c) {
-  return (
-    r >= 0 &&
-    r < 8 &&
-    c >= 0 &&
-    c < 8
-  );
+function chessInside(row, col) {
+  return row >= 0 && row < 8 && col >= 0 && col < 8;
 }
 
-function chessMovesFor(board, r, c) {
-  const piece = board[r][c];
-
-  if (!piece) return [];
-
-  const color = chessColor(piece);
-  const type = chessType(piece);
-
-  const enemy =
-    color === "w" ? "b" : "w";
-
+function chessPathMoves(row, col, directions, color) {
+  const game = Games.chess;
   const moves = [];
 
-  function pushSquare(nr, nc) {
-    if (!insideBoard(nr, nc))
-      return false;
+  for (const [dr, dc] of directions) {
+    let r = row + dr;
+    let c = col + dc;
 
-    const target =
-      board[nr][nc];
+    while (chessInside(r, c)) {
+      const target = game.board[r][c];
 
-    if (!target) {
-      moves.push([nr, nc]);
-      return true;
-    }
+      if (!target) {
+        moves.push({ row: r, col: c });
+      } else {
+        if (chessColor(target) !== color) {
+          moves.push({
+            row: r,
+            col: c,
+            capture: true
+          });
+        }
 
-    if (
-      chessColor(target) === enemy
-    ) {
-      moves.push([nr, nc]);
-    }
-
-    return false;
-  }
-
-  function slide(directions) {
-    directions.forEach(([dr, dc]) => {
-      let nr = r + dr;
-      let nc = c + dc;
-
-      while (insideBoard(nr, nc)) {
-        if (!pushSquare(nr, nc))
-          break;
-
-        nr += dr;
-        nc += dc;
+        break;
       }
-    });
-  }
 
-  if (type === "p") {
-    const direction =
-      color === "w" ? -1 : 1;
-
-    const startRow =
-      color === "w" ? 6 : 1;
-
-    if (
-      insideBoard(r + direction, c) &&
-      !board[r + direction][c]
-    ) {
-      moves.push([
-        r + direction,
-        c
-      ]);
-
-      if (
-        r === startRow &&
-        !board[r + direction * 2][c]
-      ) {
-        moves.push([
-          r + direction * 2,
-          c
-        ]);
-      }
+      r += dr;
+      c += dc;
     }
-
-    [-1, 1].forEach(dc => {
-      const nr =
-        r + direction;
-
-      const nc =
-        c + dc;
-
-      if (
-        insideBoard(nr, nc) &&
-        board[nr][nc] &&
-        chessColor(board[nr][nc]) === enemy
-      ) {
-        moves.push([nr, nc]);
-      }
-    });
-  }
-
-  else if (type === "r") {
-    slide([
-      [1,0],
-      [-1,0],
-      [0,1],
-      [0,-1]
-    ]);
-  }
-
-  else if (type === "b") {
-    slide([
-      [1,1],
-      [1,-1],
-      [-1,1],
-      [-1,-1]
-    ]);
-  }
-
-  else if (type === "q") {
-    slide([
-      [1,0],
-      [-1,0],
-      [0,1],
-      [0,-1],
-      [1,1],
-      [1,-1],
-      [-1,1],
-      [-1,-1]
-    ]);
-  }
-
-  else if (type === "n") {
-    [
-      [2,1],
-      [2,-1],
-      [-2,1],
-      [-2,-1],
-      [1,2],
-      [1,-2],
-      [-1,2],
-      [-1,-2]
-    ].forEach(([dr, dc]) =>
-      pushSquare(r + dr, c + dc)
-    );
-  }
-
-  else if (type === "k") {
-    [
-      [1,0],
-      [-1,0],
-      [0,1],
-      [0,-1],
-      [1,1],
-      [1,-1],
-      [-1,1],
-      [-1,-1]
-    ].forEach(([dr, dc]) =>
-      pushSquare(r + dr, c + dc)
-    );
   }
 
   return moves;
 }
 
-function chessSquareName(r, c) {
-  return `${"abcdefgh"[c]}${8 - r}`;
-}
+function chessPseudoMoves(row, col) {
+  const game = Games.chess;
+  const piece = game.board[row][col];
 
-function renderChess() {
-  GameCenter.activeGame = "chess";
+  if (!piece) return [];
 
-  if (!GameCenter.chess)
-    resetChess();
-
-  const game =
-    GameCenter.chess;
-
-  $("#contentBody").innerHTML = `
-    ${workspaceHeader(
-      "GALAXY GAMING",
-      "Chess vs GALAXY"
-    )}
-
-    <section class="game-shell">
-
-      <div class="game-head">
-
-        ${gameBackButton()}
-
-        <strong>
-          ${escapeHTML(game.status)}
-        </strong>
-
-        <button
-          class="ghost-btn"
-          data-chess-reset
-        >
-          ↻ New game
-        </button>
-
-      </div>
-
-      <div class="board-wrap">
-
-        <div class="chess-board">
-
-          ${game.board.map(
-            (row, r) =>
-              row.map(
-                (piece, c) => {
-
-                  const selected =
-                    game.selected &&
-                    game.selected[0] === r &&
-                    game.selected[1] === c;
-
-                  const legal =
-                    game.legal.some(
-                      ([lr, lc]) =>
-                        lr === r &&
-                        lc === c
-                    );
-
-                  return `
-                    <button
-                      class="
-                        chess-square
-                        ${(r + c) % 2 ? "dark" : "light"}
-                        ${selected ? "selected" : ""}
-                        ${legal ? "legal" : ""}
-                      "
-                      data-chess-square="${r},${c}"
-                    >
-                      ${
-                        piece
-                          ? CHESS_PIECES[piece]
-                          : legal
-                            ? "•"
-                            : ""
-                      }
-                    </button>
-                  `;
-                }
-              ).join("")
-          ).join("")}
-
-        </div>
-
-      </div>
-
-      <div style="
-        max-width:560px;
-        margin:15px auto 0;
-      ">
-
-        <p>
-          You are White. Select a piece,
-          then select a legal square.
-        </p>
-
-        <small>
-          Moves:
-          ${
-            game.history.length
-              ? escapeHTML(
-                  game.history.join(" · ")
-                )
-              : "None yet"
-          }
-        </small>
-
-      </div>
-
-    </section>
-  `;
-}
-
-function makeChessMove(
-  fromR,
-  fromC,
-  toR,
-  toC,
-  color
-) {
-  const game =
-    GameCenter.chess;
-
-  const piece =
-    game.board[fromR][fromC];
-
-  const captured =
-    game.board[toR][toC];
-
-  game.board[toR][toC] = piece;
-  game.board[fromR][fromC] = null;
-
-  /* pawn promotion */
-
-  if (
-    piece === "wp" &&
-    toR === 0
-  ) {
-    game.board[toR][toC] = "wq";
-  }
-
-  if (
-    piece === "bp" &&
-    toR === 7
-  ) {
-    game.board[toR][toC] = "bq";
-  }
-
-  game.history.push(
-    `${chessSquareName(fromR, fromC)}-${chessSquareName(toR, toC)}`
-  );
-
-  if (
-    captured === "bk"
-  ) {
-    game.gameOver = true;
-    game.status = "You win!";
-    return;
-  }
-
-  if (
-    captured === "wk"
-  ) {
-    game.gameOver = true;
-    game.status = "GALAXY wins";
-    return;
-  }
-
-  game.turn =
-    color === "w" ? "b" : "w";
-
-  game.status =
-    game.turn === "w"
-      ? "Your turn — White"
-      : "GALAXY is thinking…";
-}
-
-function handleChessSquare(r, c) {
-  const game =
-    GameCenter.chess;
-
-  if (
-    !game ||
-    game.gameOver ||
-    game.turn !== "w"
-  ) return;
-
-  const piece =
-    game.board[r][c];
-
-  if (!game.selected) {
-    if (
-      piece &&
-      chessColor(piece) === "w"
-    ) {
-      game.selected = [r, c];
-
-      game.legal =
-        chessMovesFor(
-          game.board,
-          r,
-          c
-        );
-
-      renderChess();
-    }
-
-    return;
-  }
-
-  const [sr, sc] =
-    game.selected;
-
-  const legal =
-    game.legal.some(
-      ([lr, lc]) =>
-        lr === r &&
-        lc === c
-    );
-
-  if (legal) {
-    makeChessMove(
-      sr,
-      sc,
-      r,
-      c,
-      "w"
-    );
-
-    game.selected = null;
-    game.legal = [];
-
-    renderChess();
-
-    if (!game.gameOver) {
-      setTimeout(
-        galaxyChessMove,
-        400
-      );
-    }
-
-    return;
-  }
-
-  if (
-    piece &&
-    chessColor(piece) === "w"
-  ) {
-    game.selected = [r, c];
-
-    game.legal =
-      chessMovesFor(
-        game.board,
-        r,
-        c
-      );
-  }
-
-  else {
-    game.selected = null;
-    game.legal = [];
-  }
-
-  renderChess();
-}
-
-function galaxyChessMove() {
-  const game =
-    GameCenter.chess;
-
-  if (
-    !game ||
-    game.gameOver ||
-    game.turn !== "b"
-  ) return;
+  const color = chessColor(piece);
+  const lower = piece.toLowerCase();
 
   const moves = [];
 
-  for (let r = 0; r < 8; r++) {
-    for (let c = 0; c < 8; c++) {
+  if (lower === "p") {
+    const direction = color === "w" ? -1 : 1;
+    const startRow = color === "w" ? 6 : 1;
 
-      const piece =
-        game.board[r][c];
+    const one = row + direction;
+
+    if (
+      chessInside(one, col) &&
+      !game.board[one][col]
+    ) {
+      moves.push({
+        row: one,
+        col
+      });
+
+      const two = row + direction * 2;
 
       if (
-        piece &&
-        chessColor(piece) === "b"
+        row === startRow &&
+        chessInside(two, col) &&
+        !game.board[two][col]
       ) {
-        chessMovesFor(
-          game.board,
-          r,
-          c
-        ).forEach(([tr, tc]) => {
-          moves.push([
-            r,
-            c,
-            tr,
-            tc
-          ]);
+        moves.push({
+          row: two,
+          col
+        });
+      }
+    }
+
+    for (const dc of [-1, 1]) {
+      const r = row + direction;
+      const c = col + dc;
+
+      if (
+        chessInside(r, c) &&
+        game.board[r][c] &&
+        chessColor(game.board[r][c]) !== color
+      ) {
+        moves.push({
+          row: r,
+          col: c,
+          capture: true
         });
       }
     }
   }
 
-  if (!moves.length) {
-    game.gameOver = true;
-    game.status =
-      "You win — GALAXY has no moves.";
+  if (lower === "n") {
+    const jumps = [
+      [-2,-1],[-2,1],
+      [-1,-2],[-1,2],
+      [1,-2],[1,2],
+      [2,-1],[2,1]
+    ];
 
+    for (const [dr, dc] of jumps) {
+      const r = row + dr;
+      const c = col + dc;
+
+      if (!chessInside(r, c)) continue;
+
+      const target = game.board[r][c];
+
+      if (!target) {
+        moves.push({ row: r, col: c });
+      } else if (chessColor(target) !== color) {
+        moves.push({
+          row: r,
+          col: c,
+          capture: true
+        });
+      }
+    }
+  }
+
+  if (lower === "b") {
+    return chessPathMoves(
+      row,
+      col,
+      [[1,1],[1,-1],[-1,1],[-1,-1]],
+      color
+    );
+  }
+
+  if (lower === "r") {
+    return chessPathMoves(
+      row,
+      col,
+      [[1,0],[-1,0],[0,1],[0,-1]],
+      color
+    );
+  }
+
+  if (lower === "q") {
+    return chessPathMoves(
+      row,
+      col,
+      [
+        [1,1],[1,-1],[-1,1],[-1,-1],
+        [1,0],[-1,0],[0,1],[0,-1]
+      ],
+      color
+    );
+  }
+
+  if (lower === "k") {
+    for (let dr = -1; dr <= 1; dr++) {
+      for (let dc = -1; dc <= 1; dc++) {
+        if (dr === 0 && dc === 0) continue;
+
+        const r = row + dr;
+        const c = col + dc;
+
+        if (!chessInside(r, c)) continue;
+
+        const target = game.board[r][c];
+
+        if (!target) {
+          moves.push({ row: r, col: c });
+        } else if (chessColor(target) !== color) {
+          moves.push({
+            row: r,
+            col: c,
+            capture: true
+          });
+        }
+      }
+    }
+  }
+
+  return moves;
+}
+
+function chessAllMoves(color) {
+  const game = Games.chess;
+  const all = [];
+
+  for (let row = 0; row < 8; row++) {
+    for (let col = 0; col < 8; col++) {
+      const piece = game.board[row][col];
+
+      if (
+        piece &&
+        chessColor(piece) === color
+      ) {
+        const moves = chessPseudoMoves(row, col);
+
+        for (const move of moves) {
+          all.push({
+            from: { row, col },
+            to: move,
+            piece
+          });
+        }
+      }
+    }
+  }
+
+  return all;
+}
+
+function chessSquareName(row, col) {
+  const file = "abcdefgh"[col];
+  const rank = 8 - row;
+
+  return `${file}${rank}`;
+}
+
+function chessMoveText(move, captured = "") {
+  const pieceName =
+    move.piece.toLowerCase() === "p"
+      ? ""
+      : move.piece.toUpperCase();
+
+  const capture = captured ? "x" : "";
+
+  return `${pieceName}${chessSquareName(
+    move.from.row,
+    move.from.col
+  )}${capture}${chessSquareName(
+    move.to.row,
+    move.to.col
+  )}`;
+}
+
+function chessSnapshot() {
+  const game = Games.chess;
+
+  return {
+    board: clone(game.board),
+    turn: game.turn,
+    history: clone(game.history),
+    finished: game.finished,
+    winner: game.winner
+  };
+}
+
+function chessRestore(snapshot) {
+  const game = Games.chess;
+
+  game.board = clone(snapshot.board);
+  game.turn = snapshot.turn;
+  game.history = clone(snapshot.history);
+  game.finished = snapshot.finished;
+  game.winner = snapshot.winner;
+  game.selected = null;
+  game.legal = [];
+}
+
+function chessMoveScore(move) {
+  const game = Games.chess;
+  const target =
+    game.board[move.to.row][move.to.col];
+
+  let score = 0;
+
+  if (target) {
+    score +=
+      CHESS_VALUES[target.toLowerCase()] * 10;
+  }
+
+  const centerDistance =
+    Math.abs(3.5 - move.to.row) +
+    Math.abs(3.5 - move.to.col);
+
+  score += Math.max(0, 6 - centerDistance);
+
+  if (move.piece.toLowerCase() === "p") {
+    score += 1;
+  }
+
+  return score;
+}
+
+function chooseGalaxyChessMove() {
+  const game = Games.chess;
+
+  let moves = chessAllMoves("b");
+
+  if (!moves.length) return null;
+
+  moves = moves.map(move => ({
+    ...move,
+    score: chessMoveScore(move)
+  }));
+
+  moves.sort((a, b) => b.score - a.score);
+
+  const strength = game.elo;
+
+  let poolSize = moves.length;
+
+  if (strength >= 1200) poolSize = Math.min(2, moves.length);
+  else if (strength >= 1000) poolSize = Math.min(3, moves.length);
+  else if (strength >= 800) poolSize = Math.min(5, moves.length);
+  else if (strength >= 500) poolSize = Math.min(8, moves.length);
+  else if (strength >= 200) poolSize = Math.min(14, moves.length);
+
+  return randomItem(
+    moves.slice(0, Math.max(1, poolSize))
+  );
+}
+
+function chessApplyMove(move, actor = "player") {
+  const game = Games.chess;
+
+  if (game.finished) return;
+
+  game.snapshots.push(chessSnapshot());
+
+  const piece =
+    game.board[move.from.row][move.from.col];
+
+  const captured =
+    game.board[move.to.row][move.to.col];
+
+  game.board[move.to.row][move.to.col] = piece;
+  game.board[move.from.row][move.from.col] = "";
+
+  if (
+    piece === "P" &&
+    move.to.row === 0
+  ) {
+    game.board[move.to.row][move.to.col] = "Q";
+  }
+
+  if (
+    piece === "p" &&
+    move.to.row === 7
+  ) {
+    game.board[move.to.row][move.to.col] = "q";
+  }
+
+  game.history.push({
+    actor,
+    text: chessMoveText(
+      {
+        ...move,
+        piece
+      },
+      captured
+    ),
+    captured
+  });
+
+  if (captured?.toLowerCase() === "k") {
+    game.finished = true;
+
+    game.winner =
+      actor === "galaxy"
+        ? "GALAXY"
+        : actor === "friend"
+          ? "Friend"
+          : "You";
+  }
+
+  game.turn =
+    game.turn === "w" ? "b" : "w";
+
+  game.selected = null;
+  game.legal = [];
+
+  renderChess();
+
+  if (
+    !game.finished &&
+    game.mode === "galaxy" &&
+    game.turn === "b"
+  ) {
+    setTimeout(galaxyChessTurn, 450);
+  }
+}
+
+function galaxyChessTurn() {
+  const game = Games.chess;
+
+  if (
+    game.finished ||
+    game.mode !== "galaxy" ||
+    game.turn !== "b"
+  ) {
+    return;
+  }
+
+  const move = chooseGalaxyChessMove();
+
+  if (!move) {
+    game.finished = true;
+    game.winner = "You";
     renderChess();
     return;
   }
 
-  const captures =
-    moves.filter(
-      ([r,c,tr,tc]) =>
-        game.board[tr][tc]
+  chessApplyMove(move, "galaxy");
+}
+
+function chessClickSquare(row, col) {
+  const game = Games.chess;
+
+  if (game.finished) return;
+
+  if (
+    game.mode === "galaxy" &&
+    game.turn === "b"
+  ) {
+    return;
+  }
+
+  const piece = game.board[row][col];
+
+  const playerColor =
+    game.turn;
+
+  if (game.selected) {
+    const legal = game.legal.find(
+      move =>
+        move.row === row &&
+        move.col === col
     );
 
-  const pool =
-    captures.length
-      ? captures
-      : moves;
+    if (legal) {
+      const actor =
+        game.mode === "friend" &&
+        game.turn === "b"
+          ? "friend"
+          : "player";
 
-  const move =
-    pool[
-      Math.floor(
-        Math.random() *
-        pool.length
-      )
-    ];
+      chessApplyMove(
+        {
+          from: game.selected,
+          to: legal
+        },
+        actor
+      );
 
-  makeChessMove(
-    move[0],
-    move[1],
-    move[2],
-    move[3],
-    "b"
-  );
+      return;
+    }
+  }
+
+  if (
+    piece &&
+    chessColor(piece) === playerColor
+  ) {
+    game.selected = { row, col };
+    game.legal = chessPseudoMoves(row, col);
+  } else {
+    game.selected = null;
+    game.legal = [];
+  }
 
   renderChess();
+}
+
+function chessHint() {
+  const game = Games.chess;
+
+  if (game.finished) return;
+
+  const moves = chessAllMoves(game.turn);
+
+  if (!moves.length) {
+    toast("No move available.");
+    return;
+  }
+
+  moves.sort(
+    (a, b) =>
+      chessMoveScore(b) -
+      chessMoveScore(a)
+  );
+
+  const best = moves[0];
+
+  game.hints += 1;
+
+  toast(
+    `Hint: ${chessSquareName(
+      best.from.row,
+      best.from.col
+    )} → ${chessSquareName(
+      best.to.row,
+      best.to.col
+    )}`
+  );
+}
+
+function chessUndo() {
+  const game = Games.chess;
+
+  if (!game.snapshots.length) {
+    toast("Nothing to undo.");
+    return;
+  }
+
+  let snapshot = game.snapshots.pop();
+
+  if (
+    game.mode === "galaxy" &&
+    snapshot.turn === "b" &&
+    game.snapshots.length
+  ) {
+    snapshot = game.snapshots.pop();
+  }
+
+  chessRestore(snapshot);
+  renderChess();
+}
+
+function chessResign() {
+  const game = Games.chess;
+
+  if (game.finished) return;
+
+  game.finished = true;
+
+  if (game.mode === "galaxy") {
+    game.winner = "GALAXY";
+  } else {
+    game.winner =
+      game.turn === "w"
+        ? "Friend"
+        : "You";
+  }
+
+  renderChess();
+}
+
+function chessReviewHTML() {
+  const game = Games.chess;
+
+  const playerMoves =
+    game.history.filter(
+      item => item.actor === "player"
+    );
+
+  const captures =
+    playerMoves.filter(
+      item => item.captured
+    ).length;
+
+  const moves = playerMoves.length;
+
+  let accuracy =
+    Math.max(
+      35,
+      Math.min(
+        98,
+        72 +
+        captures * 4 -
+        Math.max(0, moves - captures * 2) * 0.7 -
+        game.hints * 2
+      )
+    );
+
+  accuracy = Math.round(accuracy);
+
+  const best = Math.max(
+    0,
+    Math.round(captures * 0.7)
+  );
+
+  const good = Math.max(
+    0,
+    moves - best - Math.floor(moves * 0.15)
+  );
+
+  const mistakes =
+    Math.max(
+      0,
+      Math.floor(moves * 0.1)
+    );
+
+  const blunders =
+    Math.max(
+      0,
+      Math.floor(moves * 0.05)
+    );
+
+  return reviewCardHTML(
+    "Chess Review",
+    [
+      ["Estimated accuracy", `${accuracy}%`],
+      ["Moves", moves],
+      ["Best moves", best],
+      ["Good moves", good],
+      ["Mistakes", mistakes],
+      ["Blunders", blunders],
+      ["Hints used", game.hints],
+      ["Result", game.winner || "In progress"]
+    ],
+    "GALAXY Chess review is heuristic and is not Stockfish-certified."
+  );
+}
+
+function renderChess() {
+  const game = Games.chess;
+
+  const status =
+    game.finished
+      ? `${game.winner || "Game"} wins`
+      : game.mode === "galaxy"
+        ? game.turn === "w"
+          ? "Your turn"
+          : "GALAXY is thinking"
+        : game.turn === "w"
+          ? "Your turn"
+          : "Friend's turn";
+
+  const toolbar = `
+    ${gameModeSelector("chess")}
+    ${gameLevelSelector("chess")}
+    ${commonGameButtons("chess")}
+  `;
+
+  let boardHTML = "";
+
+  for (let row = 0; row < 8; row++) {
+    for (let col = 0; col < 8; col++) {
+      const piece =
+        game.board[row][col];
+
+      const light =
+        (row + col) % 2 === 0;
+
+      const selected =
+        game.selected &&
+        game.selected.row === row &&
+        game.selected.col === col;
+
+      const legalMove =
+        game.legal.find(
+          move =>
+            move.row === row &&
+            move.col === col
+        );
+
+      boardHTML += `
+        <button
+          class="
+            chess-square
+            ${light ? "light" : "dark"}
+            ${selected ? "selected" : ""}
+            ${legalMove ? "legal" : ""}
+            ${
+              legalMove?.capture
+                ? "capture"
+                : ""
+            }
+          "
+          data-chess-square="${row},${col}"
+          type="button"
+        >
+          ${piece ? CHESS_ICONS[piece] : ""}
+        </button>
+      `;
+    }
+  }
+
+  const historyHTML =
+    game.history.length
+      ? game.history
+          .map(
+            (move, index) =>
+              `<div>${index + 1}. ${escapeHTML(
+                move.text
+              )}</div>`
+          )
+          .join("")
+      : "<div>No moves yet.</div>";
+
+  setContent(
+    "Chess",
+    "GALAXY GAMES",
+    `
+      <div class="game-shell">
+
+        ${gameHeader(
+          "Chess",
+          status,
+          toolbar
+        )}
+
+        <div class="game-layout">
+
+          <div class="chess-board-wrap">
+
+            <div class="chess-board">
+              ${boardHTML}
+            </div>
+
+            <div class="chess-files">
+              <span>a</span>
+              <span>b</span>
+              <span>c</span>
+              <span>d</span>
+              <span>e</span>
+              <span>f</span>
+              <span>g</span>
+              <span>h</span>
+            </div>
+
+          </div>
+
+          <div class="game-side-panel">
+
+            <div class="player-card">
+              <div class="player-avatar">Y</div>
+              <div>
+                <strong>You</strong>
+                <span>White</span>
+              </div>
+            </div>
+
+            <div class="player-card">
+              <div class="player-avatar galaxy-avatar">
+                ${
+                  game.mode === "galaxy"
+                    ? "✦"
+                    : "F"
+                }
+              </div>
+
+              <div>
+                <strong>
+                  ${
+                    game.mode === "galaxy"
+                      ? "GALAXY"
+                      : "Friend"
+                  }
+                </strong>
+
+                <span>
+                  ${
+                    game.mode === "galaxy"
+                      ? `${game.elo} ELO`
+                      : "Black"
+                  }
+                </span>
+              </div>
+            </div>
+
+            <div class="move-history">
+              <strong>Move history</strong>
+
+              <div class="move-history-list">
+                ${historyHTML}
+              </div>
+            </div>
+
+            ${
+              game.reviewOpen
+                ? chessReviewHTML()
+                : ""
+            }
+
+          </div>
+
+        </div>
+      </div>
+    `
+  );
 }
 
 
@@ -2249,246 +1589,479 @@ function galaxyChessMove() {
    TIC TAC TOE
    ========================================================= */
 
-function resetTicTacToe() {
-  GameCenter.ticTacToe = {
-    board: Array(9).fill(""),
-    turn: "X",
-    status: "Your turn",
-    gameOver: false
-  };
+function resetTTT(render = true) {
+  const game = Games.ttt;
+
+  game.board = Array(9).fill("");
+  game.turn = "X";
+  game.history = [];
+  game.finished = false;
+  game.winner = null;
+  game.hints = 0;
+  game.reviewOpen = false;
+
+  renderTTT();
 }
 
-function tttWinner(board) {
-  const lines = [
-    [0,1,2],
-    [3,4,5],
-    [6,7,8],
-    [0,3,6],
-    [1,4,7],
-    [2,5,8],
-    [0,4,8],
-    [2,4,6]
-  ];
+const TTT_LINES = [
+  [0,1,2],
+  [3,4,5],
+  [6,7,8],
+  [0,3,6],
+  [1,4,7],
+  [2,5,8],
+  [0,4,8],
+  [2,4,6]
+];
 
-  for (
-    const [a,b,c] of lines
-  ) {
+function tttWinner(board) {
+  for (const [a,b,c] of TTT_LINES) {
     if (
       board[a] &&
       board[a] === board[b] &&
-      board[a] === board[c]
+      board[b] === board[c]
     ) {
       return board[a];
     }
   }
 
-  if (board.every(Boolean))
+  if (board.every(Boolean)) {
     return "draw";
+  }
 
   return null;
 }
 
-function renderTicTacToe() {
-  GameCenter.activeGame =
-    "tictactoe";
+function tttWinningMove(board, symbol) {
+  for (let i = 0; i < 9; i++) {
+    if (board[i]) continue;
 
-  if (!GameCenter.ticTacToe)
-    resetTicTacToe();
+    const copy = [...board];
+    copy[i] = symbol;
 
-  const game =
-    GameCenter.ticTacToe;
-
-  $("#contentBody").innerHTML = `
-    ${workspaceHeader(
-      "GALAXY GAMING",
-      "Tic-Tac-Toe"
-    )}
-
-    <section class="game-shell">
-
-      <div class="game-head">
-
-        ${gameBackButton()}
-
-        <strong>
-          ${escapeHTML(game.status)}
-        </strong>
-
-        <button
-          class="ghost-btn"
-          data-ttt-reset
-        >
-          ↻ New game
-        </button>
-
-      </div>
-
-      <div class="board-wrap">
-
-        <div class="ttt-board">
-
-          ${game.board.map(
-            (value, index) => `
-              <button
-                class="ttt-cell"
-                data-ttt-cell="${index}"
-              >
-                ${
-                  value === "X"
-                    ? "✕"
-                    : value === "O"
-                      ? "○"
-                      : ""
-                }
-              </button>
-            `
-          ).join("")}
-
-        </div>
-
-      </div>
-
-    </section>
-  `;
-}
-
-function handleTtt(index) {
-  const game =
-    GameCenter.ticTacToe;
-
-  if (
-    !game ||
-    game.gameOver ||
-    game.turn !== "X" ||
-    game.board[index]
-  ) return;
-
-  game.board[index] = "X";
-
-  let winner =
-    tttWinner(game.board);
-
-  if (winner) {
-    game.gameOver = true;
-
-    game.status =
-      winner === "draw"
-        ? "Draw"
-        : "You win!";
-
-    renderTicTacToe();
-    return;
+    if (tttWinner(copy) === symbol) {
+      return i;
+    }
   }
 
-  game.turn = "O";
-  game.status =
-    "GALAXY is thinking…";
-
-  renderTicTacToe();
-
-  setTimeout(() => {
-    galaxyTttMove();
-  }, 350);
+  return null;
 }
 
-function galaxyTttMove() {
-  const game =
-    GameCenter.ticTacToe;
+function tttGalaxyChoice() {
+  const game = Games.ttt;
+  const board = game.board;
 
-  if (
-    !game ||
-    game.gameOver
-  ) return;
+  const available = board
+    .map((cell, index) =>
+      cell ? null : index
+    )
+    .filter(index => index !== null);
 
-  const empty =
-    game.board
-      .map((value, index) =>
-        value ? null : index
-      )
-      .filter(
-        value => value !== null
-      );
+  if (!available.length) return null;
 
-  /* try winning move */
+  const win = tttWinningMove(board, "O");
+  const block = tttWinningMove(board, "X");
 
-  let choice = null;
+  const random = () =>
+    randomItem(available);
 
-  for (const index of empty) {
-    const test =
-      [...game.board];
+  if (game.elo >= 1000) {
+    if (win !== null) return win;
+    if (block !== null) return block;
 
-    test[index] = "O";
+    if (!board[4]) return 4;
+
+    const corners = [0,2,6,8]
+      .filter(index => !board[index]);
+
+    if (corners.length) {
+      return randomItem(corners);
+    }
+
+    return random();
+  }
+
+  if (game.elo >= 800) {
+    if (win !== null) return win;
 
     if (
-      tttWinner(test) === "O"
+      block !== null &&
+      Math.random() < 0.92
     ) {
-      choice = index;
-      break;
+      return block;
+    }
+
+    if (!board[4] && Math.random() < 0.8) {
+      return 4;
     }
   }
 
-  /* block player */
+  if (game.elo >= 500) {
+    if (
+      win !== null &&
+      Math.random() < 0.85
+    ) {
+      return win;
+    }
 
-  if (choice === null) {
-    for (const index of empty) {
-      const test =
-        [...game.board];
-
-      test[index] = "X";
-
-      if (
-        tttWinner(test) === "X"
-      ) {
-        choice = index;
-        break;
-      }
+    if (
+      block !== null &&
+      Math.random() < 0.7
+    ) {
+      return block;
     }
   }
 
-  /* center */
+  if (game.elo >= 200) {
+    if (
+      win !== null &&
+      Math.random() < 0.55
+    ) {
+      return win;
+    }
+
+    if (
+      block !== null &&
+      Math.random() < 0.45
+    ) {
+      return block;
+    }
+  }
+
+  return random();
+}
+
+function tttApplyMove(index, symbol, actor) {
+  const game = Games.ttt;
 
   if (
-    choice === null &&
-    !game.board[4]
+    game.finished ||
+    game.board[index]
   ) {
-    choice = 4;
-  }
-
-  /* random */
-
-  if (choice === null) {
-    choice =
-      empty[
-        Math.floor(
-          Math.random() *
-          empty.length
-        )
-      ];
-  }
-
-  if (choice === undefined)
     return;
+  }
 
-  game.board[choice] = "O";
+  game.board[index] = symbol;
+
+  game.history.push({
+    index,
+    symbol,
+    actor
+  });
 
   const winner =
     tttWinner(game.board);
 
   if (winner) {
-    game.gameOver = true;
+    game.finished = true;
 
-    game.status =
-      winner === "draw"
+    if (winner === "draw") {
+      game.winner = "Draw";
+    } else if (winner === "X") {
+      game.winner = "You";
+    } else {
+      game.winner =
+        game.mode === "galaxy"
+          ? "GALAXY"
+          : "Friend";
+    }
+
+    renderTTT();
+    return;
+  }
+
+  game.turn =
+    symbol === "X"
+      ? "O"
+      : "X";
+
+  renderTTT();
+
+  if (
+    game.mode === "galaxy" &&
+    game.turn === "O"
+  ) {
+    setTimeout(tttGalaxyTurn, 380);
+  }
+}
+
+function tttClick(index) {
+  const game = Games.ttt;
+
+  if (
+    game.finished ||
+    game.board[index]
+  ) {
+    return;
+  }
+
+  if (
+    game.mode === "galaxy" &&
+    game.turn === "O"
+  ) {
+    return;
+  }
+
+  const actor =
+    game.mode === "friend" &&
+    game.turn === "O"
+      ? "friend"
+      : "player";
+
+  tttApplyMove(
+    index,
+    game.turn,
+    actor
+  );
+}
+
+function tttGalaxyTurn() {
+  const game = Games.ttt;
+
+  if (
+    game.mode !== "galaxy" ||
+    game.finished ||
+    game.turn !== "O"
+  ) {
+    return;
+  }
+
+  const move = tttGalaxyChoice();
+
+  if (move === null) return;
+
+  tttApplyMove(
+    move,
+    "O",
+    "galaxy"
+  );
+}
+
+function tttHint() {
+  const game = Games.ttt;
+
+  if (game.finished) return;
+
+  const symbol = game.turn;
+
+  const win =
+    tttWinningMove(
+      game.board,
+      symbol
+    );
+
+  const block =
+    tttWinningMove(
+      game.board,
+      symbol === "X" ? "O" : "X"
+    );
+
+  let move = win ?? block;
+
+  if (
+    move === null ||
+    move === undefined
+  ) {
+    if (!game.board[4]) {
+      move = 4;
+    } else {
+      const available =
+        game.board
+          .map((cell, index) =>
+            cell ? null : index
+          )
+          .filter(index => index !== null);
+
+      move = randomItem(available);
+    }
+  }
+
+  game.hints += 1;
+
+  toast(
+    `Hint: choose square ${move + 1}`
+  );
+}
+
+function tttUndo() {
+  const game = Games.ttt;
+
+  if (!game.history.length) {
+    toast("Nothing to undo.");
+    return;
+  }
+
+  let count =
+    game.mode === "galaxy"
+      ? 2
+      : 1;
+
+  while (
+    count > 0 &&
+    game.history.length
+  ) {
+    const last = game.history.pop();
+
+    game.board[last.index] = "";
+
+    count--;
+  }
+
+  game.finished = false;
+  game.winner = null;
+
+  game.turn =
+    game.history.length % 2 === 0
+      ? "X"
+      : "O";
+
+  renderTTT();
+}
+
+function tttResign() {
+  const game = Games.ttt;
+
+  if (game.finished) return;
+
+  game.finished = true;
+
+  game.winner =
+    game.mode === "galaxy"
+      ? "GALAXY"
+      : game.turn === "X"
+        ? "Friend"
+        : "You";
+
+  renderTTT();
+}
+
+function tttReviewHTML() {
+  const game = Games.ttt;
+
+  const playerMoves =
+    game.history.filter(
+      move => move.actor === "player"
+    ).length;
+
+  return reviewCardHTML(
+    "Tic-Tac-Toe Review",
+    [
+      ["Your moves", playerMoves],
+      ["Total moves", game.history.length],
+      ["Hints used", game.hints],
+      ["Result", game.winner || "In progress"],
+      [
+        "Difficulty",
+        game.mode === "galaxy"
+          ? `${game.elo} ELO`
+          : "Friend mode"
+      ],
+      [
+        "Board filled",
+        `${game.board.filter(Boolean).length}/9`
+      ]
+    ]
+  );
+}
+
+function renderTTT() {
+  const game = Games.ttt;
+
+  const status =
+    game.finished
+      ? game.winner === "Draw"
         ? "Draw"
-        : "GALAXY wins";
-  }
+        : `${game.winner} wins`
+      : game.mode === "galaxy"
+        ? game.turn === "X"
+          ? "Your turn"
+          : "GALAXY's turn"
+        : game.turn === "X"
+          ? "Your turn"
+          : "Friend's turn";
 
-  else {
-    game.turn = "X";
-    game.status = "Your turn";
-  }
+  const toolbar = `
+    ${gameModeSelector("ttt")}
+    ${gameLevelSelector("ttt")}
+    ${commonGameButtons("ttt")}
+  `;
 
-  renderTicTacToe();
+  setContent(
+    "Tic-Tac-Toe",
+    "GALAXY GAMES",
+    `
+      <div class="game-shell">
+
+        ${gameHeader(
+          "Tic-Tac-Toe",
+          status,
+          toolbar
+        )}
+
+        <div class="game-layout">
+
+          <div class="ttt-board">
+            ${game.board.map((cell, index) => `
+              <button
+                class="ttt-cell"
+                data-ttt-cell="${index}"
+                type="button"
+              >
+                ${cell}
+              </button>
+            `).join("")}
+          </div>
+
+          <div class="game-side-panel">
+
+            <div class="player-card">
+              <div class="player-avatar">X</div>
+              <div>
+                <strong>You</strong>
+                <span>Player X</span>
+              </div>
+            </div>
+
+            <div class="player-card">
+              <div class="player-avatar galaxy-avatar">
+                ${
+                  game.mode === "galaxy"
+                    ? "✦"
+                    : "O"
+                }
+              </div>
+
+              <div>
+                <strong>
+                  ${
+                    game.mode === "galaxy"
+                      ? "GALAXY"
+                      : "Friend"
+                  }
+                </strong>
+
+                <span>
+                  ${
+                    game.mode === "galaxy"
+                      ? `${game.elo} ELO`
+                      : "Player O"
+                  }
+                </span>
+              </div>
+            </div>
+
+            ${
+              game.reviewOpen
+                ? tttReviewHTML()
+                : ""
+            }
+
+          </div>
+
+        </div>
+      </div>
+    `
+  );
 }
 
 
@@ -2496,21 +2069,36 @@ function galaxyTttMove() {
    CONNECT FOUR
    ========================================================= */
 
-function resetConnectFour() {
-  GameCenter.connectFour = {
-    board:
-      Array.from(
-        { length: 6 },
-        () => Array(7).fill("")
-      ),
+function resetConnect(render = true) {
+  const game = Games.connect;
 
-    turn: "R",
-    status: "Your turn",
-    gameOver: false
-  };
+  game.board =
+    Array.from(
+      { length: 6 },
+      () => Array(7).fill("")
+    );
+
+  game.turn = "P";
+  game.history = [];
+  game.finished = false;
+  game.winner = null;
+  game.hints = 0;
+  game.reviewOpen = false;
+
+  renderConnect();
 }
 
-function connectWinner(board, player) {
+function connectAvailableRow(board, col) {
+  for (let row = 5; row >= 0; row--) {
+    if (!board[row][col]) {
+      return row;
+    }
+  }
+
+  return -1;
+}
+
+function connectWinner(board, symbol) {
   const directions = [
     [0,1],
     [1,0],
@@ -2518,39 +2106,35 @@ function connectWinner(board, player) {
     [1,-1]
   ];
 
-  for (let r = 0; r < 6; r++) {
-    for (let c = 0; c < 7; c++) {
+  for (let row = 0; row < 6; row++) {
+    for (let col = 0; col < 7; col++) {
+      if (board[row][col] !== symbol) {
+        continue;
+      }
 
-      if (
-        board[r][c] !== player
-      ) continue;
-
-      for (
-        const [dr,dc] of directions
-      ) {
+      for (const [dr, dc] of directions) {
         let count = 1;
 
-        for (
-          let step = 1;
-          step < 4;
-          step++
-        ) {
-          const nr =
-            r + dr * step;
-
-          const nc =
-            c + dc * step;
+        for (let step = 1; step < 4; step++) {
+          const r = row + dr * step;
+          const c = col + dc * step;
 
           if (
-            !insideConnect(nr,nc) ||
-            board[nr][nc] !== player
-          ) break;
+            r < 0 ||
+            r >= 6 ||
+            c < 0 ||
+            c >= 7 ||
+            board[r][c] !== symbol
+          ) {
+            break;
+          }
 
           count++;
         }
 
-        if (count >= 4)
+        if (count >= 4) {
           return true;
+        }
       }
     }
   }
@@ -2558,274 +2142,502 @@ function connectWinner(board, player) {
   return false;
 }
 
-function insideConnect(r,c) {
-  return (
-    r >= 0 &&
-    r < 6 &&
-    c >= 0 &&
-    c < 7
-  );
+function connectBoardFull(board) {
+  return board[0].every(Boolean);
 }
 
-function connectDropRow(
-  board,
-  column
-) {
-  for (let r = 5; r >= 0; r--) {
-    if (!board[r][column])
-      return r;
+function connectWinningColumn(board, symbol) {
+  for (let col = 0; col < 7; col++) {
+    const row =
+      connectAvailableRow(board, col);
+
+    if (row < 0) continue;
+
+    const copy = clone(board);
+
+    copy[row][col] = symbol;
+
+    if (
+      connectWinner(copy, symbol)
+    ) {
+      return col;
+    }
   }
 
-  return -1;
+  return null;
 }
 
-function renderConnectFour() {
-  GameCenter.activeGame =
-    "connect4";
+function connectGalaxyChoice() {
+  const game = Games.connect;
 
-  if (!GameCenter.connectFour)
-    resetConnectFour();
+  const available =
+    [0,1,2,3,4,5,6]
+      .filter(
+        col =>
+          connectAvailableRow(
+            game.board,
+            col
+          ) >= 0
+      );
 
-  const game =
-    GameCenter.connectFour;
+  if (!available.length) return null;
 
-  $("#contentBody").innerHTML = `
-    ${workspaceHeader(
-      "GALAXY GAMING",
-      "Connect Four"
-    )}
+  const win =
+    connectWinningColumn(
+      game.board,
+      "G"
+    );
 
-    <section class="game-shell">
+  const block =
+    connectWinningColumn(
+      game.board,
+      "P"
+    );
 
-      <div class="game-head">
+  if (game.elo >= 1000) {
+    if (win !== null) return win;
+    if (block !== null) return block;
 
-        ${gameBackButton()}
+    const preferred =
+      [3,2,4,1,5,0,6]
+        .filter(
+          col =>
+            available.includes(col)
+        );
 
-        <strong>
-          ${escapeHTML(game.status)}
-        </strong>
+    return preferred[0];
+  }
 
-        <button
-          class="ghost-btn"
-          data-connect-reset
-        >
-          ↻ New game
-        </button>
+  if (game.elo >= 800) {
+    if (win !== null) return win;
 
-      </div>
+    if (
+      block !== null &&
+      Math.random() < 0.92
+    ) {
+      return block;
+    }
 
-      <div class="board-wrap">
+    if (
+      available.includes(3) &&
+      Math.random() < 0.75
+    ) {
+      return 3;
+    }
+  }
 
-        <div class="connect-board">
+  if (game.elo >= 500) {
+    if (
+      win !== null &&
+      Math.random() < 0.85
+    ) {
+      return win;
+    }
 
-          ${game.board.map(
-            row =>
-              row.map(
-                (value, column) => `
-                  <button
-                    class="
-                      connect-cell
-                      ${
-                        value === "R"
-                          ? "red"
-                          : value === "Y"
-                            ? "yellow"
-                            : ""
-                      }
-                    "
-                    data-connect-column="${column}"
-                  ></button>
-                `
-              ).join("")
-          ).join("")}
+    if (
+      block !== null &&
+      Math.random() < 0.7
+    ) {
+      return block;
+    }
+  }
 
-        </div>
+  if (game.elo >= 200) {
+    if (
+      win !== null &&
+      Math.random() < 0.5
+    ) {
+      return win;
+    }
 
-      </div>
+    if (
+      block !== null &&
+      Math.random() < 0.4
+    ) {
+      return block;
+    }
+  }
 
-    </section>
-  `;
+  return randomItem(available);
 }
 
-function handleConnect(column) {
-  const game =
-    GameCenter.connectFour;
+function connectDrop(col, actor) {
+  const game = Games.connect;
 
-  if (
-    !game ||
-    game.gameOver ||
-    game.turn !== "R"
-  ) return;
+  if (game.finished) return;
 
   const row =
-    connectDropRow(
+    connectAvailableRow(
       game.board,
-      column
+      col
     );
 
   if (row < 0) return;
 
-  game.board[row][column] = "R";
+  const symbol =
+    game.turn;
+
+  game.board[row][col] = symbol;
+
+  game.history.push({
+    row,
+    col,
+    symbol,
+    actor
+  });
 
   if (
     connectWinner(
       game.board,
-      "R"
+      symbol
     )
   ) {
-    game.gameOver = true;
-    game.status = "You win!";
+    game.finished = true;
 
-    renderConnectFour();
+    if (symbol === "P") {
+      game.winner = "You";
+    } else {
+      game.winner =
+        game.mode === "galaxy"
+          ? "GALAXY"
+          : "Friend";
+    }
+
+    renderConnect();
     return;
   }
+
+  if (connectBoardFull(game.board)) {
+    game.finished = true;
+    game.winner = "Draw";
+    renderConnect();
+    return;
+  }
+
+  game.turn =
+    symbol === "P"
+      ? "G"
+      : "P";
+
+  renderConnect();
 
   if (
-    game.board.every(
-      row => row.every(Boolean)
+    game.mode === "galaxy" &&
+    game.turn === "G"
+  ) {
+    setTimeout(
+      connectGalaxyTurn,
+      450
+    );
+  }
+}
+
+function connectClick(col) {
+  const game = Games.connect;
+
+  if (
+    game.finished ||
+    (
+      game.mode === "galaxy" &&
+      game.turn === "G"
     )
   ) {
-    game.gameOver = true;
-    game.status = "Draw";
-
-    renderConnectFour();
     return;
   }
 
-  game.turn = "Y";
-  game.status =
-    "GALAXY is thinking…";
+  const actor =
+    game.mode === "friend" &&
+    game.turn === "G"
+      ? "friend"
+      : "player";
 
-  renderConnectFour();
-
-  setTimeout(
-    galaxyConnectMove,
-    350
+  connectDrop(
+    col,
+    actor
   );
 }
 
-function galaxyConnectMove() {
-  const game =
-    GameCenter.connectFour;
+function connectGalaxyTurn() {
+  const game = Games.connect;
 
   if (
-    !game ||
-    game.gameOver
-  ) return;
-
-  const valid = [];
-
-  for (let c = 0; c < 7; c++) {
-    if (
-      connectDropRow(
-        game.board,
-        c
-      ) >= 0
-    ) {
-      valid.push(c);
-    }
-  }
-
-  if (!valid.length)
-    return;
-
-  let column = null;
-
-  /* GALAXY tries to win */
-
-  for (const c of valid) {
-    const row =
-      connectDropRow(
-        game.board,
-        c
-      );
-
-    game.board[row][c] = "Y";
-
-    const wins =
-      connectWinner(
-        game.board,
-        "Y"
-      );
-
-    game.board[row][c] = "";
-
-    if (wins) {
-      column = c;
-      break;
-    }
-  }
-
-  /* block player */
-
-  if (column === null) {
-    for (const c of valid) {
-      const row =
-        connectDropRow(
-          game.board,
-          c
-        );
-
-      game.board[row][c] = "R";
-
-      const wins =
-        connectWinner(
-          game.board,
-          "R"
-        );
-
-      game.board[row][c] = "";
-
-      if (wins) {
-        column = c;
-        break;
-      }
-    }
-  }
-
-  /* prefer center */
-
-  if (
-    column === null &&
-    valid.includes(3)
+    game.finished ||
+    game.mode !== "galaxy" ||
+    game.turn !== "G"
   ) {
-    column = 3;
+    return;
   }
 
-  if (column === null) {
-    column =
-      valid[
-        Math.floor(
-          Math.random() *
-          valid.length
-        )
-      ];
-  }
+  const col =
+    connectGalaxyChoice();
 
-  const row =
-    connectDropRow(
+  if (col === null) return;
+
+  connectDrop(
+    col,
+    "galaxy"
+  );
+}
+
+function connectHint() {
+  const game = Games.connect;
+
+  if (game.finished) return;
+
+  const symbol = game.turn;
+
+  let col =
+    connectWinningColumn(
       game.board,
-      column
+      symbol
     );
 
-  game.board[row][column] = "Y";
+  if (col === null) {
+    col =
+      connectWinningColumn(
+        game.board,
+        symbol === "P"
+          ? "G"
+          : "P"
+      );
+  }
 
-  if (
-    connectWinner(
-      game.board,
-      "Y"
-    )
+  if (col === null) {
+    const available =
+      [3,2,4,1,5,0,6]
+        .filter(
+          column =>
+            connectAvailableRow(
+              game.board,
+              column
+            ) >= 0
+        );
+
+    col = available[0];
+  }
+
+  game.hints++;
+
+  toast(
+    `Hint: play column ${col + 1}`
+  );
+}
+
+function connectUndo() {
+  const game = Games.connect;
+
+  if (!game.history.length) {
+    toast("Nothing to undo.");
+    return;
+  }
+
+  let count =
+    game.mode === "galaxy"
+      ? 2
+      : 1;
+
+  while (
+    count > 0 &&
+    game.history.length
   ) {
-    game.gameOver = true;
-    game.status = "GALAXY wins";
+    const last =
+      game.history.pop();
+
+    game.board[last.row][last.col] = "";
+
+    count--;
   }
 
-  else {
-    game.turn = "R";
-    game.status = "Your turn";
+  game.finished = false;
+  game.winner = null;
+
+  game.turn =
+    game.history.length % 2 === 0
+      ? "P"
+      : "G";
+
+  renderConnect();
+}
+
+function connectResign() {
+  const game = Games.connect;
+
+  if (game.finished) return;
+
+  game.finished = true;
+
+  game.winner =
+    game.mode === "galaxy"
+      ? "GALAXY"
+      : game.turn === "P"
+        ? "Friend"
+        : "You";
+
+  renderConnect();
+}
+
+function connectReviewHTML() {
+  const game = Games.connect;
+
+  return reviewCardHTML(
+    "Connect Four Review",
+    [
+      [
+        "Your moves",
+        game.history.filter(
+          move =>
+            move.actor === "player"
+        ).length
+      ],
+      ["Total moves", game.history.length],
+      ["Hints", game.hints],
+      ["Result", game.winner || "In progress"],
+      [
+        "Difficulty",
+        game.mode === "galaxy"
+          ? `${game.elo} ELO`
+          : "Friend mode"
+      ]
+    ]
+  );
+}
+
+function renderConnect() {
+  const game = Games.connect;
+
+  const status =
+    game.finished
+      ? game.winner === "Draw"
+        ? "Draw"
+        : `${game.winner} wins`
+      : game.mode === "galaxy"
+        ? game.turn === "P"
+          ? "Your turn"
+          : "GALAXY's turn"
+        : game.turn === "P"
+          ? "Your turn"
+          : "Friend's turn";
+
+  const toolbar = `
+    ${gameModeSelector("connect")}
+    ${gameLevelSelector("connect")}
+    ${commonGameButtons("connect")}
+  `;
+
+  let boardHTML = "";
+
+  for (let row = 0; row < 6; row++) {
+    for (let col = 0; col < 7; col++) {
+      const value =
+        game.board[row][col];
+
+      boardHTML += `
+        <div class="connect-cell">
+          <span
+            class="
+              connect-disc
+              ${
+                value === "P"
+                  ? "player"
+                  : value === "G"
+                    ? game.mode === "galaxy"
+                      ? "galaxy"
+                      : "friend"
+                    : ""
+              }
+            "
+          ></span>
+        </div>
+      `;
+    }
   }
 
-  renderConnectFour();
+  setContent(
+    "Connect Four",
+    "GALAXY GAMES",
+    `
+      <div class="game-shell">
+
+        ${gameHeader(
+          "Connect Four",
+          status,
+          toolbar
+        )}
+
+        <div class="game-layout">
+
+          <div>
+
+            <div class="connect-columns">
+              ${[0,1,2,3,4,5,6]
+                .map(
+                  col => `
+                    <button
+                      data-connect-column="${col}"
+                      type="button"
+                    >
+                      ↓
+                    </button>
+                  `
+                )
+                .join("")}
+            </div>
+
+            <div class="connect-board">
+              ${boardHTML}
+            </div>
+
+          </div>
+
+          <div class="game-side-panel">
+
+            <div class="player-card">
+              <div class="player-avatar">●</div>
+              <div>
+                <strong>You</strong>
+                <span>Red</span>
+              </div>
+            </div>
+
+            <div class="player-card">
+              <div class="player-avatar galaxy-avatar">
+                ${
+                  game.mode === "galaxy"
+                    ? "✦"
+                    : "●"
+                }
+              </div>
+
+              <div>
+                <strong>
+                  ${
+                    game.mode === "galaxy"
+                      ? "GALAXY"
+                      : "Friend"
+                  }
+                </strong>
+
+                <span>
+                  ${
+                    game.mode === "galaxy"
+                      ? `${game.elo} ELO`
+                      : "Blue"
+                  }
+                </span>
+              </div>
+            </div>
+
+            ${
+              game.reviewOpen
+                ? connectReviewHTML()
+                : ""
+            }
+
+          </div>
+        </div>
+      </div>
+    `
+  );
 }
 
 
@@ -2834,1127 +2646,2102 @@ function galaxyConnectMove() {
    ========================================================= */
 
 const MEMORY_SYMBOLS = [
-  "✦",
-  "♞",
-  "◈",
-  "◇",
-  "◎",
-  "▣",
-  "☄",
-  "★"
+  "🚀",
+  "🌕",
+  "🪐",
+  "⭐",
+  "👾",
+  "☄️",
+  "🛰️",
+  "🌌"
 ];
 
 function shuffle(array) {
-  const result = [...array];
+  const copy = [...array];
 
   for (
-    let i = result.length - 1;
+    let i = copy.length - 1;
     i > 0;
     i--
   ) {
     const j =
       Math.floor(
-        Math.random() *
-        (i + 1)
+        Math.random() * (i + 1)
       );
 
-    [
-      result[i],
-      result[j]
-    ] = [
-      result[j],
-      result[i]
-    ];
+    [copy[i], copy[j]] =
+      [copy[j], copy[i]];
   }
 
-  return result;
+  return copy;
 }
 
-function resetMemory() {
-  const cards =
+function resetMemory(render = true) {
+  const game = Games.memory;
+
+  const deck =
     shuffle([
       ...MEMORY_SYMBOLS,
       ...MEMORY_SYMBOLS
-    ]).map(
-      (symbol, index) => ({
-        id: index,
-        symbol,
-        flipped: false,
-        matched: false
-      })
-    );
+    ]);
 
-  GameCenter.memory = {
-    cards,
-    selected: [],
-    moves: 0,
-    locked: false,
-    status: "Find all matching pairs"
+  game.cards =
+    deck.map((symbol, index) => ({
+      id: index,
+      symbol
+    }));
+
+  game.revealed = [];
+  game.matched = new Set();
+  game.turn = "player";
+  game.playerScore = 0;
+  game.opponentScore = 0;
+  game.history = [];
+  game.known = {};
+  game.busy = false;
+  game.finished = false;
+  game.hints = 0;
+  game.reviewOpen = false;
+  game.playerAttempts = 0;
+  game.playerMatches = 0;
+
+  renderMemory();
+}
+
+function memoryRemember(index) {
+  const game = Games.memory;
+
+  const symbol =
+    game.cards[index]?.symbol;
+
+  if (!symbol) return;
+
+  game.known[index] = symbol;
+}
+
+function memorySnapshot() {
+  const game = Games.memory;
+
+  return {
+    matched: [...game.matched],
+    turn: game.turn,
+    playerScore: game.playerScore,
+    opponentScore: game.opponentScore,
+    history: clone(game.history),
+    known: clone(game.known),
+    playerAttempts: game.playerAttempts,
+    playerMatches: game.playerMatches
   };
 }
 
-function renderMemory() {
-  GameCenter.activeGame =
-    "memory";
+function memoryRestore(snapshot) {
+  const game = Games.memory;
 
-  if (!GameCenter.memory)
-    resetMemory();
+  game.matched =
+    new Set(snapshot.matched);
 
-  const game =
-    GameCenter.memory;
+  game.turn = snapshot.turn;
+  game.playerScore = snapshot.playerScore;
+  game.opponentScore = snapshot.opponentScore;
+  game.history = clone(snapshot.history);
+  game.known = clone(snapshot.known);
+  game.playerAttempts = snapshot.playerAttempts;
+  game.playerMatches = snapshot.playerMatches;
 
-  $("#contentBody").innerHTML = `
-    ${workspaceHeader(
-      "GALAXY GAMING",
-      "Memory"
-    )}
-
-    <section class="game-shell">
-
-      <div class="game-head">
-
-        ${gameBackButton()}
-
-        <strong>
-          ${escapeHTML(game.status)}
-          · Moves ${game.moves}
-        </strong>
-
-        <button
-          class="ghost-btn"
-          data-memory-reset
-        >
-          ↻ New game
-        </button>
-
-      </div>
-
-      <div class="board-wrap">
-
-        <div class="memory-board">
-
-          ${game.cards.map(card => `
-            <button
-              class="
-                memory-card
-                ${
-                  card.flipped
-                    ? "flipped"
-                    : ""
-                }
-                ${
-                  card.matched
-                    ? "matched"
-                    : ""
-                }
-              "
-              data-memory-card="${card.id}"
-            >
-              ${
-                card.flipped ||
-                card.matched
-                  ? card.symbol
-                  : "?"
-              }
-            </button>
-          `).join("")}
-
-        </div>
-
-      </div>
-
-    </section>
-  `;
+  game.revealed = [];
+  game.finished =
+    game.matched.size ===
+    game.cards.length;
 }
 
-function handleMemory(index) {
-  const game =
-    GameCenter.memory;
+async function memoryClick(index) {
+  const game = Games.memory;
 
   if (
-    !game ||
-    game.locked
-  ) return;
-
-  const card =
-    game.cards[index];
+    game.finished ||
+    game.busy ||
+    game.matched.has(index) ||
+    game.revealed.includes(index)
+  ) {
+    return;
+  }
 
   if (
-    !card ||
-    card.flipped ||
-    card.matched
-  ) return;
+    game.mode === "galaxy" &&
+    game.turn === "galaxy"
+  ) {
+    return;
+  }
 
-  card.flipped = true;
+  if (game.revealed.length === 0) {
+    game.history.push({
+      snapshot: memorySnapshot()
+    });
+  }
 
-  game.selected.push(index);
+  game.revealed.push(index);
+  memoryRemember(index);
 
   renderMemory();
 
+  if (game.revealed.length < 2) {
+    return;
+  }
+
+  game.busy = true;
+
+  const [a, b] =
+    game.revealed;
+
+  const match =
+    game.cards[a].symbol ===
+    game.cards[b].symbol;
+
+  if (game.turn === "player") {
+    game.playerAttempts++;
+  }
+
+  await delay(650);
+
+  if (match) {
+    game.matched.add(a);
+    game.matched.add(b);
+
+    if (game.turn === "player") {
+      game.playerScore++;
+      game.playerMatches++;
+    } else {
+      game.opponentScore++;
+    }
+  }
+
+  game.revealed = [];
+
   if (
-    game.selected.length < 2
-  ) return;
-
-  game.moves++;
-
-  const [
-    firstIndex,
-    secondIndex
-  ] = game.selected;
-
-  const first =
-    game.cards[firstIndex];
-
-  const second =
-    game.cards[secondIndex];
-
-  if (
-    first.symbol ===
-    second.symbol
+    game.matched.size ===
+    game.cards.length
   ) {
-    first.matched = true;
-    second.matched = true;
+    game.finished = true;
+    game.busy = false;
+    renderMemory();
+    return;
+  }
 
-    game.selected = [];
+  if (!match) {
+    game.turn =
+      game.turn === "player"
+        ? (
+            game.mode === "galaxy"
+              ? "galaxy"
+              : "friend"
+          )
+        : "player";
+  }
+
+  game.busy = false;
+  renderMemory();
+
+  if (
+    game.mode === "galaxy" &&
+    game.turn === "galaxy" &&
+    !game.finished
+  ) {
+    setTimeout(
+      memoryGalaxyTurn,
+      550
+    );
+  }
+}
+
+function memoryUnknownIndexes() {
+  const game = Games.memory;
+
+  return game.cards
+    .map((card, index) => index)
+    .filter(
+      index =>
+        !game.matched.has(index)
+    );
+}
+
+function memoryKnownPair() {
+  const game = Games.memory;
+
+  const groups = {};
+
+  for (
+    const [indexText, symbol]
+    of Object.entries(game.known)
+  ) {
+    const index =
+      Number(indexText);
+
+    if (game.matched.has(index)) {
+      continue;
+    }
+
+    if (!groups[symbol]) {
+      groups[symbol] = [];
+    }
+
+    groups[symbol].push(index);
+  }
+
+  for (
+    const indexes
+    of Object.values(groups)
+  ) {
+    if (indexes.length >= 2) {
+      return indexes.slice(0, 2);
+    }
+  }
+
+  return null;
+}
+
+function memoryGalaxyRecallChance() {
+  const elo =
+    Games.memory.elo;
+
+  if (elo >= 1200) return 0.98;
+  if (elo >= 1000) return 0.9;
+  if (elo >= 800) return 0.78;
+  if (elo >= 500) return 0.58;
+  if (elo >= 200) return 0.35;
+
+  return 0.15;
+}
+
+async function memoryGalaxyTurn() {
+  const game = Games.memory;
+
+  if (
+    game.finished ||
+    game.mode !== "galaxy" ||
+    game.turn !== "galaxy" ||
+    game.busy
+  ) {
+    return;
+  }
+
+  game.busy = true;
+
+  let choices = [];
+
+  const rememberedPair =
+    memoryKnownPair();
+
+  if (
+    rememberedPair &&
+    Math.random() <
+      memoryGalaxyRecallChance()
+  ) {
+    choices = rememberedPair;
+  } else {
+    const available =
+      memoryUnknownIndexes();
+
+    const first =
+      randomItem(available);
+
+    let secondPool =
+      available.filter(
+        index => index !== first
+      );
+
+    let second = null;
+
+    const knownMatch =
+      Object.entries(game.known)
+        .find(
+          ([indexText, symbol]) =>
+            Number(indexText) !== first &&
+            !game.matched.has(
+              Number(indexText)
+            ) &&
+            symbol ===
+              game.cards[first].symbol
+        );
 
     if (
-      game.cards.every(
-        card => card.matched
-      )
+      knownMatch &&
+      Math.random() <
+        memoryGalaxyRecallChance()
     ) {
-      game.status =
-        `You won in ${game.moves} moves!`;
+      second =
+        Number(knownMatch[0]);
+    } else {
+      second =
+        randomItem(secondPool);
     }
 
-    renderMemory();
+    choices = [first, second];
   }
 
-  else {
-    game.locked = true;
-
-    setTimeout(() => {
-      first.flipped = false;
-      second.flipped = false;
-
-      game.selected = [];
-      game.locked = false;
-
-      renderMemory();
-    }, 650);
-  }
-}
-
-
-/* =========================================================
-   FILE UPLOAD
-   ========================================================= */
-
-function openFilePicker(target = "assets") {
-  const input =
-    $("#fileInput");
-
-  if (!input) return;
-
-  input.dataset.target = target;
-
-  input.click();
-}
-
-function handleFiles(files) {
-  const input =
-    $("#fileInput");
-
-  const target =
-    input?.dataset.target ||
-    "assets";
-
-  [...files].forEach(file => {
-
-    const asset = {
-      id: uid("asset"),
-      name: file.name,
-      type: file.type,
-      size: file.size,
-      createdAt: Date.now()
-    };
-
-    Galaxy.state.assets.unshift(asset);
-
-    if (target === "studio") {
-      Galaxy.state.studioReferences.push(asset);
-    }
+  game.history.push({
+    snapshot: memorySnapshot()
   });
 
-  saveState();
+  game.revealed = [choices[0]];
+  memoryRemember(choices[0]);
+  renderMemory();
 
-  if (target === "studio") {
-    const zone =
-      $("#referenceZone");
+  await delay(550);
 
-    if (zone) {
-      zone.innerHTML = `
-        <b>
-          ${Galaxy.state.studioReferences.length}
-          reference(s) added
-        </b>
-        <span>
-          Click to add more
-        </span>
-      `;
-    }
+  game.revealed = choices;
+  memoryRemember(choices[1]);
+  renderMemory();
 
-    toast("Reference added.");
+  await delay(700);
+
+  const match =
+    game.cards[choices[0]].symbol ===
+    game.cards[choices[1]].symbol;
+
+  if (match) {
+    game.matched.add(choices[0]);
+    game.matched.add(choices[1]);
+
+    game.opponentScore++;
   }
 
-  else {
-    toast("File added to Library.");
+  game.revealed = [];
 
-    if (
-      Galaxy.state.view === "assets"
-    ) {
-      renderAssets();
-    }
+  if (
+    game.matched.size ===
+    game.cards.length
+  ) {
+    game.finished = true;
+  } else if (!match) {
+    game.turn = "player";
   }
 
-  if (input)
-    input.value = "";
+  game.busy = false;
+  renderMemory();
+
+  if (
+    !game.finished &&
+    game.turn === "galaxy" &&
+    match
+  ) {
+    setTimeout(
+      memoryGalaxyTurn,
+      500
+    );
+  }
 }
 
+function memoryHint() {
+  const game = Games.memory;
 
-/* =========================================================
-   VOICE
-   ========================================================= */
+  if (game.finished) return;
 
-function startVoice() {
-  const Recognition =
-    window.SpeechRecognition ||
-    window.webkitSpeechRecognition;
+  const knownPair =
+    memoryKnownPair();
 
-  if (!Recognition) {
+  if (knownPair) {
+    game.hints++;
+
     toast(
-      "Voice recognition is not supported by this browser."
+      `Hint: cards ${knownPair[0] + 1} and ${knownPair[1] + 1} match.`
     );
 
     return;
   }
 
-  const recognition =
-    new Recognition();
+  const available =
+    memoryUnknownIndexes();
 
-  recognition.lang = "en-US";
+  if (!available.length) return;
 
-  recognition.interimResults = false;
+  game.hints++;
 
-  recognition.onstart = () =>
-    toast("Listening…");
-
-  recognition.onresult = event => {
-    const text =
-      event.results[0][0]
-        .transcript;
-
-    const input =
-      $("#promptInput");
-
-    if (input) {
-      input.value = text;
-      resizePrompt();
-    }
-  };
-
-  recognition.onerror = () =>
-    toast("Voice recognition stopped.");
-
-  recognition.start();
+  toast(
+    `Hint: try card ${randomItem(available) + 1}.`
+  );
 }
 
-
-/* =========================================================
-   GLOBAL CLICK HANDLER
-   ========================================================= */
-
-document.addEventListener(
-  "click",
-  event => {
-
-    const viewButton =
-      event.target.closest(
-        "[data-view]"
-      );
-
-    if (viewButton) {
-      openView(
-        viewButton.dataset.view
-      );
-
-      return;
-    }
-
-
-    const starter =
-      event.target.closest(
-        "[data-starter]"
-      );
-
-    if (starter) {
-      const input =
-        $("#promptInput");
-
-      if (input) {
-        input.value =
-          starter.dataset.starter;
-
-        resizePrompt();
-        input.focus();
-      }
-
-      return;
-    }
-
-
-    const studioTab =
-      event.target.closest(
-        "[data-studio]"
-      );
-
-    if (studioTab) {
-      setStudioMode(
-        studioTab.dataset.studio
-      );
-
-      return;
-    }
-
-
-    const camera =
-      event.target.closest(
-        "#cameraChips button"
-      );
-
-    if (camera) {
-      selectCamera(camera);
-      return;
-    }
-
-
-    const game =
-      event.target.closest(
-        "[data-game-open]"
-      );
-
-    if (game) {
-      const name =
-        game.dataset.gameOpen;
-
-      if (name === "chess")
-        renderChess();
-
-      if (name === "tictactoe")
-        renderTicTacToe();
-
-      if (name === "connect4")
-        renderConnectFour();
-
-      if (name === "memory")
-        renderMemory();
-
-      return;
-    }
-
-
-    if (
-      event.target.closest(
-        "[data-game-back]"
-      )
-    ) {
-      renderGames();
-      return;
-    }
-
-
-    const chessSquare =
-      event.target.closest(
-        "[data-chess-square]"
-      );
-
-    if (chessSquare) {
-      const [r,c] =
-        chessSquare.dataset
-          .chessSquare
-          .split(",")
-          .map(Number);
-
-      handleChessSquare(r,c);
-
-      return;
-    }
-
-
-    if (
-      event.target.closest(
-        "[data-chess-reset]"
-      )
-    ) {
-      resetChess();
-      renderChess();
-      return;
-    }
-
-
-    const tttCell =
-      event.target.closest(
-        "[data-ttt-cell]"
-      );
-
-    if (tttCell) {
-      handleTtt(
-        Number(
-          tttCell.dataset.tttCell
-        )
-      );
-
-      return;
-    }
-
-
-    if (
-      event.target.closest(
-        "[data-ttt-reset]"
-      )
-    ) {
-      resetTicTacToe();
-      renderTicTacToe();
-      return;
-    }
-
-
-    const connectCell =
-      event.target.closest(
-        "[data-connect-column]"
-      );
-
-    if (connectCell) {
-      handleConnect(
-        Number(
-          connectCell.dataset
-            .connectColumn
-        )
-      );
-
-      return;
-    }
-
-
-    if (
-      event.target.closest(
-        "[data-connect-reset]"
-      )
-    ) {
-      resetConnectFour();
-      renderConnectFour();
-      return;
-    }
-
-
-    const memoryCard =
-      event.target.closest(
-        "[data-memory-card]"
-      );
-
-    if (memoryCard) {
-      handleMemory(
-        Number(
-          memoryCard.dataset
-            .memoryCard
-        )
-      );
-
-      return;
-    }
-
-
-    if (
-      event.target.closest(
-        "[data-memory-reset]"
-      )
-    ) {
-      resetMemory();
-      renderMemory();
-      return;
-    }
-
-
-    const reuse =
-      event.target.closest(
-        "[data-generation-reuse]"
-      );
-
-    if (reuse) {
-      const generation =
-        Galaxy.state.generations.find(
-          item =>
-            item.id ===
-            reuse.dataset
-              .generationReuse
-        );
-
-      if (generation) {
-        $("#studioPrompt").value =
-          generation.prompt;
-
-        toast("Prompt restored.");
-      }
-
-      return;
-    }
-
-
-    const deleteGeneration =
-      event.target.closest(
-        "[data-generation-delete]"
-      );
-
-    if (deleteGeneration) {
-      Galaxy.state.generations =
-        Galaxy.state.generations.filter(
-          item =>
-            item.id !==
-            deleteGeneration.dataset
-              .generationDelete
-        );
-
-      saveState();
-      renderGenerations();
-
-      return;
-    }
-
-
-    const chatButton =
-      event.target.closest(
-        "[data-chat-id]"
-      );
-
-    if (chatButton) {
-      Galaxy.state.activeChatId =
-        chatButton.dataset.chatId;
-
-      saveState();
-
-      openView("chat");
-
-      return;
-    }
-
-
-    const deleteProject =
-      event.target.closest(
-        "[data-delete-project]"
-      );
-
-    if (deleteProject) {
-      Galaxy.state.projects =
-        Galaxy.state.projects.filter(
-          project =>
-            project.id !==
-            deleteProject.dataset
-              .deleteProject
-        );
-
-      saveState();
-      renderProjects();
-
-      return;
-    }
-
-
-    const deleteAsset =
-      event.target.closest(
-        "[data-delete-asset]"
-      );
-
-    if (deleteAsset) {
-      Galaxy.state.assets =
-        Galaxy.state.assets.filter(
-          asset =>
-            asset.id !==
-            deleteAsset.dataset
-              .deleteAsset
-        );
-
-      saveState();
-      renderAssets();
-
-      return;
-    }
-
-
-    const deleteScene =
-      event.target.closest(
-        "[data-delete-scene]"
-      );
-
-    if (deleteScene) {
-      scenes =
-        scenes.filter(
-          scene =>
-            scene.id !==
-            deleteScene.dataset
-              .deleteScene
-        );
-
-      Storage.set(
-        "scenes",
-        scenes
-      );
-
-      renderSceneList();
-
-      return;
-    }
-
-
-    const deleteTask =
-      event.target.closest(
-        "[data-delete-task]"
-      );
-
-    if (deleteTask) {
-      Galaxy.state.scheduled =
-        Galaxy.state.scheduled.filter(
-          task =>
-            task.id !==
-            deleteTask.dataset
-              .deleteTask
-        );
-
-      saveState();
-      renderScheduled();
-
-      return;
-    }
-
-
-    const usePack =
-      event.target.closest(
-        "[data-use-pack]"
-      );
-
-    if (usePack) {
-      openView("chat");
-
-      const input =
-        $("#promptInput");
-
-      input.value =
-        `Use the ${usePack.dataset.usePack} for this task: `;
-
-      input.focus();
-
-      resizePrompt();
-
-      return;
-    }
-
-
-    const agent =
-      event.target.closest(
-        "[data-agent]"
-      );
-
-    if (agent) {
-      openView("chat");
-
-      const input =
-        $("#promptInput");
-
-      input.value =
-        `Act as my ${agent.dataset.agent}. `;
-
-      input.focus();
-
-      return;
-    }
-
-
-    const plugin =
-      event.target.closest(
-        "[data-plugin]"
-      );
-
-    if (plugin) {
-      toast(
-        `${plugin.dataset.plugin} connection requires backend integration.`
-      );
-
-      return;
-    }
-
-
-    const site =
-      event.target.closest(
-        "[data-site-prompt]"
-      );
-
-    if (site) {
-      openView("chat");
-
-      const input =
-        $("#promptInput");
-
-      input.value =
-        site.dataset.sitePrompt;
-
-      input.focus();
-
-      return;
-    }
-
-
-    const actionButton =
-      event.target.closest(
-        "[data-action]"
-      );
-
-    if (!actionButton)
-      return;
-
-    const action =
-      actionButton.dataset.action;
-
-
-    if (action === "toggle-sidebar") {
-      $("#sidebar")
-        ?.classList.toggle("open");
-    }
-
-
-    else if (action === "new-chat") {
-      createChat();
-    }
-
-
-    else if (action === "upload") {
-      openFilePicker("assets");
-    }
-
-
-    else if (
-      action === "studio-upload"
-    ) {
-      studioUpload();
-    }
-
-
-    else if (
-      action === "web-search"
-    ) {
-      Galaxy.state.webSearch =
-        !Galaxy.state.webSearch;
-
-      actionButton.classList.toggle(
-        "active",
-        Galaxy.state.webSearch
-      );
-
-      toast(
-        Galaxy.state.webSearch
-          ? "Web search enabled."
-          : "Web search disabled."
-      );
-    }
-
-
-    else if (
-      action === "image-create"
-    ) {
-      openView("create");
-      setStudioMode("image");
-    }
-
-
-    else if (
-      action === "video-create"
-    ) {
-      openView("create");
-      setStudioMode("text-video");
-    }
-
-
-    else if (action === "voice") {
-      startVoice();
-    }
-
-
-    else if (action === "run-work") {
-      runWork();
-    }
-
-
-    else if (
-      action === "clear-preview"
-    ) {
-      const output =
-        $("#workOutput");
-
-      if (output)
-        output.textContent =
-          "Your result will appear here.";
-    }
-
-
-    else if (
-      action ===
-      "new-creative-project"
-    ) {
-      newCreativeProject();
-    }
-
-
-    else if (
-      action === "studio-generate"
-    ) {
-      generateStudioContent();
-    }
-
-
-    else if (
-      action === "create-project"
-    ) {
-      createProject();
-    }
-
-
-    else if (
-      action === "add-scene"
-    ) {
-      addScene();
-    }
-
-
-    else if (
-      action === "new-scheduled"
-    ) {
-      createScheduledTask();
-    }
-
-
-    else if (action === "share") {
-      if (
-        navigator.share
-      ) {
-        navigator.share({
-          title: "GALAXY AI",
-          text: "GALAXY AI"
-        }).catch(() => {});
-      }
-
-      else {
-        navigator.clipboard
-          ?.writeText(
-            location.href
-          );
-
-        toast("Link copied.");
-      }
-    }
-
-  }
-);
-
-
-/* =========================================================
-   INPUT EVENTS
-   ========================================================= */
-
-$("#composer")?.addEventListener(
-  "submit",
-  event => {
-    event.preventDefault();
-    sendChatMessage();
-  }
-);
-
-$("#promptInput")?.addEventListener(
-  "input",
-  resizePrompt
-);
-
-$("#promptInput")?.addEventListener(
-  "keydown",
-  event => {
-
-    if (
-      event.key === "Enter" &&
-      !event.shiftKey
-    ) {
-      event.preventDefault();
-
-      sendChatMessage();
-    }
-  }
-);
-
-$("#aiProvider")?.addEventListener(
-  "change",
-  event => {
-    Galaxy.state.provider =
-      event.target.value;
-
-    saveState();
-
-    toast(
-      event.target.value === "gemini"
-        ? "Gemini selected."
-        : "OpenAI selected."
-    );
-  }
-);
-
-$("#fileInput")?.addEventListener(
-  "change",
-  event => {
-    handleFiles(
-      event.target.files
-    );
-  }
-);
-
-document.addEventListener(
-  "input",
-  event => {
-
-    if (
-      event.target.id ===
-      "workspaceSearch"
-    ) {
-      runWorkspaceSearch(
-        event.target.value
-      );
-    }
-
-  }
-);
-
-
-/* =========================================================
-   KEYBOARD SHORTCUTS
-   ========================================================= */
-
-document.addEventListener(
-  "keydown",
-  event => {
-
-    if (
-      (event.ctrlKey || event.metaKey) &&
-      event.key.toLowerCase() === "k"
-    ) {
-      event.preventDefault();
-
-      openView("search");
-
-      setTimeout(() => {
-        $("#workspaceSearch")
-          ?.focus();
-      }, 50);
-    }
-
-
-    if (
-      (event.ctrlKey || event.metaKey) &&
-      event.shiftKey &&
-      event.key.toLowerCase() === "o"
-    ) {
-      event.preventDefault();
-
-      createChat();
-    }
-
-  }
-);
-
-
-/* =========================================================
-   DRAG AND DROP
-   ========================================================= */
-
-document.addEventListener(
-  "dragover",
-  event => {
-    event.preventDefault();
-  }
-);
-
-document.addEventListener(
-  "drop",
-  event => {
-
-    event.preventDefault();
-
-    if (
-      event.dataTransfer?.files?.length
-    ) {
-      handleFiles(
-        event.dataTransfer.files
-      );
-    }
-
-  }
-);
-
-
-/* =========================================================
-   INITIALIZATION
-   ========================================================= */
-
-function initializeGalaxy() {
-  const provider =
-    $("#aiProvider");
-
-  if (provider) {
-    provider.value =
-      Galaxy.state.provider;
-  }
-
-  renderRecentChats();
-
-  renderGenerations();
-
-  setStudioMode(
-    Galaxy.state.selectedStudioMode
-  );
+function memoryUndo() {
+  const game = Games.memory;
 
   if (
-    !Galaxy.state.activeChatId &&
-    Galaxy.state.chats.length
+    game.busy ||
+    !game.history.length
   ) {
-    Galaxy.state.activeChatId =
-      Galaxy.state.chats[0].id;
+    toast("Nothing to undo.");
+    return;
   }
 
-  renderChat();
+  const item =
+    game.history.pop();
 
-  resizePrompt();
+  if (!item?.snapshot) return;
 
-  console.log(
-    `GALAXY AI ${Galaxy.version} ready`
+  memoryRestore(
+    item.snapshot
+  );
+
+  renderMemory();
+}
+
+function memoryResign() {
+  const game = Games.memory;
+
+  if (game.finished) return;
+
+  game.finished = true;
+  game.busy = false;
+
+  renderMemory();
+}
+
+function memoryResultText() {
+  const game = Games.memory;
+
+  if (!game.finished) {
+    return "In progress";
+  }
+
+  if (
+    game.playerScore >
+    game.opponentScore
+  ) {
+    return "You win";
+  }
+
+  if (
+    game.playerScore <
+    game.opponentScore
+  ) {
+    return `${opponentName(game.mode)} wins`;
+  }
+
+  return "Draw";
+}
+
+function memoryReviewHTML() {
+  const game = Games.memory;
+
+  const accuracy =
+    game.playerAttempts
+      ? Math.round(
+          game.playerMatches /
+          game.playerAttempts *
+          100
+        )
+      : 0;
+
+  return reviewCardHTML(
+    "Memory Review",
+    [
+      ["Your pairs", game.playerScore],
+      [
+        `${opponentName(game.mode)} pairs`,
+        game.opponentScore
+      ],
+      ["Your attempts", game.playerAttempts],
+      ["Match accuracy", `${accuracy}%`],
+      ["Hints", game.hints],
+      ["Result", memoryResultText()]
+    ]
+  );
+}
+
+function renderMemory() {
+  const game = Games.memory;
+
+  const turnName =
+    game.turn === "player"
+      ? "Your turn"
+      : game.mode === "galaxy"
+        ? "GALAXY's turn"
+        : "Friend's turn";
+
+  const status =
+    game.finished
+      ? memoryResultText()
+      : turnName;
+
+  const toolbar = `
+    ${gameModeSelector("memory")}
+    ${gameLevelSelector("memory")}
+    ${commonGameButtons("memory", {
+      hint: true,
+      undo: true,
+      resign: true,
+      review: true
+    })}
+  `;
+
+  const cards =
+    game.cards.map((card, index) => {
+      const revealed =
+        game.revealed.includes(index);
+
+      const matched =
+        game.matched.has(index);
+
+      return `
+        <button
+          class="
+            memory-card
+            ${
+              revealed || matched
+                ? "revealed"
+                : ""
+            }
+            ${
+              matched
+                ? "matched"
+                : ""
+            }
+          "
+          data-memory-card="${index}"
+          type="button"
+        >
+          <span class="back">✦</span>
+          <span class="front">
+            ${card.symbol}
+          </span>
+        </button>
+      `;
+    }).join("");
+
+  setContent(
+    "Memory",
+    "GALAXY GAMES",
+    `
+      <div class="game-shell">
+
+        ${gameHeader(
+          "Memory",
+          status,
+          toolbar
+        )}
+
+        <div class="scoreboard">
+
+          <div class="scorebox">
+            <span>You</span>
+            <strong>
+              ${game.playerScore}
+            </strong>
+          </div>
+
+          <div class="scorebox">
+            <span>
+              ${opponentName(game.mode)}
+            </span>
+            <strong>
+              ${game.opponentScore}
+            </strong>
+          </div>
+
+          <div class="scorebox">
+            <span>Pairs left</span>
+            <strong>
+              ${
+                8 -
+                game.matched.size / 2
+              }
+            </strong>
+          </div>
+
+          <div class="scorebox">
+            <span>Hints</span>
+            <strong>${game.hints}</strong>
+          </div>
+
+        </div>
+
+        <div class="game-layout">
+
+          <div class="memory-board">
+            ${cards}
+          </div>
+
+          <div class="game-side-panel">
+
+            <div class="player-card">
+              <div class="player-avatar">Y</div>
+
+              <div>
+                <strong>You</strong>
+                <span>
+                  ${game.playerScore} pairs
+                </span>
+              </div>
+            </div>
+
+            <div class="player-card">
+              <div class="player-avatar galaxy-avatar">
+                ${
+                  game.mode === "galaxy"
+                    ? "✦"
+                    : "F"
+                }
+              </div>
+
+              <div>
+                <strong>
+                  ${opponentName(game.mode)}
+                </strong>
+
+                <span>
+                  ${
+                    game.mode === "galaxy"
+                      ? `${game.elo} ELO memory`
+                      : `${game.opponentScore} pairs`
+                  }
+                </span>
+              </div>
+            </div>
+
+            ${
+              game.reviewOpen
+                ? memoryReviewHTML()
+                : ""
+            }
+
+          </div>
+
+        </div>
+      </div>
+    `
   );
 }
 
 
 /* =========================================================
-   START GALAXY
+   SHOOTING GAME
    ========================================================= */
+
+function stopShooterTimers() {
+  const game = Games.shooter;
+
+  if (game.timer) {
+    clearInterval(game.timer);
+    game.timer = null;
+  }
+
+  if (game.galaxyTimer) {
+    clearInterval(game.galaxyTimer);
+    game.galaxyTimer = null;
+  }
+}
+
+function resetShooter(render = true) {
+  const game = Games.shooter;
+
+  stopShooterTimers();
+
+  game.running = false;
+  game.finished = false;
+  game.time = 30;
+  game.playerScore = 0;
+  game.opponentScore = 0;
+  game.shots = 0;
+  game.hits = 0;
+  game.misses = 0;
+  game.streak = 0;
+  game.bestStreak = 0;
+  game.target = null;
+  game.friendTurn = 1;
+  game.friendScores = [0, 0];
+
+  game.friendStats = [
+    {
+      shots: 0,
+      hits: 0,
+      misses: 0,
+      bestStreak: 0
+    },
+    {
+      shots: 0,
+      hits: 0,
+      misses: 0,
+      bestStreak: 0
+    }
+  ];
+
+  game.reviewOpen = false;
+
+  renderShooter();
+}
+
+function shooterDifficulty() {
+  const elo =
+    Games.shooter.elo;
+
+  if (elo >= 1200) {
+    return {
+      interval: 650,
+      hitChance: 0.9,
+      targetSize: 44
+    };
+  }
+
+  if (elo >= 1000) {
+    return {
+      interval: 800,
+      hitChance: 0.8,
+      targetSize: 48
+    };
+  }
+
+  if (elo >= 800) {
+    return {
+      interval: 950,
+      hitChance: 0.7,
+      targetSize: 50
+    };
+  }
+
+  if (elo >= 500) {
+    return {
+      interval: 1150,
+      hitChance: 0.58,
+      targetSize: 54
+    };
+  }
+
+  if (elo >= 200) {
+    return {
+      interval: 1400,
+      hitChance: 0.4,
+      targetSize: 58
+    };
+  }
+
+  return {
+    interval: 1650,
+    hitChance: 0.25,
+    targetSize: 64
+  };
+}
+
+function shooterNewTarget() {
+  const game = Games.shooter;
+
+  const stage =
+    $(".shooting-stage");
+
+  if (
+    !stage ||
+    !game.running
+  ) {
+    return;
+  }
+
+  const rect =
+    stage.getBoundingClientRect();
+
+  const difficulty =
+    shooterDifficulty();
+
+  const size =
+    difficulty.targetSize;
+
+  const maxX =
+    Math.max(
+      0,
+      rect.width - size - 20
+    );
+
+  const maxY =
+    Math.max(
+      0,
+      rect.height - size - 20
+    );
+
+  game.target = {
+    x:
+      10 +
+      Math.random() * maxX,
+    y:
+      10 +
+      Math.random() * maxY,
+    size
+  };
+
+  renderShooter();
+}
+
+function startShooter() {
+  const game = Games.shooter;
+
+  if (game.running) return;
+
+  if (game.finished) {
+    resetShooter();
+  }
+
+  game.running = true;
+  game.finished = false;
+  game.time = 30;
+
+  shooterNewTarget();
+
+  game.timer =
+    setInterval(() => {
+      game.time--;
+
+      if (game.time <= 0) {
+        finishShooter();
+        return;
+      }
+
+      const timerEl =
+        $("[data-shooter-time]");
+
+      if (timerEl) {
+        timerEl.textContent =
+          game.time;
+      }
+    }, 1000);
+
+  if (game.mode === "galaxy") {
+    startGalaxyShooterAI();
+  }
+
+  renderShooter();
+}
+
+function startGalaxyShooterAI() {
+  const game = Games.shooter;
+
+  if (
+    game.mode !== "galaxy" ||
+    !game.running
+  ) {
+    return;
+  }
+
+  if (game.galaxyTimer) {
+    clearInterval(
+      game.galaxyTimer
+    );
+  }
+
+  const difficulty =
+    shooterDifficulty();
+
+  game.galaxyTimer =
+    setInterval(() => {
+      if (
+        !game.running ||
+        game.mode !== "galaxy"
+      ) {
+        return;
+      }
+
+      if (
+        Math.random() <
+        difficulty.hitChance
+      ) {
+        game.opponentScore += 10;
+
+        shooterGalaxyEffect();
+        shooterNewTarget();
+      }
+    }, difficulty.interval);
+}
+
+function shooterGalaxyEffect() {
+  const stage =
+    $(".shooting-stage");
+
+  if (!stage) return;
+
+  const effect =
+    document.createElement("span");
+
+  effect.className =
+    "galaxy-shot";
+
+  effect.style.left =
+    `${20 + Math.random() * 70}%`;
+
+  effect.style.top =
+    `${15 + Math.random() * 70}%`;
+
+  stage.appendChild(effect);
+
+  setTimeout(
+    () => effect.remove(),
+    400
+  );
+}
+
+function shooterHit(event) {
+  const game = Games.shooter;
+
+  if (!game.running) return;
+
+  event.preventDefault();
+  event.stopPropagation();
+
+  game.shots++;
+  game.hits++;
+  game.streak++;
+
+  game.bestStreak =
+    Math.max(
+      game.bestStreak,
+      game.streak
+    );
+
+  game.playerScore +=
+    10 + Math.min(20, game.streak);
+
+  if (game.mode === "friend") {
+    game.friendScores[
+      game.friendTurn - 1
+    ] = game.playerScore;
+
+    const stats =
+      game.friendStats[
+        game.friendTurn - 1
+      ];
+
+    stats.shots = game.shots;
+    stats.hits = game.hits;
+    stats.misses = game.misses;
+    stats.bestStreak =
+      game.bestStreak;
+  }
+
+  shooterNewTarget();
+}
+
+function shooterMiss(event) {
+  const game = Games.shooter;
+
+  if (!game.running) return;
+
+  if (
+    event.target.closest(
+      "[data-shooter-target]"
+    )
+  ) {
+    return;
+  }
+
+  game.shots++;
+  game.misses++;
+  game.streak = 0;
+
+  if (game.mode === "friend") {
+    const stats =
+      game.friendStats[
+        game.friendTurn - 1
+      ];
+
+    stats.shots = game.shots;
+    stats.hits = game.hits;
+    stats.misses = game.misses;
+    stats.bestStreak =
+      game.bestStreak;
+  }
+
+  renderShooter();
+}
+
+function finishShooter() {
+  const game = Games.shooter;
+
+  stopShooterTimers();
+
+  game.running = false;
+
+  if (
+    game.mode === "friend" &&
+    game.friendTurn === 1
+  ) {
+    game.friendScores[0] =
+      game.playerScore;
+
+    game.friendStats[0] = {
+      shots: game.shots,
+      hits: game.hits,
+      misses: game.misses,
+      bestStreak: game.bestStreak
+    };
+
+    game.friendTurn = 2;
+
+    game.time = 30;
+    game.playerScore = 0;
+    game.shots = 0;
+    game.hits = 0;
+    game.misses = 0;
+    game.streak = 0;
+    game.bestStreak = 0;
+    game.target = null;
+
+    renderShooter();
+
+    toast(
+      "Friend's turn. Press Start Round."
+    );
+
+    return;
+  }
+
+  if (game.mode === "friend") {
+    game.friendScores[1] =
+      game.playerScore;
+
+    game.friendStats[1] = {
+      shots: game.shots,
+      hits: game.hits,
+      misses: game.misses,
+      bestStreak: game.bestStreak
+    };
+  }
+
+  game.finished = true;
+  game.target = null;
+
+  renderShooter();
+}
+
+function shooterResign() {
+  const game = Games.shooter;
+
+  if (
+    !game.running &&
+    !game.finished
+  ) {
+    return;
+  }
+
+  stopShooterTimers();
+
+  game.running = false;
+  game.finished = true;
+  game.target = null;
+
+  renderShooter();
+}
+
+function shooterResultText() {
+  const game = Games.shooter;
+
+  if (!game.finished) {
+    return "In progress";
+  }
+
+  if (game.mode === "galaxy") {
+    if (
+      game.playerScore >
+      game.opponentScore
+    ) {
+      return "You win";
+    }
+
+    if (
+      game.playerScore <
+      game.opponentScore
+    ) {
+      return "GALAXY wins";
+    }
+
+    return "Draw";
+  }
+
+  if (
+    game.friendScores[0] >
+    game.friendScores[1]
+  ) {
+    return "You win";
+  }
+
+  if (
+    game.friendScores[0] <
+    game.friendScores[1]
+  ) {
+    return "Friend wins";
+  }
+
+  return "Draw";
+}
+
+function shooterReviewHTML() {
+  const game = Games.shooter;
+
+  if (game.mode === "friend") {
+    const p1 =
+      game.friendStats[0];
+
+    const p2 =
+      game.friendStats[1];
+
+    const accuracy1 =
+      p1.shots
+        ? Math.round(
+            p1.hits /
+            p1.shots *
+            100
+          )
+        : 0;
+
+    const accuracy2 =
+      p2.shots
+        ? Math.round(
+            p2.hits /
+            p2.shots *
+            100
+          )
+        : 0;
+
+    return reviewCardHTML(
+      "Shooting Review",
+      [
+        ["Your score", game.friendScores[0]],
+        ["Friend score", game.friendScores[1]],
+        ["Your accuracy", `${accuracy1}%`],
+        ["Friend accuracy", `${accuracy2}%`],
+        ["Your best streak", p1.bestStreak],
+        ["Friend best streak", p2.bestStreak],
+        ["Result", shooterResultText()]
+      ]
+    );
+  }
+
+  const accuracy =
+    game.shots
+      ? Math.round(
+          game.hits /
+          game.shots *
+          100
+        )
+      : 0;
+
+  return reviewCardHTML(
+    "Shooting Review",
+    [
+      ["Your score", game.playerScore],
+      ["GALAXY score", game.opponentScore],
+      ["Shots", game.shots],
+      ["Hits", game.hits],
+      ["Misses", game.misses],
+      ["Accuracy", `${accuracy}%`],
+      ["Best streak", game.bestStreak],
+      ["Result", shooterResultText()]
+    ]
+  );
+}
+
+function renderShooter() {
+  const game = Games.shooter;
+
+  let status =
+    game.running
+      ? game.mode === "friend"
+        ? `Player ${game.friendTurn} shooting`
+        : "Target active"
+      : game.finished
+        ? shooterResultText()
+        : game.mode === "friend"
+          ? game.friendTurn === 1
+            ? "Your round"
+            : "Friend's round"
+          : "Ready";
+
+  const toolbar = `
+    ${gameModeSelector("shooter")}
+    ${gameLevelSelector("shooter")}
+
+    <button
+      class="primary-btn"
+      data-game-command="shooter:start"
+      type="button"
+    >
+      ${
+        game.running
+          ? "Running"
+          : "Start Round"
+      }
+    </button>
+
+    <button
+      class="secondary-btn"
+      data-game-command="shooter:resign"
+      type="button"
+    >
+      End
+    </button>
+
+    <button
+      class="secondary-btn"
+      data-game-command="shooter:review"
+      type="button"
+    >
+      Review
+    </button>
+
+    <button
+      class="secondary-btn"
+      data-game-command="shooter:reset"
+      type="button"
+    >
+      New Game
+    </button>
+  `;
+
+  const opponentScore =
+    game.mode === "galaxy"
+      ? game.opponentScore
+      : game.friendScores[1];
+
+  setContent(
+    "GALAXY Shooting",
+    "GALAXY GAMES",
+    `
+      <div class="game-shell">
+
+        ${gameHeader(
+          "GALAXY Shooting",
+          status,
+          toolbar
+        )}
+
+        <div class="shooting-hud">
+
+          <div class="scorebox">
+            <span>Time</span>
+            <strong data-shooter-time>
+              ${game.time}
+            </strong>
+          </div>
+
+          <div class="scorebox">
+            <span>
+              ${
+                game.mode === "friend"
+                  ? game.friendTurn === 1
+                    ? "Your score"
+                    : "Friend score"
+                  : "Your score"
+              }
+            </span>
+
+            <strong>
+              ${game.playerScore}
+            </strong>
+          </div>
+
+          <div class="scorebox">
+            <span>
+              ${
+                game.mode === "galaxy"
+                  ? "GALAXY score"
+                  : "Your Round 1"
+              }
+            </span>
+
+            <strong>
+              ${
+                game.mode === "galaxy"
+                  ? opponentScore
+                  : game.friendScores[0]
+              }
+            </strong>
+          </div>
+
+          <div class="scorebox">
+            <span>Best streak</span>
+            <strong>
+              ${game.bestStreak}
+            </strong>
+          </div>
+
+        </div>
+
+        <div class="game-layout">
+
+          <div
+            class="shooting-stage"
+            data-shooter-arena
+          >
+
+            ${
+              game.target &&
+              game.running
+                ? `
+                  <button
+                    class="shooting-target"
+                    data-shooter-target
+                    type="button"
+                    style="
+                      left:${game.target.x}px;
+                      top:${game.target.y}px;
+                      width:${game.target.size}px;
+                      height:${game.target.size}px;
+                    "
+                    aria-label="Target"
+                  ></button>
+                `
+                : `
+                  <div
+                    style="
+                      height:100%;
+                      min-height:500px;
+                      display:grid;
+                      place-items:center;
+                      color:var(--muted);
+                      text-align:center;
+                      padding:30px;
+                    "
+                  >
+                    ${
+                      game.finished
+                        ? escapeHTML(
+                            shooterResultText()
+                          )
+                        : "Press Start Round to begin."
+                    }
+                  </div>
+                `
+            }
+
+          </div>
+
+          <div class="game-side-panel">
+
+            <div class="game-stat">
+              <span>Shots</span>
+              <strong>
+                ${game.shots}
+              </strong>
+            </div>
+
+            <div class="game-stat">
+              <span>Hits</span>
+              <strong>
+                ${game.hits}
+              </strong>
+            </div>
+
+            <div class="game-stat">
+              <span>Misses</span>
+              <strong>
+                ${game.misses}
+              </strong>
+            </div>
+
+            <div class="game-stat">
+              <span>Current streak</span>
+              <strong>
+                ${game.streak}
+              </strong>
+            </div>
+
+            ${
+              game.reviewOpen
+                ? shooterReviewHTML()
+                : ""
+            }
+
+          </div>
+
+        </div>
+      </div>
+    `
+  );
+}
+
+
+/* =========================================================
+   REVIEW CARD
+   ========================================================= */
+
+function reviewCardHTML(
+  title,
+  metrics,
+  note = ""
+) {
+  return `
+    <div class="review-card">
+
+      <strong>
+        ${escapeHTML(title)}
+      </strong>
+
+      <div
+        class="review-grid"
+        style="margin-top:10px"
+      >
+        ${metrics.map(
+          ([label, value]) => `
+            <div class="review-metric">
+
+              <span>
+                ${escapeHTML(label)}
+              </span>
+
+              <strong>
+                ${escapeHTML(value)}
+              </strong>
+
+            </div>
+          `
+        ).join("")}
+      </div>
+
+      ${
+        note
+          ? `
+            <p
+              style="
+                color:var(--muted);
+                font-size:11px;
+                line-height:1.45;
+                margin:10px 0 0;
+              "
+            >
+              ${escapeHTML(note)}
+            </p>
+          `
+          : ""
+      }
+
+    </div>
+  `;
+}
+
+
+/* =========================================================
+   GAME COMMANDS
+   ========================================================= */
+
+function handleGameCommand(
+  gameName,
+  command
+) {
+  if (gameName === "chess") {
+    if (command === "reset") resetChess();
+    if (command === "hint") chessHint();
+    if (command === "undo") chessUndo();
+    if (command === "resign") chessResign();
+
+    if (command === "review") {
+      Games.chess.reviewOpen =
+        !Games.chess.reviewOpen;
+
+      renderChess();
+    }
+
+    return;
+  }
+
+  if (gameName === "ttt") {
+    if (command === "reset") resetTTT();
+    if (command === "hint") tttHint();
+    if (command === "undo") tttUndo();
+    if (command === "resign") tttResign();
+
+    if (command === "review") {
+      Games.ttt.reviewOpen =
+        !Games.ttt.reviewOpen;
+
+      renderTTT();
+    }
+
+    return;
+  }
+
+  if (gameName === "connect") {
+    if (command === "reset") resetConnect();
+    if (command === "hint") connectHint();
+    if (command === "undo") connectUndo();
+    if (command === "resign") connectResign();
+
+    if (command === "review") {
+      Games.connect.reviewOpen =
+        !Games.connect.reviewOpen;
+
+      renderConnect();
+    }
+
+    return;
+  }
+
+  if (gameName === "memory") {
+    if (command === "reset") resetMemory();
+    if (command === "hint") memoryHint();
+    if (command === "undo") memoryUndo();
+    if (command === "resign") memoryResign();
+
+    if (command === "review") {
+      Games.memory.reviewOpen =
+        !Games.memory.reviewOpen;
+
+      renderMemory();
+    }
+
+    return;
+  }
+
+  if (gameName === "shooter") {
+    if (command === "reset") resetShooter();
+    if (command === "start") startShooter();
+    if (command === "resign") shooterResign();
+
+    if (command === "review") {
+      Games.shooter.reviewOpen =
+        !Games.shooter.reviewOpen;
+
+      renderShooter();
+    }
+  }
+}
+
+function changeGameMode(
+  gameName,
+  mode
+) {
+  if (!Games[gameName]) return;
+
+  Games[gameName].mode = mode;
+
+  if (gameName === "chess") {
+    resetChess();
+  }
+
+  if (gameName === "ttt") {
+    resetTTT();
+  }
+
+  if (gameName === "connect") {
+    resetConnect();
+  }
+
+  if (gameName === "memory") {
+    resetMemory();
+  }
+
+  if (gameName === "shooter") {
+    resetShooter();
+  }
+}
+
+function changeGameLevel(
+  gameName,
+  elo
+) {
+  if (!Games[gameName]) return;
+
+  Games[gameName].elo =
+    Number(elo);
+
+  if (gameName === "chess") {
+    resetChess();
+  }
+
+  if (gameName === "ttt") {
+    resetTTT();
+  }
+
+  if (gameName === "connect") {
+    resetConnect();
+  }
+
+  if (gameName === "memory") {
+    resetMemory();
+  }
+
+  if (gameName === "shooter") {
+    resetShooter();
+  }
+}
+
+
+/* =========================================================
+   WORK MODE
+   ========================================================= */
+
+async function sendWork() {
+  const input =
+    $("#workPrompt");
+
+  const output =
+    $("#workOutput");
+
+  if (
+    !input ||
+    !output
+  ) {
+    return;
+  }
+
+  const text =
+    input.value.trim();
+
+  if (!text) {
+    toast(
+      "Enter a work request."
+    );
+    return;
+  }
+
+  output.textContent =
+    "GALAXY is working…";
+
+  try {
+    const provider =
+      $("#aiProvider")?.value ||
+      "gemini";
+
+    const endpoint =
+      provider === "openai"
+        ? "/api/chat"
+        : "/api/gemini";
+
+    const response =
+      await fetch(endpoint, {
+        method: "POST",
+
+        headers: {
+          "Content-Type":
+            "application/json"
+        },
+
+        body: JSON.stringify({
+          message: text,
+          messages: [
+            {
+              role: "user",
+              content: text
+            }
+          ]
+        })
+      });
+
+    const data =
+      await response.json();
+
+    if (!response.ok) {
+      throw new Error(
+        data.error ||
+        data.message ||
+        "GALAXY backend error"
+      );
+    }
+
+    output.textContent =
+      data.reply ||
+      data.text ||
+      data.output ||
+      data.message ||
+      "No output returned.";
+  } catch (error) {
+    output.textContent =
+      `Error: ${error.message}`;
+  }
+}
+
+
+/* =========================================================
+   CLICK HANDLER
+   ========================================================= */
+
+function handleClick(event) {
+  const viewButton =
+    event.target.closest(
+      "[data-view]"
+    );
+
+  if (viewButton) {
+    switchView(
+      viewButton.dataset.view
+    );
+
+    return;
+  }
+
+  const gameOpen =
+    event.target.closest(
+      "[data-game-open]"
+    );
+
+  if (gameOpen) {
+    openGame(
+      gameOpen.dataset.gameOpen
+    );
+
+    return;
+  }
+
+  const gameBack =
+    event.target.closest(
+      "[data-game-back]"
+    );
+
+  if (gameBack) {
+    renderGamesHome();
+    return;
+  }
+
+  const command =
+    event.target.closest(
+      "[data-game-command]"
+    );
+
+  if (command) {
+    const [
+      gameName,
+      action
+    ] =
+      command.dataset.gameCommand.split(":");
+
+    handleGameCommand(
+      gameName,
+      action
+    );
+
+    return;
+  }
+
+  const chessSquare =
+    event.target.closest(
+      "[data-chess-square]"
+    );
+
+  if (chessSquare) {
+    const [row, col] =
+      chessSquare.dataset.chessSquare
+        .split(",")
+        .map(Number);
+
+    chessClickSquare(
+      row,
+      col
+    );
+
+    return;
+  }
+
+  const tttCell =
+    event.target.closest(
+      "[data-ttt-cell]"
+    );
+
+  if (tttCell) {
+    tttClick(
+      Number(
+        tttCell.dataset.tttCell
+      )
+    );
+
+    return;
+  }
+
+  const connectColumn =
+    event.target.closest(
+      "[data-connect-column]"
+    );
+
+  if (connectColumn) {
+    connectClick(
+      Number(
+        connectColumn.dataset.connectColumn
+      )
+    );
+
+    return;
+  }
+
+  const memoryCard =
+    event.target.closest(
+      "[data-memory-card]"
+    );
+
+  if (memoryCard) {
+    memoryClick(
+      Number(
+        memoryCard.dataset.memoryCard
+      )
+    );
+
+    return;
+  }
+
+  const shooterTarget =
+    event.target.closest(
+      "[data-shooter-target]"
+    );
+
+  if (shooterTarget) {
+    shooterHit(event);
+    return;
+  }
+
+  const shooterArena =
+    event.target.closest(
+      "[data-shooter-arena]"
+    );
+
+  if (shooterArena) {
+    shooterMiss(event);
+    return;
+  }
+
+  const actionButton =
+    event.target.closest(
+      "[data-action]"
+    );
+
+  if (!actionButton) return;
+
+  const action =
+    actionButton.dataset.action;
+
+  if (action === "new-chat") {
+    newChat();
+    return;
+  }
+
+  /*
+    IMPORTANT:
+    SEND is also directly bound inside bindEvents().
+    The direct listener stops propagation.
+    This delegated fallback only runs if necessary.
+  */
+  if (action === "send") {
+    sendMessage();
+    return;
+  }
+
+  if (action === "attach") {
+    $("#fileInput")?.click();
+    return;
+  }
+
+  if (action === "web-search") {
+    App.searchEnabled =
+      !App.searchEnabled;
+
+    actionButton.classList.toggle(
+      "active",
+      App.searchEnabled
+    );
+
+    toast(
+      App.searchEnabled
+        ? "Web search enabled"
+        : "Web search disabled"
+    );
+
+    return;
+  }
+
+  if (action === "image") {
+    toast(
+      "GALAXY Image Studio"
+    );
+
+    switchView("studio");
+    return;
+  }
+
+  if (action === "video") {
+    toast(
+      "GALAXY Video Studio"
+    );
+
+    switchView("studio");
+    return;
+  }
+
+  if (action === "voice") {
+    toast(
+      "Voice mode can be connected next."
+    );
+
+    return;
+  }
+
+  if (action === "send-work") {
+    sendWork();
+  }
+}
+
+
+/* =========================================================
+   CHANGE HANDLER
+   ========================================================= */
+
+function handleChange(event) {
+  const modeSelect =
+    event.target.closest(
+      "[data-game-mode]"
+    );
+
+  if (modeSelect) {
+    changeGameMode(
+      modeSelect.dataset.gameMode,
+      modeSelect.value
+    );
+
+    return;
+  }
+
+  const levelSelect =
+    event.target.closest(
+      "[data-game-level]"
+    );
+
+  if (levelSelect) {
+    changeGameLevel(
+      levelSelect.dataset.gameLevel,
+      levelSelect.value
+    );
+  }
+}
+
+
+/* =========================================================
+   KEYBOARD
+   ========================================================= */
+
+function handlePromptKeydown(event) {
+  if (
+    event.key === "Enter" &&
+    !event.shiftKey
+  ) {
+    event.preventDefault();
+    sendMessage();
+  }
+}
+
+
+/* =========================================================
+   BIND EVENTS
+   ========================================================= */
+
+function bindEvents() {
+  /*
+    General delegated click handler
+  */
+  document.addEventListener(
+    "click",
+    handleClick
+  );
+
+  /*
+    Game mode + level changes
+  */
+  document.addEventListener(
+    "change",
+    handleChange
+  );
+
+  /*
+    SEND ARROW FIX
+    This directly binds the send button.
+  */
+  const sendButton =
+    $("#sendButton");
+
+  if (sendButton) {
+    sendButton.type = "button";
+
+    sendButton.addEventListener(
+      "click",
+      event => {
+        event.preventDefault();
+        event.stopPropagation();
+
+        sendMessage();
+      }
+    );
+  }
+
+  /*
+    Prompt typing
+  */
+  const promptInput =
+    $("#promptInput");
+
+  if (promptInput) {
+    promptInput.addEventListener(
+      "input",
+      autoResizePrompt
+    );
+
+    promptInput.addEventListener(
+      "keydown",
+      handlePromptKeydown
+    );
+  }
+
+  /*
+    File upload
+  */
+  const fileInput =
+    $("#fileInput");
+
+  if (fileInput) {
+    fileInput.addEventListener(
+      "change",
+      event => {
+        handleFiles(
+          event.target.files
+        );
+
+        event.target.value = "";
+      }
+    );
+  }
+
+  /*
+    Protect composer if it is inside a form
+  */
+  const composer =
+    $("#composer");
+
+  if (
+    composer &&
+    composer.tagName === "FORM"
+  ) {
+    composer.addEventListener(
+      "submit",
+      event => {
+        event.preventDefault();
+        sendMessage();
+      }
+    );
+  }
+}
+
+
+/* =========================================================
+   INITIALIZE
+   ========================================================= */
+
+function initGalaxy() {
+  bindEvents();
+
+  updateSendButtonState();
+  autoResizePrompt();
+  renderMessages();
+
+  switchView("chat");
+
+  console.log(
+    "GALAXY AI loaded successfully."
+  );
+}
 
 if (
   document.readyState === "loading"
 ) {
   document.addEventListener(
     "DOMContentLoaded",
-    initializeGalaxy
+    initGalaxy
   );
-}
-
-else {
-  initializeGalaxy();
+} else {
+  initGalaxy();
 }
