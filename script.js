@@ -12098,3 +12098,4212 @@ window.GALAXY = {
 
   openPals
 };
+/* ============================================================
+   GALAXY PALS — ADVANCED CREATURE UPGRADE
+   Paste at END of script.js
+   ============================================================ */
+
+(() => {
+
+  "use strict";
+
+
+  const GP = {
+
+    active:
+      false,
+
+    creatures:
+      [],
+
+    resources:
+      [],
+
+    buildings:
+      [],
+
+    projectiles:
+      [],
+
+    companion:
+      null,
+
+    target:
+      null,
+
+    keys:
+      new Set(),
+
+    mouseDown:
+      false
+  };
+
+
+  /* ============================================================
+     ORIGINAL DETAILED CREATURE DATABASE
+     ============================================================ */
+
+  const GALAXY_CREATURES = [
+
+    {
+      id: "emberfox",
+      name: "Emberfox",
+      type: "fox",
+      element: "Fire",
+      rarity: 1,
+      hp: 90,
+      attack: 22,
+      speed: 3.2,
+      body: 0xe1633f,
+      accent: 0xffc55b
+    },
+
+    {
+      id: "mossbun",
+      name: "Mossbun",
+      type: "rabbit",
+      element: "Grass",
+      rarity: 1,
+      hp: 100,
+      attack: 17,
+      speed: 3.1,
+      body: 0x62a95f,
+      accent: 0xc3e883
+    },
+
+    {
+      id: "voltcat",
+      name: "Voltcat",
+      type: "cat",
+      element: "Electric",
+      rarity: 2,
+      hp: 85,
+      attack: 27,
+      speed: 3.8,
+      body: 0xe5c943,
+      accent: 0x3c3831
+    },
+
+    {
+      id: "aquafin",
+      name: "Aquafin",
+      type: "dragon",
+      element: "Water",
+      rarity: 2,
+      hp: 115,
+      attack: 24,
+      speed: 2.8,
+      body: 0x4f9ed0,
+      accent: 0xa1eaff
+    },
+
+    {
+      id: "stonehorn",
+      name: "Stonehorn",
+      type: "deer",
+      element: "Ground",
+      rarity: 2,
+      hp: 145,
+      attack: 29,
+      speed: 2.4,
+      body: 0x8a7762,
+      accent: 0xd0b893
+    },
+
+    {
+      id: "frostwolf",
+      name: "Frostwolf",
+      type: "wolf",
+      element: "Ice",
+      rarity: 3,
+      hp: 125,
+      attack: 34,
+      speed: 3.9,
+      body: 0x9cd4e5,
+      accent: 0xf0fbff
+    },
+
+    {
+      id: "shadebat",
+      name: "Shadebat",
+      type: "bat",
+      element: "Dark",
+      rarity: 2,
+      hp: 83,
+      attack: 31,
+      speed: 4.2,
+      body: 0x55466e,
+      accent: 0xb394dd
+    },
+
+    {
+      id: "ironape",
+      name: "Ironape",
+      type: "ape",
+      element: "Ground",
+      rarity: 3,
+      hp: 165,
+      attack: 39,
+      speed: 2.3,
+      body: 0x6c7780,
+      accent: 0x273038
+    },
+
+    {
+      id: "stormgryph",
+      name: "Stormgryph",
+      type: "bird",
+      element: "Electric",
+      rarity: 4,
+      hp: 170,
+      attack: 43,
+      speed: 4.7,
+      body: 0xc6aa37,
+      accent: 0x5e4f27
+    },
+
+    {
+      id: "cinderdrake",
+      name: "Cinderdrake",
+      type: "dragon",
+      element: "Fire",
+      rarity: 4,
+      hp: 190,
+      attack: 48,
+      speed: 3.3,
+      body: 0xa94131,
+      accent: 0xff8a43
+    },
+
+    {
+      id: "glacierox",
+      name: "Glacierox",
+      type: "bull",
+      element: "Ice",
+      rarity: 4,
+      hp: 230,
+      attack: 41,
+      speed: 2.1,
+      body: 0x88bed3,
+      accent: 0xe4f7ff
+    },
+
+    {
+      id: "voidlion",
+      name: "Voidlion",
+      type: "lion",
+      element: "Dark",
+      rarity: 5,
+      hp: 220,
+      attack: 55,
+      speed: 3.6,
+      body: 0x46355e,
+      accent: 0xbd6eff
+    },
+
+    {
+      id: "solara",
+      name: "Solara",
+      type: "bird",
+      element: "Dragon",
+      rarity: 5,
+      hp: 205,
+      attack: 57,
+      speed: 5,
+      body: 0xe0b957,
+      accent: 0xfff2b2
+    }
+
+  ];
+
+
+  if (
+    typeof PALS_CREATURES !==
+    "undefined"
+  ) {
+
+    PALS_CREATURES.splice(
+      0,
+      PALS_CREATURES.length,
+      ...GALAXY_CREATURES
+    );
+  }
+
+
+  /* ============================================================
+     CREATURE BODY BUILDERS
+     ============================================================ */
+
+  function material(
+    THREE,
+    color
+  ) {
+
+    return new THREE
+      .MeshStandardMaterial({
+
+        color,
+
+        roughness:
+          0.72
+      });
+  }
+
+
+  function sphere(
+    THREE,
+    radius,
+    color,
+    x,
+    y,
+    z,
+    sx = 1,
+    sy = 1,
+    sz = 1
+  ) {
+
+    const mesh =
+      new THREE.Mesh(
+
+        new THREE
+          .SphereGeometry(
+            radius,
+            14,
+            11
+          ),
+
+        material(
+          THREE,
+          color
+        )
+      );
+
+
+    mesh.position.set(
+      x,
+      y,
+      z
+    );
+
+
+    mesh.scale.set(
+      sx,
+      sy,
+      sz
+    );
+
+
+    mesh.castShadow =
+      true;
+
+
+    return mesh;
+  }
+
+
+  function box(
+    THREE,
+    w,
+    h,
+    d,
+    color
+  ) {
+
+    const mesh =
+      new THREE.Mesh(
+
+        new THREE
+          .BoxGeometry(
+            w,
+            h,
+            d
+          ),
+
+        material(
+          THREE,
+          color
+        )
+      );
+
+
+    mesh.castShadow =
+      true;
+
+
+    return mesh;
+  }
+
+
+  function cone(
+    THREE,
+    radius,
+    height,
+    color
+  ) {
+
+    const mesh =
+      new THREE.Mesh(
+
+        new THREE
+          .ConeGeometry(
+            radius,
+            height,
+            6
+          ),
+
+        material(
+          THREE,
+          color
+        )
+      );
+
+
+    mesh.castShadow =
+      true;
+
+
+    return mesh;
+  }
+
+
+  function createDetailedCreature(
+    THREE,
+    species
+  ) {
+
+    const root =
+      new THREE.Group();
+
+
+    const bodyColor =
+      species.body;
+
+
+    const accent =
+      species.accent;
+
+
+    const body =
+      sphere(
+        THREE,
+        .75,
+        bodyColor,
+        0,
+        1.05,
+        0,
+        1.25,
+        .9,
+        1.5
+      );
+
+
+    root.add(
+      body
+    );
+
+
+    const chest =
+      sphere(
+        THREE,
+        .58,
+        bodyColor,
+        0,
+        1.25,
+        -.55,
+        1,
+        1.05,
+        1
+      );
+
+
+    root.add(
+      chest
+    );
+
+
+    const neck =
+      sphere(
+        THREE,
+        .35,
+        bodyColor,
+        0,
+        1.5,
+        -.82,
+        .8,
+        1.2,
+        .8
+      );
+
+
+    root.add(
+      neck
+    );
+
+
+    const head =
+      sphere(
+        THREE,
+        .52,
+        bodyColor,
+        0,
+        1.85,
+        -1.05,
+        1,
+        .95,
+        1
+      );
+
+
+    root.add(
+      head
+    );
+
+
+    const muzzle =
+      sphere(
+        THREE,
+        .25,
+        accent,
+        0,
+        1.72,
+        -1.48,
+        1.15,
+        .75,
+        .9
+      );
+
+
+    root.add(
+      muzzle
+    );
+
+
+    const eyes = [];
+
+
+    [
+      -.19,
+      .19
+    ]
+      .forEach(
+        x => {
+
+          const eye =
+            sphere(
+              THREE,
+              .075,
+              0xffffff,
+              x,
+              1.98,
+              -1.49
+            );
+
+
+          const pupil =
+            sphere(
+              THREE,
+              .035,
+              0x101010,
+              x,
+              1.98,
+              -1.56
+            );
+
+
+          root.add(
+            eye,
+            pupil
+          );
+
+
+          eyes.push(
+            eye,
+            pupil
+          );
+        }
+      );
+
+
+    const ears = [];
+
+
+    [
+      -.32,
+      .32
+    ]
+      .forEach(
+        x => {
+
+          const ear =
+            cone(
+              THREE,
+              .17,
+              .65,
+              accent
+            );
+
+
+          ear.position.set(
+            x,
+            2.38,
+            -1.04
+          );
+
+
+          ear.rotation.z =
+            x < 0
+              ? .16
+              : -.16;
+
+
+          root.add(
+            ear
+          );
+
+
+          ears.push(
+            ear
+          );
+        }
+      );
+
+
+    const legs = [];
+
+
+    [
+      [-.43, -.55],
+      [.43, -.55],
+      [-.48, .62],
+      [.48, .62]
+    ]
+      .forEach(
+        (
+          [
+            x,
+            z
+          ]
+        ) => {
+
+          const pivot =
+            new THREE.Group();
+
+
+          pivot.position.set(
+            x,
+            .8,
+            z
+          );
+
+
+          const upper =
+            box(
+              THREE,
+              .25,
+              .75,
+              .27,
+              bodyColor
+            );
+
+
+          upper.position.y =
+            -.34;
+
+
+          pivot.add(
+            upper
+          );
+
+
+          const foot =
+            sphere(
+              THREE,
+              .19,
+              accent,
+              0,
+              -.72,
+              -.06,
+              1.15,
+              .55,
+              1.4
+            );
+
+
+          pivot.add(
+            foot
+          );
+
+
+          root.add(
+            pivot
+          );
+
+
+          legs.push(
+            pivot
+          );
+        }
+      );
+
+
+    const tailPivot =
+      new THREE.Group();
+
+
+    tailPivot.position.set(
+      0,
+      1.25,
+      .95
+    );
+
+
+    const tail =
+      sphere(
+        THREE,
+        .22,
+        accent,
+        0,
+        .15,
+        .6,
+        .75,
+        .75,
+        3
+      );
+
+
+    tail.rotation.x =
+      -.45;
+
+
+    tailPivot.add(
+      tail
+    );
+
+
+    root.add(
+      tailPivot
+    );
+
+
+    const wings = [];
+
+
+    if (
+      species.type ===
+      "bird" ||
+      species.type ===
+      "bat" ||
+      species.type ===
+      "dragon"
+    ) {
+
+      [
+        -1,
+        1
+      ]
+        .forEach(
+          side => {
+
+            const wingPivot =
+              new THREE.Group();
+
+
+            wingPivot.position.set(
+              side *
+              .65,
+              1.45,
+              0
+            );
+
+
+            const wing =
+              new THREE.Mesh(
+
+                new THREE
+                  .ConeGeometry(
+                    .55,
+                    1.8,
+                    3
+                  ),
+
+                material(
+                  THREE,
+                  accent
+                )
+              );
+
+
+            wing.rotation.z =
+              side *
+              Math.PI /
+              2;
+
+
+            wing.rotation.y =
+              .2;
+
+
+            wingPivot.add(
+              wing
+            );
+
+
+            root.add(
+              wingPivot
+            );
+
+
+            wings.push(
+              wingPivot
+            );
+          }
+        );
+    }
+
+
+    const horns = [];
+
+
+    if (
+      species.type ===
+      "deer" ||
+      species.type ===
+      "bull" ||
+      species.type ===
+      "dragon"
+    ) {
+
+      [
+        -.28,
+        .28
+      ]
+        .forEach(
+          x => {
+
+            const horn =
+              cone(
+                THREE,
+                .09,
+                .55,
+                0xd9d0ba
+              );
+
+
+            horn.position.set(
+              x,
+              2.28,
+              -1.08
+            );
+
+
+            horn.rotation.z =
+              x < 0
+                ? -.3
+                : .3;
+
+
+            root.add(
+              horn
+            );
+
+
+            horns.push(
+              horn
+            );
+        }
+      );
+    }
+
+
+    root.userData = {
+
+      species,
+
+      body,
+
+      head,
+
+      legs,
+
+      wings,
+
+      tailPivot,
+
+      eyes,
+
+      horns,
+
+      animTime:
+        Math.random() *
+        10
+    };
+
+
+    return root;
+  }
+
+
+  /* ============================================================
+     CREATURE ANIMATION
+     ============================================================ */
+
+  function animateCreature(
+    creature,
+    dt,
+    moving
+  ) {
+
+    const model =
+      creature.model;
+
+
+    const data =
+      model.userData;
+
+
+    data.animTime +=
+      dt;
+
+
+    const t =
+      data.animTime;
+
+
+    data.body.position.y =
+      1.05 +
+      Math.sin(
+        t *
+        2
+      ) *
+      .025;
+
+
+    data.head.rotation.y =
+      Math.sin(
+        t *
+        .8
+      ) *
+      .09;
+
+
+    data.tailPivot.rotation.x =
+      Math.sin(
+        t *
+        3
+      ) *
+      .3;
+
+
+    if (
+      moving
+    ) {
+
+      data.legs
+        .forEach(
+          (
+            leg,
+            index
+          ) => {
+
+            leg.rotation.x =
+              Math.sin(
+                t *
+                7 +
+                index *
+                Math.PI
+              ) *
+              .55;
+          }
+        );
+
+    } else {
+
+      data.legs
+        .forEach(
+          leg => {
+
+            leg.rotation.x *=
+              .85;
+          }
+        );
+    }
+
+
+    data.wings
+      .forEach(
+        (
+          wing,
+          index
+        ) => {
+
+          wing.rotation.z =
+            Math.sin(
+              t *
+              4
+            ) *
+            .28 *
+            (
+              index
+                ? -1
+                : 1
+            );
+        }
+      );
+
+
+    model.rotation.z =
+      Math.sin(
+        t *
+        1.5
+      ) *
+      .01;
+  }
+
+
+  /* ============================================================
+     ADVANCED ORB
+     ============================================================ */
+
+  function createOrbMesh(
+    THREE,
+    tier = 0
+  ) {
+
+    const colors = [
+
+      0x4fa8ff,
+      0x55d474,
+      0xe4c748,
+      0x9f66e7,
+      0xf2d8ff,
+      0xffb338
+    ];
+
+
+    const group =
+      new THREE.Group();
+
+
+    const top =
+      new THREE.Mesh(
+
+        new THREE
+          .SphereGeometry(
+            .19,
+            16,
+            12
+          ),
+
+        new THREE
+          .MeshStandardMaterial({
+
+            color:
+              colors[
+                tier %
+                colors.length
+              ],
+
+            metalness:
+              .35,
+
+            roughness:
+              .25,
+
+            emissive:
+              colors[
+                tier %
+                colors.length
+              ],
+
+            emissiveIntensity:
+              .15
+          })
+      );
+
+
+    const band =
+      new THREE.Mesh(
+
+        new THREE
+          .TorusGeometry(
+            .19,
+            .025,
+            8,
+            24
+          ),
+
+        new THREE
+          .MeshStandardMaterial({
+
+            color:
+              0xffffff,
+
+            metalness:
+              .5
+          })
+      );
+
+
+    band.rotation.x =
+      Math.PI /
+      2;
+
+
+    const button =
+      sphere(
+        THREE,
+        .045,
+        0xffffff,
+        0,
+        0,
+        -.19
+      );
+
+
+    group.add(
+      top,
+      band,
+      button
+    );
+
+
+    return group;
+  }
+
+
+  /* ============================================================
+     THIRD PERSON PLAYER
+     ============================================================ */
+
+  function createPlayerModel(
+    THREE
+  ) {
+
+    const root =
+      new THREE.Group();
+
+
+    const torso =
+      box(
+        THREE,
+        .58,
+        .85,
+        .33,
+        0x354c68
+      );
+
+
+    torso.position.y =
+      1.15;
+
+
+    root.add(
+      torso
+    );
+
+
+    const head =
+      sphere(
+        THREE,
+        .24,
+        0xd0aa8c,
+        0,
+        1.86,
+        0
+      );
+
+
+    root.add(
+      head
+    );
+
+
+    const arms =
+      [];
+
+
+    [
+      -.4,
+      .4
+    ]
+      .forEach(
+        x => {
+
+          const pivot =
+            new THREE.Group();
+
+
+          pivot.position.set(
+            x,
+            1.45,
+            0
+          );
+
+
+          const arm =
+            box(
+              THREE,
+              .17,
+              .72,
+              .18,
+              0x354c68
+            );
+
+
+          arm.position.y =
+            -.32;
+
+
+          pivot.add(
+            arm
+          );
+
+
+          root.add(
+            pivot
+          );
+
+
+          arms.push(
+            pivot
+          );
+        }
+      );
+
+
+    const legs =
+      [];
+
+
+    [
+      -.18,
+      .18
+    ]
+      .forEach(
+        x => {
+
+          const pivot =
+            new THREE.Group();
+
+
+          pivot.position.set(
+            x,
+            .77,
+            0
+          );
+
+
+          const leg =
+            box(
+              THREE,
+              .2,
+              .75,
+              .22,
+              0x263141
+            );
+
+
+          leg.position.y =
+            -.36;
+
+
+          pivot.add(
+            leg
+          );
+
+
+          root.add(
+            pivot
+          );
+
+
+          legs.push(
+            pivot
+          );
+        }
+      );
+
+
+    root.userData = {
+
+      arms,
+
+      legs,
+
+      anim:
+        0
+    };
+
+
+    return root;
+  }
+
+
+  /* ============================================================
+     REPLACE START PALS
+     ============================================================ */
+
+  const oldStartPals =
+    typeof startPals ===
+    "function"
+      ? startPals
+      : null;
+
+
+  startPals =
+    async function () {
+
+      cleanup3D();
+
+
+      GP.active =
+        true;
+
+
+      const game =
+        GameCenter.pals ||
+        palsDefault();
+
+
+      GameCenter.pals =
+        game;
+
+
+      const body =
+        $("#contentBody");
+
+
+      body.innerHTML = `
+
+        <div
+          class="pals-shell"
+        >
+
+          <div
+            class="pals-world"
+            id="palsWorld"
+          >
+
+            <canvas
+              id="palsCanvas"
+            ></canvas>
+
+
+            <div
+              class="pals-vignette"
+            ></div>
+
+
+            <div
+              class="pals-hud-top"
+            >
+
+              <div
+                class="pals-zone"
+              >
+                Verdant Wilds
+              </div>
+
+
+              <div
+                id="palsTime"
+                class="pals-clock"
+              >
+                DAY ${game.day || 1}
+              </div>
+
+
+              <div
+                class="pals-level"
+              >
+                LEVEL
+                <strong
+                  id="palsLevel"
+                >
+                  ${game.level || 1}
+                </strong>
+              </div>
+
+            </div>
+
+
+            <div
+              id="palsTarget"
+              class="pals-target-card"
+              hidden
+            ></div>
+
+
+            <div
+              id="pParty"
+              class="pals-party"
+            ></div>
+
+
+            <div
+              class="pals-minimap"
+            >
+              <span
+                class="pals-minimap-player"
+              ></span>
+            </div>
+
+
+            <div
+              id="palsFeed"
+              class="pals-feed"
+            ></div>
+
+
+            <div
+              class="pals-crosshair"
+            ></div>
+
+
+            <div
+              id="palsInteract"
+              class="pals-interact"
+            >
+              Click world to control camera
+            </div>
+
+
+            <div
+              class="pals-hud-left"
+            >
+
+              <div
+                class="pals-bar-row"
+              >
+                <span>HEALTH</span>
+
+                <div
+                  class="pals-bar"
+                >
+                  <span
+                    id="palsHP"
+                    class="pals-health-fill"
+                  ></span>
+                </div>
+
+                <strong
+                  id="palsHPText"
+                >
+                  100
+                </strong>
+              </div>
+
+
+              <div
+                class="pals-bar-row"
+              >
+                <span>STAMINA</span>
+
+                <div
+                  class="pals-bar"
+                >
+                  <span
+                    id="palsStamina"
+                    class="pals-stamina-fill"
+                  ></span>
+                </div>
+
+                <strong
+                  id="palsStaminaText"
+                >
+                  100
+                </strong>
+              </div>
+
+
+              <div
+                class="pals-bar-row"
+              >
+                <span>FOOD</span>
+
+                <div
+                  class="pals-bar"
+                >
+                  <span
+                    id="palsFood"
+                    class="pals-hunger-fill"
+                  ></span>
+                </div>
+
+                <strong
+                  id="palsFoodText"
+                >
+                  100
+                </strong>
+              </div>
+
+            </div>
+
+
+            <div
+              id="palsOrbWheel"
+              class="pals-sphere-wheel"
+            ></div>
+
+          </div>
+
+        </div>
+
+      `;
+
+
+      try {
+
+        const THREE =
+          await loadThree();
+
+
+        const canvas =
+          $("#palsCanvas");
+
+
+        const scene =
+          new THREE.Scene();
+
+
+        const camera =
+          new THREE
+            .PerspectiveCamera(
+              67,
+              1,
+              .1,
+              260
+            );
+
+
+        const renderer =
+          new THREE
+            .WebGLRenderer({
+
+              canvas,
+
+              antialias:
+                true
+            });
+
+
+        renderer.shadowMap.enabled =
+          true;
+
+
+        renderer.shadowMap.type =
+          THREE.PCFSoftShadowMap;
+
+
+        Object.assign(
+          THREE_ACTIVE,
+          {
+
+            kind:
+              "pals",
+
+            renderer,
+
+            scene,
+
+            camera,
+
+            canvas
+          }
+        );
+
+
+        scene.background =
+          new THREE.Color(
+            0x85c5e6
+          );
+
+
+        scene.fog =
+          new THREE.FogExp2(
+            0x9bcada,
+            .008
+          );
+
+
+        const hemisphere =
+          new THREE
+            .HemisphereLight(
+              0xcceeff,
+              0x40502d,
+              1.5
+            );
+
+
+        scene.add(
+          hemisphere
+        );
+
+
+        const sun =
+          new THREE
+            .DirectionalLight(
+              0xfff3ce,
+              2
+            );
+
+
+        sun.position.set(
+          35,
+          55,
+          28
+        );
+
+
+        sun.castShadow =
+          true;
+
+
+        scene.add(
+          sun
+        );
+
+
+        /* ====================================================
+           WORLD
+           ==================================================== */
+
+        const world =
+          new THREE.Group();
+
+
+        scene.add(
+          world
+        );
+
+
+        const ground =
+          new THREE.Mesh(
+
+            new THREE
+              .PlaneGeometry(
+                300,
+                300,
+                1,
+                1
+              ),
+
+            new THREE
+              .MeshStandardMaterial({
+                color:
+                  0x587d45,
+
+                roughness:
+                  1
+              })
+          );
+
+
+        ground.rotation.x =
+          -Math.PI /
+          2;
+
+
+        ground.receiveShadow =
+          true;
+
+
+        world.add(
+          ground
+        );
+
+
+        /* water */
+
+        const water =
+          new THREE.Mesh(
+
+            new THREE
+              .PlaneGeometry(
+                55,
+                40
+              ),
+
+            new THREE
+              .MeshStandardMaterial({
+
+                color:
+                  0x4388b6,
+
+                transparent:
+                  true,
+
+                opacity:
+                  .78,
+
+                roughness:
+                  .2
+              })
+          );
+
+
+        water.rotation.x =
+          -Math.PI /
+          2;
+
+
+        water.position.set(
+          45,
+          .05,
+          -45
+        );
+
+
+        world.add(
+          water
+        );
+
+
+        /* rocks + trees */
+
+        for (
+          let i = 0;
+          i < 100;
+          i++
+        ) {
+
+          const x =
+            rand(
+              -135,
+              135
+            );
+
+
+          const z =
+            rand(
+              -135,
+              135
+            );
+
+
+          if (
+            Math.hypot(
+              x,
+              z
+            ) <
+            12
+          ) {
+            continue;
+          }
+
+
+          if (
+            Math.random() <
+            .65
+          ) {
+
+            const tree =
+              new THREE.Group();
+
+
+            const trunk =
+              new THREE.Mesh(
+
+                new THREE
+                  .CylinderGeometry(
+                    .25,
+                    .42,
+                    rand(
+                      3,
+                      6
+                    ),
+                    7
+                  ),
+
+                material(
+                  THREE,
+                  0x6b4a2f
+                )
+              );
+
+
+            trunk.position.y =
+              2;
+
+
+            tree.add(
+              trunk
+            );
+
+
+            for (
+              let c = 0;
+              c < 3;
+              c++
+            ) {
+
+              const crown =
+                sphere(
+                  THREE,
+                  rand(
+                    1.2,
+                    2.1
+                  ),
+                  pick([
+                    0x416d3a,
+                    0x4b7c41,
+                    0x558744
+                  ]),
+                  rand(
+                    -.4,
+                    .4
+                  ),
+                  4 +
+                  c *
+                  .6,
+                  rand(
+                    -.4,
+                    .4
+                  )
+                );
+
+
+              tree.add(
+                crown
+              );
+            }
+
+
+            tree.position.set(
+              x,
+              0,
+              z
+            );
+
+
+            world.add(
+              tree
+            );
+
+          } else {
+
+            const rock =
+              new THREE.Mesh(
+
+                new THREE
+                  .DodecahedronGeometry(
+                    rand(
+                      .7,
+                      1.8
+                    )
+                  ),
+
+                material(
+                  THREE,
+                  0x7a7c75
+                )
+              );
+
+
+            rock.position.set(
+              x,
+              .7,
+              z
+            );
+
+
+            rock.rotation.set(
+              rand(
+                0,
+                2
+              ),
+              rand(
+                0,
+                2
+              ),
+              rand(
+                0,
+                2
+              )
+            );
+
+
+            world.add(
+              rock
+            );
+          }
+        }
+
+
+        /* ====================================================
+           PLAYER
+           ==================================================== */
+
+        const playerModel =
+          createPlayerModel(
+            THREE
+          );
+
+
+        world.add(
+          playerModel
+        );
+
+
+        const player = {
+
+          x:
+            game.x || 0,
+
+          z:
+            game.z || 8,
+
+          y:
+            0,
+
+          yaw:
+            0,
+
+          pitch:
+            -.12,
+
+          velocityY:
+            0,
+
+          ground:
+            true,
+
+          hp:
+            game.hp || 100,
+
+          stamina:
+            game.stamina || 100,
+
+          hunger:
+            game.hunger || 100
+        };
+
+
+        /* ====================================================
+           CREATURES
+           ==================================================== */
+
+        const creatures =
+          [];
+
+
+        function spawnWild() {
+
+          const species =
+            pick(
+              GALAXY_CREATURES
+            );
+
+
+          const model =
+            createDetailedCreature(
+              THREE,
+              species
+            );
+
+
+          const creature = {
+
+            species,
+
+            model,
+
+            x:
+              rand(
+                -100,
+                100
+              ),
+
+            z:
+              rand(
+                -100,
+                100
+              ),
+
+            hp:
+              species.hp,
+
+            maxHp:
+              species.hp,
+
+            level:
+              Math.max(
+                1,
+                Math.floor(
+                  rand(
+                    1,
+                    5 +
+                    game.level *
+                    .8
+                  )
+                )
+              ),
+
+            direction:
+              rand(
+                0,
+                Math.PI *
+                2
+              ),
+
+            nextDirection:
+              performance.now() +
+              rand(
+                800,
+                2500
+              ),
+
+            alive:
+              true,
+
+            captured:
+              false
+          };
+
+
+          model.position.set(
+            creature.x,
+            0,
+            creature.z
+          );
+
+
+          model.traverse(
+            child => {
+
+              if (
+                child.isMesh
+              ) {
+
+                child.userData.creature =
+                  creature;
+              }
+            }
+          );
+
+
+          world.add(
+            model
+          );
+
+
+          creatures.push(
+            creature
+          );
+        }
+
+
+        for (
+          let i = 0;
+          i < 26;
+          i++
+        ) {
+
+          spawnWild();
+        }
+
+
+        GP.creatures =
+          creatures;
+
+
+        /* ====================================================
+           INPUT
+           ==================================================== */
+
+        const keys =
+          GP.keys;
+
+
+        keys.clear();
+
+
+        on3D(
+          canvas,
+          "click",
+          () => {
+
+            canvas
+              .requestPointerLock
+              ?.();
+          }
+        );
+
+
+        on3D(
+          document,
+          "mousemove",
+          event => {
+
+            if (
+              document.pointerLockElement !==
+              canvas
+            ) {
+              return;
+            }
+
+
+            player.yaw -=
+              event.movementX *
+              .0025;
+
+
+            player.pitch =
+              clamp(
+
+                player.pitch -
+                event.movementY *
+                .0018,
+
+                -.48,
+                .3
+              );
+          }
+        );
+
+
+        on3D(
+          document,
+          "keydown",
+          event => {
+
+            if (
+              THREE_ACTIVE.kind !==
+              "pals"
+            ) {
+              return;
+            }
+
+
+            keys.add(
+              event.code
+            );
+
+
+            if (
+              /^Digit[1-5]$/
+                .test(
+                  event.code
+                )
+            ) {
+
+              game.orb =
+                Number(
+                  event.code
+                    .slice(-1)
+                ) -
+                1;
+            }
+
+
+            if (
+              event.code ===
+              "KeyQ"
+            ) {
+
+              throwOrb();
+            }
+
+
+            if (
+              event.code ===
+              "KeyF"
+            ) {
+
+              summonCreature();
+            }
+
+
+            if (
+              event.code ===
+              "KeyI"
+            ) {
+
+              showAdvancedPalBox();
+
+              document
+                .exitPointerLock
+                ?.();
+            }
+          }
+        );
+
+
+        on3D(
+          document,
+          "keyup",
+          event => {
+
+            keys.delete(
+              event.code
+            );
+          }
+        );
+
+
+        on3D(
+          document,
+          "mousedown",
+          event => {
+
+            if (
+              THREE_ACTIVE.kind !==
+              "pals"
+            ) {
+              return;
+            }
+
+
+            if (
+              event.button === 0 &&
+              document.pointerLockElement ===
+              canvas
+            ) {
+
+              damageTarget();
+            }
+          }
+        );
+
+
+        /* ====================================================
+           RAY TARGET
+           ==================================================== */
+
+        const raycaster =
+          new THREE
+            .Raycaster();
+
+
+        function findTarget() {
+
+          raycaster.setFromCamera(
+            new THREE.Vector2(
+              0,
+              0
+            ),
+            camera
+          );
+
+
+          const meshes =
+            [];
+
+
+          creatures.forEach(
+            creature => {
+
+              if (
+                !creature.alive
+              ) {
+                return;
+              }
+
+
+              creature.model.traverse(
+                child => {
+
+                  if (
+                    child.isMesh
+                  ) {
+
+                    meshes.push(
+                      child
+                    );
+                  }
+                }
+              );
+            }
+          );
+
+
+          const hit =
+            raycaster.intersectObjects(
+              meshes,
+              false
+            )[0];
+
+
+          const creature =
+            hit
+              ?.object
+              ?.userData
+              ?.creature;
+
+
+          if (
+            creature &&
+            hit.distance <
+            20
+          ) {
+
+            GP.target =
+              creature;
+
+          } else {
+
+            GP.target =
+              null;
+          }
+        }
+
+
+        /* ====================================================
+           DAMAGE
+           ==================================================== */
+
+        function damageTarget() {
+
+          const creature =
+            GP.target;
+
+
+          if (
+            !creature ||
+            !creature.alive
+          ) {
+            return;
+          }
+
+
+          creature.hp -=
+            13 +
+            game.level *
+            1.3;
+
+
+          creature.model
+            .rotation.z =
+            .15;
+
+
+          setTimeout(
+            () => {
+
+              if (
+                creature.model
+              ) {
+
+                creature.model
+                  .rotation.z =
+                  0;
+              }
+            },
+            100
+          );
+
+
+          addFeed(
+            `${creature.species.name} HP ${Math.ceil(
+              Math.max(
+                0,
+                creature.hp
+              )
+            )}`
+          );
+
+
+          if (
+            creature.hp <= 0
+          ) {
+
+            creature.alive =
+              false;
+
+            creature.model.visible =
+              false;
+
+
+            game.xp =
+              (
+                game.xp ||
+                0
+              )
+              +
+              25 *
+              creature.species
+                .rarity;
+
+
+            addFeed(
+              `${creature.species.name} defeated`
+            );
+          }
+        }
+
+
+        /* ====================================================
+           CAPTURE CHANCE
+           ==================================================== */
+
+        function captureChance(
+          creature
+        ) {
+
+          const orb =
+            PALS_ORBS[
+              game.orb ||
+              0
+            ];
+
+
+          const hp =
+            creature.hp /
+            creature.maxHp;
+
+
+          const hpBonus =
+            1 -
+            hp *
+            .72;
+
+
+          const rarityPenalty =
+            1 /
+            (
+              1 +
+              creature.species
+                .rarity *
+              .28
+            );
+
+
+          const levelPenalty =
+            1 /
+            (
+              1 +
+              creature.level *
+              .025
+            );
+
+
+          return clamp(
+
+            (
+              .26 +
+              hpBonus
+            )
+
+            *
+
+            (
+              orb?.bonus ||
+              1
+            )
+
+            *
+
+            rarityPenalty
+
+            *
+
+            levelPenalty,
+
+            .03,
+            .96
+          );
+        }
+
+
+        /* ====================================================
+           THROW PHYSICAL ORB
+           ==================================================== */
+
+        function throwOrb() {
+
+          const tier =
+            game.orb ||
+            0;
+
+
+          game.inventory.orbs =
+            game.inventory.orbs ||
+            [
+              10,
+              2,
+              0,
+              0,
+              0
+            ];
+
+
+          if (
+            (
+              game.inventory.orbs[
+                tier
+              ] ||
+              0
+            ) <= 0
+          ) {
+
+            addFeed(
+              "No capture Orbs"
+            );
+
+            return;
+          }
+
+
+          game.inventory.orbs[
+            tier
+          ]--;
+
+
+          const orb =
+            createOrbMesh(
+              THREE,
+              tier
+            );
+
+
+          const direction =
+            new THREE.Vector3();
+
+
+          camera.getWorldDirection(
+            direction
+          );
+
+
+          orb.position.copy(
+            playerModel.position
+          );
+
+
+          orb.position.y =
+            1.6;
+
+
+          orb.position.add(
+            direction
+              .clone()
+              .multiplyScalar(
+                1
+              )
+          );
+
+
+          world.add(
+            orb
+          );
+
+
+          GP.projectiles.push({
+
+            mesh:
+              orb,
+
+            velocity:
+              direction
+                .multiplyScalar(
+                  13
+                )
+                .add(
+                  new THREE.Vector3(
+                    0,
+                    3.8,
+                    0
+                  )
+                ),
+
+            life:
+              4,
+
+            tier,
+
+            active:
+              true
+          });
+
+
+          addFeed(
+            `${PALS_ORBS[tier]?.name || "Orb"} thrown`
+          );
+        }
+
+
+        function updateProjectiles(
+          dt
+        ) {
+
+          for (
+            const projectile of
+            GP.projectiles
+          ) {
+
+            if (
+              !projectile.active
+            ) {
+              continue;
+            }
+
+
+            projectile.velocity.y -=
+              9.8 *
+              dt;
+
+
+            projectile.mesh.position
+              .addScaledVector(
+                projectile.velocity,
+                dt
+              );
+
+
+            projectile.mesh.rotation.x +=
+              dt *
+              8;
+
+
+            projectile.mesh.rotation.z +=
+              dt *
+              5;
+
+
+            projectile.life -=
+              dt;
+
+
+            let hitCreature =
+              null;
+
+
+            for (
+              const creature of
+              creatures
+            ) {
+
+              if (
+                !creature.alive
+              ) {
+                continue;
+              }
+
+
+              const distance =
+                projectile.mesh
+                  .position
+                  .distanceTo(
+                    creature.model
+                      .position
+                  );
+
+
+              if (
+                distance <
+                1.25
+              ) {
+
+                hitCreature =
+                  creature;
+
+                break;
+              }
+            }
+
+
+            if (
+              hitCreature
+            ) {
+
+              projectile.active =
+                false;
+
+
+              world.remove(
+                projectile.mesh
+              );
+
+
+              beginCapture(
+                hitCreature,
+                projectile.tier
+              );
+
+
+              continue;
+            }
+
+
+            if (
+              projectile.mesh
+                .position.y <
+              .15 ||
+              projectile.life <
+              0
+            ) {
+
+              projectile.active =
+                false;
+
+
+              world.remove(
+                projectile.mesh
+              );
+            }
+          }
+
+
+          GP.projectiles =
+            GP.projectiles
+              .filter(
+                projectile =>
+                  projectile.active
+              );
+        }
+
+
+        /* ====================================================
+           CAPTURE SEQUENCE
+           ==================================================== */
+
+        async function beginCapture(
+          creature,
+          tier
+        ) {
+
+          const chance =
+            captureChance(
+              creature
+            );
+
+
+          creature.model.visible =
+            false;
+
+
+          showCaptureStatus(
+            "CAPTURE STARTED",
+            `${Math.round(
+              chance *
+              100
+            )}% chance`
+          );
+
+
+          await wait(
+            500
+          );
+
+
+          showCaptureStatus(
+            "SHAKE 1",
+            creature.species.name
+          );
+
+
+          await wait(
+            550
+          );
+
+
+          showCaptureStatus(
+            "SHAKE 2",
+            creature.species.name
+          );
+
+
+          await wait(
+            550
+          );
+
+
+          if (
+            Math.random() <
+            chance
+          ) {
+
+            creature.alive =
+              false;
+
+            creature.captured =
+              true;
+
+
+            game.box =
+              game.box ||
+              [];
+
+
+            game.party =
+              game.party ||
+              [];
+
+
+            game.box.push(
+              creature.species.id
+            );
+
+
+            if (
+              game.party.length <
+              5
+            ) {
+
+              game.party.push(
+                creature.species.id
+              );
+            }
+
+
+            game.xp =
+              (
+                game.xp ||
+                0
+              )
+              +
+              40 *
+              creature.species
+                .rarity;
+
+
+            showCaptureStatus(
+              "CAPTURED!",
+              creature.species.name
+            );
+
+
+            addFeed(
+              `${creature.species.name} captured!`
+            );
+
+
+            palsSave(
+              game
+            );
+
+
+            setTimeout(
+              hideCaptureStatus,
+              1200
+            );
+
+          } else {
+
+            creature.model.visible =
+              true;
+
+
+            creature.hp =
+              Math.max(
+                1,
+                creature.hp
+              );
+
+
+            showCaptureStatus(
+              "ESCAPED!",
+              creature.species.name
+            );
+
+
+            addFeed(
+              `${creature.species.name} escaped`
+            );
+
+
+            setTimeout(
+              hideCaptureStatus,
+              900
+            );
+          }
+        }
+
+
+        function wait(ms) {
+
+          return new Promise(
+            resolve =>
+              setTimeout(
+                resolve,
+                ms
+              )
+          );
+        }
+
+
+        function showCaptureStatus(
+          title,
+          text
+        ) {
+
+          let box =
+            $("#palsCaptureStatus");
+
+
+          if (!box) {
+
+            box =
+              document.createElement(
+                "div"
+              );
+
+
+            box.id =
+              "palsCaptureStatus";
+
+
+            box.className =
+              "pals-capture-status";
+
+
+            $("#palsWorld")
+              ?.appendChild(
+                box
+              );
+          }
+
+
+          box.innerHTML = `
+
+            <strong>
+              ${escapeHTML(title)}
+            </strong>
+
+            <span>
+              ${escapeHTML(text)}
+            </span>
+
+          `;
+        }
+
+
+        function hideCaptureStatus() {
+
+          $("#palsCaptureStatus")
+            ?.remove();
+        }
+
+
+        /* ====================================================
+           COMPANION
+           ==================================================== */
+
+        function summonCreature() {
+
+          if (
+            GP.companion
+          ) {
+
+            world.remove(
+              GP.companion.model
+            );
+
+
+            GP.companion =
+              null;
+
+
+            addFeed(
+              "Companion recalled"
+            );
+
+
+            return;
+          }
+
+
+          if (
+            !game.party?.length
+          ) {
+
+            addFeed(
+              "Capture a creature first"
+            );
+
+            return;
+          }
+
+
+          const species =
+            GALAXY_CREATURES
+              .find(
+                creature =>
+                  creature.id ===
+                  game.party[0]
+              );
+
+
+          if (!species) {
+            return;
+          }
+
+
+          const model =
+            createDetailedCreature(
+              THREE,
+              species
+            );
+
+
+          model.scale.setScalar(
+            1.1
+          );
+
+
+          world.add(
+            model
+          );
+
+
+          GP.companion = {
+
+            species,
+
+            model,
+
+            hp:
+              species.hp
+          };
+
+
+          addFeed(
+            `${species.name} summoned`
+          );
+        }
+
+
+        /* ====================================================
+           PAL BOX
+           ==================================================== */
+
+        function showAdvancedPalBox() {
+
+          const old =
+            $("#palsOverlay");
+
+
+          if (old) {
+
+            old.remove();
+
+            return;
+          }
+
+
+          const overlay =
+            document.createElement(
+              "div"
+            );
+
+
+          overlay.id =
+            "palsOverlay";
+
+
+          overlay.className =
+            "pals-inventory-overlay";
+
+
+          overlay.innerHTML = `
+
+            <div
+              class="pals-panel"
+            >
+
+              <div
+                class="pals-panel-head"
+              >
+
+                <h3>
+                  PAL BOX
+                </h3>
+
+                <button
+                  class="pals-secondary"
+                  onclick="
+                    document
+                    .getElementById('palsOverlay')
+                    ?.remove()
+                  "
+                >
+                  Close
+                </button>
+
+              </div>
+
+
+              <div
+                class="pals-panel-body"
+              >
+
+                <h3>
+                  Captured
+                  ${
+                    game.box?.length ||
+                    0
+                  }
+                </h3>
+
+
+                <div
+                  class="pals-grid"
+                >
+
+                  ${
+                    (
+                      game.box ||
+                      []
+                    )
+                      .map(
+                        id => {
+
+                          const species =
+                            GALAXY_CREATURES
+                              .find(
+                                creature =>
+                                  creature.id === id
+                              );
+
+
+                          if (
+                            !species
+                          ) {
+                            return "";
+                          }
+
+
+                          return `
+
+                            <div
+                              class="pals-creature-card"
+                            >
+
+                              <div
+                                class="pals-creature-icon"
+                              >
+                                ✦
+                              </div>
+
+                              <strong>
+                                ${species.name}
+                              </strong>
+
+                              <small>
+                                ${species.element}
+                                •
+                                Rarity
+                                ${species.rarity}
+                              </small>
+
+                            </div>
+
+                          `;
+                        }
+                      )
+                      .join("")
+
+                    ||
+
+                    "<p>No creatures captured yet.</p>"
+                  }
+
+                </div>
+
+              </div>
+
+            </div>
+
+          `;
+
+
+          $("#palsWorld")
+            ?.appendChild(
+              overlay
+            );
+        }
+
+
+        /* ====================================================
+           FEED
+           ==================================================== */
+
+        const feed =
+          [];
+
+
+        function addFeed(text) {
+
+          feed.unshift({
+
+            text,
+
+            time:
+              performance.now()
+          });
+
+
+          feed.splice(
+            5
+          );
+
+
+          renderFeed();
+        }
+
+
+        function renderFeed() {
+
+          const root =
+            $("#palsFeed");
+
+
+          if (!root) {
+            return;
+          }
+
+
+          root.innerHTML =
+            feed
+              .filter(
+                item =>
+                  performance.now() -
+                  item.time <
+                  5500
+              )
+              .map(
+                item => `
+
+                  <div
+                    class="pals-feed-row"
+                  >
+                    ${escapeHTML(
+                      item.text
+                    )}
+                  </div>
+
+                `
+              )
+              .join("");
+        }
+
+
+        /* ====================================================
+           HUD
+           ==================================================== */
+
+        function updateHUD() {
+
+          $("#palsHP")
+            ?.style
+            .setProperty(
+              "width",
+              `${
+                clamp(
+                  player.hp,
+                  0,
+                  100
+                )
+              }%`
+            );
+
+
+          $("#palsStamina")
+            ?.style
+            .setProperty(
+              "width",
+              `${
+                clamp(
+                  player.stamina,
+                  0,
+                  100
+                )
+              }%`
+            );
+
+
+          $("#palsFood")
+            ?.style
+            .setProperty(
+              "width",
+              `${
+                clamp(
+                  player.hunger,
+                  0,
+                  100
+                )
+              }%`
+            );
+
+
+          if (
+            $("#palsHPText")
+          ) {
+
+            $("#palsHPText")
+              .textContent =
+              Math.round(
+                player.hp
+              );
+          }
+
+
+          if (
+            $("#palsStaminaText")
+          ) {
+
+            $("#palsStaminaText")
+              .textContent =
+              Math.round(
+                player.stamina
+              );
+          }
+
+
+          if (
+            $("#palsFoodText")
+          ) {
+
+            $("#palsFoodText")
+              .textContent =
+              Math.round(
+                player.hunger
+              );
+          }
+
+
+          const wheel =
+            $("#palsOrbWheel");
+
+
+          if (wheel) {
+
+            wheel.innerHTML =
+              PALS_ORBS
+                .map(
+                  (
+                    orb,
+                    index
+                  ) => `
+
+                    <div
+
+                      class="
+                        pals-sphere
+
+                        ${
+                          index ===
+                          (
+                            game.orb ||
+                            0
+                          )
+                            ? "active"
+                            : ""
+                        }
+                      "
+
+                    >
+
+                      ${index + 1}
+
+                      <br>
+
+                      ${escapeHTML(
+                        orb.name
+                      )}
+
+                      <br>
+
+                      x${
+                        game.inventory
+                          ?.orbs
+                          ? game.inventory
+                              .orbs[index]
+                              ||
+                              0
+                          : 0
+                      }
+
+                    </div>
+
+                  `
+                )
+                .join("");
+          }
+
+
+          const targetBox =
+            $("#palsTarget");
+
+
+          if (
+            GP.target &&
+            GP.target.alive
+          ) {
+
+            targetBox.hidden =
+              false;
+
+
+            targetBox.innerHTML = `
+
+              <div
+                class="pals-target-title"
+              >
+
+                <strong>
+                  ${GP.target.species.name}
+                </strong>
+
+                <span>
+                  LV ${GP.target.level}
+                  •
+                  ${GP.target.species.element}
+                </span>
+
+              </div>
+
+
+              <div
+                class="pals-target-hp"
+              >
+
+                <span
+                  style="
+                    width:
+                    ${
+                      clamp(
+                        GP.target.hp /
+                        GP.target.maxHp *
+                        100,
+                        0,
+                        100
+                      )
+                    }%
+                  "
+                ></span>
+
+              </div>
+
+
+              <div
+                class="pals-capture-chance"
+              >
+
+                <span>
+                  Capture probability
+                </span>
+
+                <strong>
+                  ${
+                    Math.round(
+                      captureChance(
+                        GP.target
+                      ) *
+                      100
+                    )
+                  }%
+                </strong>
+
+              </div>
+
+            `;
+
+          } else {
+
+            targetBox.hidden =
+              true;
+          }
+
+
+          const party =
+            $("#pParty");
+
+
+          if (party) {
+
+            party.innerHTML =
+              (
+                game.party ||
+                []
+              )
+                .map(
+                  id => {
+
+                    const species =
+                      GALAXY_CREATURES
+                        .find(
+                          creature =>
+                            creature.id ===
+                            id
+                        );
+
+
+                    return `
+
+                      <div
+                        class="pals-party-row"
+                      >
+
+                        <div
+                          class="pals-party-icon"
+                        >
+                          ✦
+                        </div>
+
+                        <div
+                          class="pals-party-copy"
+                        >
+
+                          <strong>
+                            ${species?.name || id}
+                          </strong>
+
+                          <span>
+                            ${species?.element || ""}
+                          </span>
+
+                          <div
+                            class="pals-party-hp"
+                          >
+                            <span></span>
+                          </div>
+
+                        </div>
+
+                      </div>
+
+                    `;
+                  }
+                )
+                .join("");
+          }
+        }
+
+
+        /* ====================================================
+           PLAYER MOVEMENT
+           ==================================================== */
+
+        function movePlayer(
+          dt
+        ) {
+
+          const forward =
+            (
+              keys.has(
+                "KeyW"
+              )
+                ? 1
+                : 0
+            )
+            -
+            (
+              keys.has(
+                "KeyS"
+              )
+                ? 1
+                : 0
+            );
+
+
+          const right =
+            (
+              keys.has(
+                "KeyD"
+              )
+                ? 1
+                : 0
+            )
+            -
+            (
+              keys.has(
+                "KeyA"
+              )
+                ? 1
+                : 0
+            );
+
+
+          const sprint =
+            keys.has(
+              "ShiftLeft"
+            ) &&
+            player.stamina >
+            1;
+
+
+          const speed =
+            sprint
+              ? 7.1
+              : 4.1;
+
+
+          const sin =
+            Math.sin(
+              player.yaw
+            );
+
+
+          const cos =
+            Math.cos(
+              player.yaw
+            );
+
+
+          player.x +=
+
+            (
+              -sin *
+              forward
+
+              +
+
+              cos *
+              right
+            )
+
+            *
+
+            speed
+
+            *
+
+            dt;
+
+
+          player.z +=
+
+            (
+              -cos *
+              forward
+
+              -
+
+              sin *
+              right
+            )
+
+            *
+
+            speed
+
+            *
+
+            dt;
+
+
+          player.x =
+            clamp(
+              player.x,
+              -140,
+              140
+            );
+
+
+          player.z =
+            clamp(
+              player.z,
+              -140,
+              140
+            );
+
+
+          if (
+            sprint &&
+            (
+              forward ||
+              right
+            )
+          ) {
+
+            player.stamina -=
+              18 *
+              dt;
+
+          } else {
+
+            player.stamina +=
+              13 *
+              dt;
+          }
+
+
+          player.stamina =
+            clamp(
+              player.stamina,
+              0,
+              100
+            );
+
+
+          playerModel.position.set(
+            player.x,
+            0,
+            player.z
+          );
+
+
+          playerModel.rotation.y =
+            player.yaw;
+
+
+          const moving =
+            Math.abs(
+              forward
+            )
+            +
+            Math.abs(
+              right
+            )
+            >
+            0;
+
+
+          const data =
+            playerModel.userData;
+
+
+          data.anim +=
+            dt;
+
+
+          data.legs
+            .forEach(
+              (
+                leg,
+                index
+              ) => {
+
+                leg.rotation.x =
+                  moving
+
+                    ? Math.sin(
+                        data.anim *
+                        (
+                          sprint
+                            ? 12
+                            : 8
+                        )
+
+                        +
+
+                        index *
+                        Math.PI
+                      ) *
+                      .65
+
+                    : 0;
+              }
+            );
+
+
+          data.arms
+            .forEach(
+              (
+                arm,
+                index
+              ) => {
+
+                arm.rotation.x =
+                  moving
+
+                    ? Math.sin(
+                        data.anim *
+                        8
+
+                        +
+
+                        (
+                          index +
+                          1
+                        ) *
+                        Math.PI
+                      ) *
+                      .4
+
+                    : 0;
+              }
+            );
+        }
+
+
+        /* ====================================================
+           CAMERA
+           ==================================================== */
+
+        function updateCamera() {
+
+          const distance =
+            6.4;
+
+
+          const height =
+            3.2;
+
+
+          camera.position.set(
+
+            player.x +
+
+            Math.sin(
+              player.yaw
+            ) *
+            distance,
+
+            height +
+
+            player.pitch *
+            3,
+
+            player.z +
+
+            Math.cos(
+              player.yaw
+            ) *
+            distance
+          );
+
+
+          camera.lookAt(
+            player.x,
+            1.45,
+            player.z
+          );
+        }
+
+
+        /* ====================================================
+           CREATURE AI
+           ==================================================== */
+
+        function updateCreatures(
+          dt,
+          now
+        ) {
+
+          creatures.forEach(
+            creature => {
+
+              if (
+                !creature.alive
+              ) {
+                return;
+              }
+
+
+              if (
+                now >
+                creature.nextDirection
+              ) {
+
+                creature.direction +=
+                  rand(
+                    -1.4,
+                    1.4
+                  );
+
+
+                creature.nextDirection =
+                  now +
+                  rand(
+                    1200,
+                    3000
+                  );
+              }
+
+
+              const distance =
+                Math.hypot(
+
+                  player.x -
+                  creature.x,
+
+                  player.z -
+                  creature.z
+                );
+
+
+              const moving =
+                distance >
+                2;
+
+
+              if (moving) {
+
+                creature.x +=
+
+                  Math.sin(
+                    creature.direction
+                  )
+
+                  *
+
+                  creature.species
+                    .speed
+
+                  *
+
+                  .2
+
+                  *
+
+                  dt;
+
+
+                creature.z +=
+
+                  Math.cos(
+                    creature.direction
+                  )
+
+                  *
+
+                  creature.species
+                    .speed
+
+                  *
+
+                  .2
+
+                  *
+
+                  dt;
+              }
+
+
+              creature.model.position.set(
+                creature.x,
+                0,
+                creature.z
+              );
+
+
+              creature.model.rotation.y =
+                creature.direction;
+
+
+              animateCreature(
+                creature,
+                dt,
+                moving
+              );
+            }
+          );
+
+
+          if (
+            GP.companion
+          ) {
+
+            const model =
+              GP.companion.model;
+
+
+            const targetX =
+              player.x +
+              Math.cos(
+                player.yaw
+              ) *
+              2;
+
+
+            const targetZ =
+              player.z -
+              Math.sin(
+                player.yaw
+              ) *
+              2;
+
+
+            model.position.x +=
+
+              (
+                targetX -
+                model.position.x
+              )
+
+              *
+
+              Math.min(
+                1,
+                dt *
+                4
+              );
+
+
+            model.position.z +=
+
+              (
+                targetZ -
+                model.position.z
+              )
+
+              *
+
+              Math.min(
+                1,
+                dt *
+                4
+              );
+
+
+            animateCreature(
+              {
+                model
+              },
+              dt,
+              true
+            );
+          }
+        }
+
+
+        /* ====================================================
+           RESIZE
+           ==================================================== */
+
+        function resize() {
+
+          const width =
+            canvas
+              .parentElement
+              .clientWidth;
+
+
+          const height =
+            canvas
+              .parentElement
+              .clientHeight;
+
+
+          renderer.setSize(
+            width,
+            height,
+            false
+          );
+
+
+          camera.aspect =
+            width /
+            height;
+
+
+          camera
+            .updateProjectionMatrix();
+        }
+
+
+        on3D(
+          window,
+          "resize",
+          resize
+        );
+
+
+        resize();
+
+
+        /* ====================================================
+           MAIN LOOP
+           ==================================================== */
+
+        let last =
+          performance.now();
+
+
+        let lastSave =
+          last;
+
+
+        function loop(now) {
+
+          if (
+            THREE_ACTIVE.kind !==
+            "pals"
+          ) {
+            return;
+          }
+
+
+          const dt =
+            clamp(
+              (
+                now -
+                last
+              ) /
+              1000,
+              0,
+              .05
+            );
+
+
+          last =
+            now;
+
+
+          movePlayer(
+            dt
+          );
+
+
+          updateCamera();
+
+
+          updateCreatures(
+            dt,
+            now
+          );
+
+
+          updateProjectiles(
+            dt
+          );
+
+
+          findTarget();
+
+
+          player.hunger -=
+            .25 *
+            dt;
+
+
+          if (
+            player.hunger <
+            15
+          ) {
+
+            player.hp -=
+              .6 *
+              dt;
+          }
+
+
+          player.hp =
+            clamp(
+              player.hp,
+              0,
+              100
+            );
+
+
+          player.hunger =
+            clamp(
+              player.hunger,
+              0,
+              100
+            );
+
+
+          updateHUD();
+
+
+          renderFeed();
+
+
+          if (
+            now -
+            lastSave >
+            5000
+          ) {
+
+            game.x =
+              player.x;
+
+            game.z =
+              player.z;
+
+            game.hp =
+              player.hp;
+
+            game.stamina =
+              player.stamina;
+
+            game.hunger =
+              player.hunger;
+
+
+            palsSave(
+              game
+            );
+
+
+            lastSave =
+              now;
+          }
+
+
+          renderer.render(
+            scene,
+            camera
+          );
+
+
+          THREE_ACTIVE.raf =
+            requestAnimationFrame(
+              loop
+            );
+        }
+
+
+        THREE_ACTIVE.raf =
+          requestAnimationFrame(
+            loop
+          );
+
+
+        addFeed(
+          "Welcome to GALAXY PALS"
+        );
+
+
+        addFeed(
+          "Attack creatures to weaken them"
+        );
+
+
+        addFeed(
+          "Press Q to throw a capture Orb"
+        );
+
+      } catch (error) {
+
+        console.error(
+          error
+        );
+
+
+        if (
+          oldStartPals
+        ) {
+
+          toast(
+            "Advanced world failed — loading basic world",
+            "error"
+          );
+
+
+          return oldStartPals();
+        }
+
+
+        $("#contentBody")
+          .innerHTML = `
+
+            <div
+              class="pals-card"
+            >
+
+              <h3>
+                GALAXY PALS failed to start
+              </h3>
+
+              <p>
+                ${escapeHTML(
+                  error.message
+                )}
+              </p>
+
+            </div>
+
+          `;
+      }
+    };
+
+
+  console.log(
+    "GALAXY PALS Advanced Creature Upgrade loaded"
+  );
+
+})();
