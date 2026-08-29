@@ -6402,17 +6402,165 @@ body{overflow:hidden}
 .review-metric span{color:var(--muted);font-size:10px;margin-bottom:3px}
 
 /* Chess */
-.chess-board-wrap{max-width:680px}
-.chess-board{display:grid;grid-template-columns:repeat(8,1fr);aspect-ratio:1/1;border-radius:14px;overflow:hidden;border:1px solid var(--line)}
-.chess-square{border:0;position:relative;display:grid;place-items:center;font-size:clamp(24px,5.2vw,54px);cursor:pointer}
-.chess-square.light{background:#d7d9df;color:#111}
-.chess-square.dark{background:#646b7b;color:#111}
-.chess-square.selected{outline:4px solid #8b7cff;outline-offset:-4px}
-.chess-square.legal::after{content:"";width:18%;aspect-ratio:1;border-radius:50%;background:rgba(35,255,140,.7);position:absolute}
-.chess-square.capture::after{width:72%;height:72%;background:transparent;border:4px solid rgba(35,255,140,.65)}
-.chess-files{display:grid;grid-template-columns:repeat(8,1fr);color:var(--muted);font-size:10px;text-align:center;margin-top:5px}
+/* =========================================================
+   ROMAN / MEDIEVAL CHESS
+   ========================================================= */
 
-/* TTT */
+.chess-board-wrap {
+  width: min(100%, 680px);
+  max-width: 680px;
+  margin: 0 auto;
+  padding: 18px;
+  background: linear-gradient(145deg, #211b16, #070707);
+  border: 5px solid #6d5738;
+  border-radius: 18px;
+  box-shadow:
+    0 24px 60px rgba(0, 0, 0, 0.65),
+    inset 0 0 0 2px #b89154;
+}
+
+.chess-board {
+  width: 100%;
+  aspect-ratio: 1 / 1;
+
+  display: grid;
+  grid-template-columns: repeat(8, minmax(0, 1fr));
+  grid-template-rows: repeat(8, minmax(0, 1fr));
+
+  gap: 0;
+
+  border: 3px solid #b7955a;
+  border-radius: 4px;
+  overflow: hidden;
+
+  background: #111;
+}
+
+.chess-square {
+  position: relative;
+
+  width: 100%;
+  height: 100%;
+
+  min-width: 0;
+  min-height: 0;
+
+  aspect-ratio: 1 / 1;
+
+  padding: 0;
+  margin: 0;
+
+  border: 0;
+  border-radius: 0;
+
+  display: grid;
+  place-items: center;
+
+  font-family:
+    "Times New Roman",
+    "Segoe UI Symbol",
+    serif;
+
+  font-size: clamp(30px, 5vw, 58px);
+  line-height: 1;
+
+  cursor: pointer;
+
+  transition:
+    filter 120ms ease,
+    box-shadow 120ms ease;
+}
+
+.chess-square.light {
+  background:
+    linear-gradient(
+      145deg,
+      #e3d3b1,
+      #c5ae82
+    );
+}
+
+.chess-square.dark {
+  background:
+    linear-gradient(
+      145deg,
+      #493727,
+      #211914
+    );
+}
+
+.chess-square:hover {
+  filter: brightness(1.12);
+}
+
+.chess-square.selected {
+  box-shadow:
+    inset 0 0 0 5px #d6aa52;
+}
+
+.chess-square.legal::after {
+  content: "";
+
+  position: absolute;
+
+  width: 18%;
+  aspect-ratio: 1;
+
+  border-radius: 50%;
+
+  background:
+    rgba(90, 210, 120, 0.8);
+
+  pointer-events: none;
+}
+
+.chess-square.capture::after {
+  width: 72%;
+  height: 72%;
+
+  background: transparent;
+
+  border:
+    4px solid
+    rgba(90, 210, 120, 0.85);
+}
+
+/* YOUR SIDE — SILVER */
+
+.chess-square {
+  color: #dddddd;
+
+  text-shadow:
+    0 1px 0 #ffffff,
+    0 2px 2px #000000,
+    0 0 7px rgba(255, 255, 255, 0.3);
+}
+
+/* GALAXY SIDE — GOLD */
+
+.chess-square:nth-child(-n + 16) {
+  color: #d7a84d;
+
+  text-shadow:
+    0 1px 0 #ffe3a1,
+    0 2px 2px #2b1700,
+    0 0 8px rgba(218, 169, 76, 0.45);
+}
+
+.chess-files {
+  display: grid;
+
+  grid-template-columns:
+    repeat(8, minmax(0, 1fr));
+
+  margin-top: 7px;
+
+  color: #b79b69;
+
+  font-size: 11px;
+
+  text-align: center;
+}
 .ttt-board{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;max-width:480px}
 .ttt-cell{aspect-ratio:1;border:1px solid var(--line);background:var(--panel);border-radius:15px;font-size:54px;cursor:pointer}
 
