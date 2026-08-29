@@ -347,7 +347,7 @@ Do not invent facts when uncertain.
              generationConfig: {
   maxOutputTokens: 1024,
   thinkingConfig: {
-    thinkingLevel: "minimal"
+    thinkingLevel: "low"
   }
 }
             })
