@@ -1,16 +1,574 @@
-<!-- ACCESSIBILITY STATUS -->
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8">
+
+  <meta
+    name="viewport"
+    content="width=device-width, initial-scale=1.0"
+  >
+
+  <meta
+    name="theme-color"
+    content="#0b0d10"
+  >
+
+  <title>GALAXY AI</title>
+
+  <link
+    rel="stylesheet"
+    href="style.css"
+  >
+</head>
+
+
+<body>
 
   <div
-    id="statusRegion"
-    class="sr-only"
-    aria-live="polite"
-  ></div>
+    id="app"
+    class="app-shell"
+  >
+
+
+    <!-- =========================
+         SIDEBAR
+         ========================= -->
+
+    <aside
+      id="sidebar"
+      class="sidebar"
+    >
+
+      <div class="sidebar-header">
+
+        <button
+          class="brand"
+          type="button"
+          data-action="new-chat"
+        >
+          <span class="brand-mark">
+            ✦
+          </span>
+
+          <span class="brand-name">
+            GALAXY AI
+          </span>
+        </button>
+
+      </div>
+
+
+      <nav class="sidebar-nav">
+
+
+        <button
+          class="nav-row"
+          type="button"
+          data-action="new-chat"
+        >
+
+          <span class="nav-icon">
+            ＋
+          </span>
+
+          <span class="nav-label">
+            New chat
+          </span>
+
+        </button>
 
 
 
-  <!-- =====================================================
-       GALAXY JAVASCRIPT
-  ====================================================== -->
+        <button
+          class="nav-row"
+          type="button"
+          data-view="games"
+        >
+
+          <span class="nav-icon">
+            ♛
+          </span>
+
+          <span class="nav-label">
+            Gaming Center
+          </span>
+
+        </button>
+
+
+
+        <button
+          class="nav-row"
+          type="button"
+          data-view="projects"
+        >
+
+          <span class="nav-icon">
+            ▱
+          </span>
+
+          <span class="nav-label">
+            Projects
+          </span>
+
+        </button>
+
+
+
+        <button
+          class="nav-row"
+          type="button"
+          data-view="library"
+        >
+
+          <span class="nav-icon">
+            ▣
+          </span>
+
+          <span class="nav-label">
+            Library
+          </span>
+
+        </button>
+
+
+
+        <button
+          class="nav-row"
+          type="button"
+          data-view="studio"
+        >
+
+          <span class="nav-icon">
+            ◫
+          </span>
+
+          <span class="nav-label">
+            Create Studio
+          </span>
+
+        </button>
+
+
+      </nav>
+
+
+      <div class="sidebar-footer">
+
+        <div class="profile-row">
+
+          <span class="avatar">
+            G
+          </span>
+
+          <span class="profile-copy">
+
+            <strong>
+              GALAXY
+            </strong>
+
+            <small>
+              Personal workspace
+            </small>
+
+          </span>
+
+        </div>
+
+      </div>
+
+
+    </aside>
+
+
+
+    <!-- =========================
+         MAIN
+         ========================= -->
+
+    <main class="main-shell">
+
+
+      <!-- TOP BAR -->
+
+      <header class="topbar">
+
+        <div class="topbar-left">
+
+          <button
+            class="top-brand"
+            type="button"
+            data-action="new-chat"
+          >
+            GALAXY AI
+          </button>
+
+        </div>
+
+
+        <div class="mode-tabs">
+
+          <button
+            class="mode-tab active"
+            type="button"
+            onclick="setView('chat')"
+          >
+            Chat
+          </button>
+
+          <button
+            class="mode-tab"
+            type="button"
+            onclick="setView('work')"
+          >
+            Work
+          </button>
+
+        </div>
+
+
+        <div class="topbar-right">
+
+          <button
+            class="icon-btn"
+            type="button"
+          >
+            ⌘
+          </button>
+
+          <button
+            class="icon-btn"
+            type="button"
+          >
+            ◔
+          </button>
+
+        </div>
+
+      </header>
+
+
+
+      <!-- =========================
+           CHAT VIEW
+           ========================= -->
+
+      <section
+        id="chatView"
+        class="view active-view"
+      >
+
+
+        <div
+          id="chatScroller"
+          class="chat-scroller"
+        >
+
+
+          <section
+            id="chatEmpty"
+            class="empty-state"
+          >
+
+            <div class="empty-logo">
+              ✦
+            </div>
+
+            <h1>
+              What can I help with?
+            </h1>
+
+          </section>
+
+
+          <div
+            id="messages"
+            class="messages"
+          ></div>
+
+
+        </div>
+
+
+
+        <div class="composer-dock">
+
+
+          <div class="composer">
+
+
+            <button
+              class="composer-icon"
+              type="button"
+            >
+              ＋
+            </button>
+
+
+
+            <select
+              id="aiProvider"
+              class="ai-provider-select"
+            >
+
+              <option
+                value="gemini"
+                selected
+              >
+                GALAXY
+              </option>
+
+            </select>
+
+
+
+            <textarea
+              id="promptInput"
+              rows="1"
+              placeholder="Ask anything"
+            ></textarea>
+
+
+
+            <button
+              class="composer-icon"
+              type="button"
+            >
+              ⌕
+            </button>
+
+
+
+            <button
+              class="composer-icon"
+              type="button"
+            >
+              ◫
+            </button>
+
+
+
+            <button
+              class="composer-icon"
+              type="button"
+            >
+              ◉
+            </button>
+
+
+
+            <button
+              id="sendButton"
+              class="send-arrow"
+              type="button"
+              data-action="send"
+            >
+              ↑
+            </button>
+
+
+          </div>
+
+
+
+          <div class="composer-footer">
+
+            <span id="draftState">
+              Ready
+            </span>
+
+            <span class="composer-hint">
+              GALAXY can make mistakes.
+              Check important information.
+            </span>
+
+          </div>
+
+
+        </div>
+
+
+      </section>
+
+
+
+      <!-- =========================
+           WORK VIEW
+           ========================= -->
+
+      <section
+        id="workView"
+        class="view"
+      >
+
+
+        <div class="workbench">
+
+
+          <section class="work-chat-pane">
+
+
+            <header class="pane-head">
+
+              <strong>
+                ✦ GALAXY Work
+              </strong>
+
+            </header>
+
+
+
+            <div
+              id="workOutput"
+              class="work-messages"
+            >
+
+              Ask GALAXY to work on
+              documents, websites,
+              code or plans.
+
+            </div>
+
+
+
+            <div class="work-composer">
+
+
+              <textarea
+                id="workPrompt"
+                rows="1"
+                placeholder="Ask GALAXY to create or change something..."
+              ></textarea>
+
+
+              <button
+                id="workSend"
+                class="send-arrow"
+                type="button"
+                data-action="work-send"
+              >
+                ↑
+              </button>
+
+
+            </div>
+
+
+          </section>
+
+
+
+          <section class="preview-pane">
+
+
+            <header class="pane-head">
+
+              <strong>
+                Preview
+              </strong>
+
+            </header>
+
+
+            <div class="preview-surface">
+
+              <div class="preview-empty">
+
+                <span class="preview-empty-icon">
+                  ✦
+                </span>
+
+                <h2>
+                  Work on anything
+                </h2>
+
+              </div>
+
+            </div>
+
+
+          </section>
+
+
+        </div>
+
+
+      </section>
+
+
+
+      <!-- =========================
+           CONTENT / GAMING VIEW
+           ========================= -->
+
+      <section
+        id="contentView"
+        class="view"
+      >
+
+
+        <div class="content-shell">
+
+
+          <header class="content-head">
+
+
+            <div class="content-heading">
+
+              <p
+                id="contentEyebrow"
+                class="content-eyebrow"
+              >
+                GALAXY
+              </p>
+
+
+              <h1 id="contentTitle">
+                GALAXY
+              </h1>
+
+            </div>
+
+
+          </header>
+
+
+
+          <div
+            id="contentBody"
+            class="content-body"
+          ></div>
+
+
+        </div>
+
+
+      </section>
+
+
+    </main>
+
+
+  </div>
+
+
+
+  <!-- =========================
+       GLOBAL UI
+       ========================= -->
+
+  <div id="toastRoot"></div>
+
+  <div id="overlayRoot"></div>
+
+  <div id="contextMenuRoot"></div>
+
+
+
+  <!-- =========================
+       SCRIPT
+       ========================= -->
 
   <script src="script.js"></script>
 
