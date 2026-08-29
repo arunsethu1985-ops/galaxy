@@ -1,18 +1,14 @@
 "use strict";
 
-/* ============================================================
-   GALAXY AI — COMPLETE SCRIPT.JS
-   Chat + Work + Gaming Center + Arena + GALAXY PALS
-   ============================================================ */
-
 const $ = (s, r = document) => r.querySelector(s);
 const $$ = (s, r = document) => [...r.querySelectorAll(s)];
 
-const clamp = (n, a, b) =>
-  Math.max(a, Math.min(b, n));
+const clamp = (n, a, b) => Math.max(a, Math.min(b, n));
+const rand = (a, b) => a + Math.random() * (b - a);
+const pick = a => a[Math.floor(Math.random() * a.length)];
 
-const escapeHTML = (v = "") =>
-  String(v).replace(
+const esc = (s = "") =>
+  String(s).replace(
     /[&<>"']/g,
     m =>
       ({
@@ -24,31 +20,11 @@ const escapeHTML = (v = "") =>
       })[m]
   );
 
-const clone = v =>
-  JSON.parse(
-    JSON.stringify(v)
-  );
-
-const rand = (a, b) =>
-  a + Math.random() * (b - a);
-
-const pick = a =>
-  a[
-    Math.floor(
-      Math.random() * a.length
-    )
-  ];
-
-const storage = {
+const store = {
   get(k, f = null) {
     try {
-      const v =
-        localStorage.getItem(k);
-
-      return v == null
-        ? f
-        : JSON.parse(v);
-
+      const v = localStorage.getItem(k);
+      return v == null ? f : JSON.parse(v);
     } catch {
       return f;
     }
@@ -56,316 +32,174 @@ const storage = {
 
   set(k, v) {
     try {
-      localStorage.setItem(
-        k,
-        JSON.stringify(v)
-      );
-    } catch {}
-  },
-
-  del(k) {
-    try {
-      localStorage.removeItem(k);
+      localStorage.setItem(k, JSON.stringify(v));
     } catch {}
   }
 };
-
-
-/* ============================================================
-   GLOBAL STATE
-   ============================================================ */
 
 const state = {
   messages: [],
   generating: false,
-  activeView: "chat"
+  view: "chat"
 };
 
 const GameCenter = {
   current: null,
-
-  chess: null,
-  ttt: null,
-  connect: null,
-  memory: null,
   snake: null,
   chicken: null,
-  arena: null,
   pals: null,
-
-  timers: new Set()
+  raf: 0,
+  cleanup: []
 };
 
-const GAME_LEVELS = [
-  100,
-  200,
-  500,
-  800,
-  1000,
-  1200
-];
+const on3D = (el, type, fn, options) => {
+  el.addEventListener(type, fn, options);
 
+  GameCenter.cleanup.push(() =>
+    el.removeEventListener(type, fn, options)
+  );
+};
 
-/* ============================================================
-   BASIC UI
-   ============================================================ */
+function cleanup3D() {
+  cancelAnimationFrame(GameCenter.raf);
 
-function toast(
-  message,
-  type = ""
-) {
+  GameCenter.cleanup
+    .splice(0)
+    .forEach(fn => {
+      try {
+        fn();
+      } catch {}
+    });
 
-  let root =
-    $("#toastRoot");
+  try {
+    document.exitPointerLock?.();
+  } catch {}
+
+  GameCenter.current = null;
+}
+
+function toast(msg) {
+  const root = $("#toastRoot");
 
   if (!root) {
-
-    root =
-      document.createElement(
-        "div"
-      );
-
-    root.id =
-      "toastRoot";
-
-    root.className =
-      "toast-root";
-
-    document.body.appendChild(
-      root
-    );
+    return;
   }
 
-  const el =
-    document.createElement(
-      "div"
-    );
+  const el = document.createElement("div");
 
-  el.className =
-    `toast ${type}`.trim();
-
-  el.textContent =
-    message;
+  el.className = "toast";
+  el.textContent = msg;
 
   root.appendChild(el);
 
-  setTimeout(
-    () => el.remove(),
-    2600
-  );
+  setTimeout(() => el.remove(), 2200);
 }
-
-
-function clearGameTimers() {
-
-  for (
-    const timer of
-    GameCenter.timers
-  ) {
-
-    clearInterval(timer);
-    clearTimeout(timer);
-  }
-
-  GameCenter.timers.clear();
-}
-
-
-function trackTimer(timer) {
-
-  GameCenter.timers.add(
-    timer
-  );
-
-  return timer;
-}
-
 
 function setView(name) {
+  state.view = name;
 
-  state.activeView =
-    name;
-
-  $$(".view").forEach(
-    view => {
-      view.classList.remove(
-        "active-view"
-      );
-    }
+  $$(".view").forEach(view =>
+    view.classList.remove("active-view")
   );
 
-  const map = {
-    chat: "#chatView",
-    work: "#workView",
-    games: "#contentView",
-    projects: "#contentView",
-    library: "#contentView",
-    studio: "#contentView"
-  };
+  const selector =
+    {
+      chat: "#chatView",
+      work: "#workView",
+      games: "#contentView",
+      projects: "#contentView",
+      library: "#contentView",
+      studio: "#contentView"
+    }[name] || "#chatView";
 
-  $(
-    map[name] ||
-    "#chatView"
-  )?.classList.add(
-    "active-view"
-  );
+  $(selector)?.classList.add("active-view");
 
-  $$("[data-view]").forEach(
-    button => {
+  $$("[data-view]").forEach(button => {
+    button.classList.toggle(
+      "active",
+      button.dataset.view === name
+    );
+  });
 
-      button.classList.toggle(
-        "active",
-        button.dataset.view ===
-          name
-      );
-    }
-  );
-
-
-  if (
-    name !== "games"
-  ) {
+  if (name !== "games") {
     cleanup3D();
   }
 
-
-  if (
-    name === "games"
-  ) {
-
+  if (name === "games") {
     renderGames();
-
   } else if (
-    name === "projects"
+    ["projects", "library", "studio"].includes(name)
   ) {
-
-    renderSimplePage(
-      "Projects",
-      "Your GALAXY projects will appear here."
-    );
-
-  } else if (
-    name === "library"
-  ) {
-
-    renderSimplePage(
-      "Library",
-      "Files, images and generated assets."
-    );
-
-  } else if (
-    name === "studio"
-  ) {
-
-    renderSimplePage(
-      "Create Studio",
-      "Image and video creative tools."
-    );
+    simplePage(name);
   }
 }
 
+function simplePage(name) {
+  const title =
+    name[0].toUpperCase() +
+    name.slice(1);
 
-function renderSimplePage(
-  title,
-  text
-) {
-
-  if (
-    $("#contentTitle")
-  ) {
-    $("#contentTitle")
-      .textContent =
-      title;
+  if ($("#contentTitle")) {
+    $("#contentTitle").textContent = title;
   }
 
-  if (
-    $("#contentEyebrow")
-  ) {
-    $("#contentEyebrow")
-      .textContent =
+  if ($("#contentEyebrow")) {
+    $("#contentEyebrow").textContent =
       "GALAXY";
   }
 
-  if (
-    $("#contentBody")
-  ) {
+  if ($("#contentBody")) {
+    $("#contentBody").innerHTML = `
+      <div class="panel">
 
-    $("#contentBody")
-      .innerHTML = `
+        <h3>${title}</h3>
 
-        <div class="panel">
+        <p>
+          ${
+            name === "projects"
+              ? "Your GALAXY projects will appear here."
+              : name === "library"
+              ? "Files, images and generated assets."
+              : "Creative tools."
+          }
+        </p>
 
-          <h3>
-            ${escapeHTML(title)}
-          </h3>
-
-          <p>
-            ${escapeHTML(text)}
-          </p>
-
-        </div>
-
-      `;
+      </div>
+    `;
   }
 }
 
-
 function newChat() {
-
   state.messages = [];
 
-  if (
-    $("#messages")
-  ) {
-
-    $("#messages")
-      .innerHTML =
-      "";
+  if ($("#messages")) {
+    $("#messages").innerHTML = "";
   }
 
   $("#chatEmpty")
     ?.classList
-    .remove(
-      "hidden"
-    );
+    .remove("hidden");
+
+  setView("chat");
 
   $("#promptInput")
     ?.focus();
-
-  setView(
-    "chat"
-  );
 }
-
 
 function autoResize(el) {
+  if (!el) return;
 
-  if (!el) {
-    return;
-  }
-
-  el.style.height =
-    "auto";
+  el.style.height = "auto";
 
   el.style.height =
-    `${Math.min(
+    Math.min(
       el.scrollHeight,
       180
-    )}px`;
+    ) + "px";
 }
 
-
-/* ============================================================
-   CHAT
-   ============================================================ */
-
-function renderMessage(
-  role,
-  text
-) {
-
-  const root =
-    $("#messages");
+function renderMessage(role, text) {
+  const root = $("#messages");
 
   if (!root) {
     return;
@@ -373,186 +207,99 @@ function renderMessage(
 
   $("#chatEmpty")
     ?.classList
-    .add(
-      "hidden"
-    );
+    .add("hidden");
 
   const row =
-    document.createElement(
-      "div"
-    );
+    document.createElement("div");
 
   row.className =
     `message ${role}`;
 
   const bubble =
-    document.createElement(
-      "div"
-    );
+    document.createElement("div");
 
-  bubble.className =
-    "bubble";
+  bubble.className = "bubble";
+  bubble.textContent = text;
 
-  bubble.textContent =
-    text;
-
-  row.appendChild(
-    bubble
-  );
-
-  root.appendChild(
-    row
-  );
+  row.appendChild(bubble);
+  root.appendChild(row);
 
   row.scrollIntoView({
-    behavior: "smooth",
-    block: "end"
+    block: "end",
+    behavior: "smooth"
   });
 }
 
-
-function updateSendButtonState() {
-
-  const button =
-    $("#sendButton");
-
-  if (!button) {
-    return;
-  }
-
-  button.textContent =
-    state.generating
-      ? "■"
-      : "↑";
-
-  button.classList.toggle(
-    "is-stop",
-    state.generating
-  );
-
-  button.setAttribute(
-    "aria-label",
-    state.generating
-      ? "Stop"
-      : "Send"
-  );
-}
-
-
-/* ============================================================
-   GEMINI
-   ============================================================ */
-
 async function fetchAIResponse(
   message,
-  includeHistory = true
+  useHistory = true
 ) {
-
-  const creatorContext =
+  const system =
     "You are GALAXY AI. " +
     "GALAXY AI was created and founded by Harshavardhan. " +
-    "If asked who created, made, founded, designed or owns GALAXY AI, " +
-    "answer: Harshavardhan created GALAXY AI. " +
-    "GALAXY uses Gemini through an API for AI responses. " +
     "Be helpful, intelligent, clear and concise.";
 
+  const messages = [
+    {
+      role: "system",
+      content: system
+    },
 
-  const payload = {
+    ...(
+      useHistory
+        ? state.messages
+            .slice(0, -1)
+            .slice(-20)
+            .map(item => ({
+              role: item.role,
+              content: item.text
+            }))
+        : []
+    ),
 
-    message,
-
-    prompt:
-      message,
-
-    mode:
-      includeHistory
-        ? "chat"
-        : "work",
-
-    system:
-      creatorContext,
-
-    messages: [
-
-      {
-        role: "system",
-        content:
-          creatorContext
-      },
-
-      ...(
-        includeHistory
-
-          ? state.messages
-              .slice(
-                0,
-                -1
-              )
-              .slice(
-                -20
-              )
-              .map(
-                item => ({
-                  role:
-                    item.role,
-
-                  content:
-                    item.text
-                })
-              )
-
-          : []
-      ),
-
-      {
-        role: "user",
-        content:
-          message
-      }
-    ]
-  };
-
+    {
+      role: "user",
+      content: message
+    }
+  ];
 
   const response =
     await fetch(
       "/api/gemini",
       {
-
-        method:
-          "POST",
+        method: "POST",
 
         headers: {
           "Content-Type":
             "application/json"
         },
 
-        body:
-          JSON.stringify(
-            payload
-          )
+        body: JSON.stringify({
+          message,
+          prompt: message,
+          mode:
+            useHistory
+              ? "chat"
+              : "work",
+          system,
+          messages,
+          history: messages
+        })
       }
     );
-
 
   const data =
     await response
       .json()
-      .catch(
-        () => ({})
-      );
+      .catch(() => ({}));
 
-
-  if (
-    !response.ok
-  ) {
-
+  if (!response.ok) {
     throw new Error(
       data.error ||
       data.message ||
       `Backend error ${response.status}`
     );
   }
-
 
   return (
     data.text ||
@@ -564,9 +311,7 @@ async function fetchAIResponse(
   );
 }
 
-
 async function sendMessage() {
-
   const input =
     $("#promptInput");
 
@@ -577,7 +322,6 @@ async function sendMessage() {
     return;
   }
 
-
   const text =
     input.value.trim();
 
@@ -585,96 +329,60 @@ async function sendMessage() {
     return;
   }
 
+  input.value = "";
 
-  input.value =
-    "";
-
-  autoResize(
-    input
-  );
-
+  autoResize(input);
 
   state.messages.push({
     role: "user",
     text
   });
 
-
   renderMessage(
     "user",
     text
   );
 
+  state.generating = true;
 
-  state.generating =
-    true;
-
-  updateSendButtonState();
-
-
-  if (
-    $("#draftState")
-  ) {
-
-    $("#draftState")
-      .textContent =
+  if ($("#draftState")) {
+    $("#draftState").textContent =
       "GALAXY is thinking…";
   }
 
-
   try {
-
     const reply =
       await fetchAIResponse(
-        text
+        text,
+        true
       );
-
 
     state.messages.push({
       role: "assistant",
       text: reply
     });
 
-
     renderMessage(
       "assistant",
       reply
     );
-
   } catch (error) {
-
     renderMessage(
       "assistant",
-      `GALAXY error: ${error.message}`
+      "GALAXY error: " +
+      error.message
     );
-
-    toast(
-      error.message,
-      "error"
-    );
-
   } finally {
+    state.generating = false;
 
-    state.generating =
-      false;
-
-    updateSendButtonState();
-
-
-    if (
-      $("#draftState")
-    ) {
-
-      $("#draftState")
-        .textContent =
+    if ($("#draftState")) {
+      $("#draftState").textContent =
         "Ready";
     }
   }
 }
 
-
 async function sendWork() {
-
   const input =
     $("#workPrompt");
 
@@ -688,7 +396,6 @@ async function sendWork() {
     return;
   }
 
-
   const prompt =
     input.value.trim();
 
@@ -696,35 +403,25 @@ async function sendWork() {
     return;
   }
 
-
   output.textContent =
     "GALAXY is working…";
 
-
   try {
-
     output.textContent =
       await fetchAIResponse(
         prompt,
         false
       );
-
   } catch (error) {
-
     output.textContent =
-      `GALAXY error: ${error.message}`;
-
-    toast(
-      error.message,
-      "error"
-    );
+      "GALAXY error: " +
+      error.message;
   }
 }
 
-
-/* ============================================================
+/* =========================================================
    GAMING CENTER
-   ============================================================ */
+   ========================================================= */
 
 function gameCard(
   id,
@@ -732,94 +429,49 @@ function gameCard(
   title,
   subtitle
 ) {
-
   return `
-
     <button
       class="game-card"
       data-game-open="${id}"
     >
 
-      <div
-        class="game-card-visual"
-      >
+      <div class="game-card-visual">
         ${icon}
       </div>
 
-
-      <div
-        class="game-card-copy"
-      >
-
-        <strong>
-          ${title}
-        </strong>
-
-        <span>
-          ${subtitle}
-        </span>
-
+      <div class="game-card-copy">
+        <strong>${title}</strong>
+        <span>${subtitle}</span>
       </div>
 
     </button>
-
   `;
 }
 
-
 function renderGames() {
-
   cleanup3D();
 
-  clearGameTimers();
+  GameCenter.current = null;
 
-  GameCenter.current =
-    null;
-
-
-  if (
-    $("#contentTitle")
-  ) {
-
-    $("#contentTitle")
-      .textContent =
+  if ($("#contentTitle")) {
+    $("#contentTitle").textContent =
       "Gaming Center";
   }
 
-
-  if (
-    $("#contentEyebrow")
-  ) {
-
-    $("#contentEyebrow")
-      .textContent =
+  if ($("#contentEyebrow")) {
+    $("#contentEyebrow").textContent =
       "PLAY WITH GALAXY";
   }
 
+  $("#contentBody").innerHTML = `
 
-  const body =
-    $("#contentBody");
+    <div class="games-home">
 
-  if (!body) {
-    return;
-  }
-
-
-  body.innerHTML = `
-
-    <div
-      class="games-home"
-    >
-
-      <div
-        class="games-hero"
-      >
+      <div class="games-hero">
 
         <div>
 
-          <span
-            class="eyebrow"
-          >
+          <span class="eyebrow">
             GALAXY GAMING
           </span>
 
@@ -829,30 +481,24 @@ function renderGames() {
 
           <p>
             Classic games,
-            3D arena combat
-            and creature survival.
+            Arena and a creature-survival world.
           </p>
 
         </div>
 
-        <div
-          class="games-hero-mark"
-        >
+        <div class="games-hero-mark">
           ✦
         </div>
 
       </div>
 
-
-      <div
-        class="games-grid"
-      >
+      <div class="games-grid">
 
         ${gameCard(
           "chess",
           "♟",
           "Chess",
-          "vs GALAXY or Friend • Levels • Review"
+          "Play a simple chess match"
         )}
 
         ${gameCard(
@@ -866,63 +512,56 @@ function renderGames() {
           "connect4",
           "●●",
           "Connect Four",
-          "vs GALAXY or Friend"
+          "vs GALAXY"
         )}
 
         ${gameCard(
           "memory",
           "▦",
           "Memory",
-          "Match pairs • Score"
+          "Match the pairs"
         )}
 
         ${gameCard(
           "arena",
           "⌖",
           "GALAXY Arena",
-          "3D FPS • Bots • FFA • Practice"
+          "3D training range"
         )}
 
         ${gameCard(
           "snake",
           "◉",
           "Snake",
-          "Single player • Levels • High score"
+          "Levels and high score"
         )}
 
         ${gameCard(
           "chicken",
           "🐔",
           "Chicken Crossing",
-          "Road • Safe grass • Levels"
+          "Road and safe grass"
         )}
 
         ${gameCard(
           "pals",
           "✦",
           "GALAXY PALS",
-          "3D creature survival • Capture • Craft • Build"
+          "30+ visibly different original creatures"
         )}
 
       </div>
 
     </div>
-
   `;
 }
 
-
 function gameTop(
   title,
-  message,
-  extra = ""
+  message = ""
 ) {
-
   return `
-
-    <div
-      class="game-topline"
-    >
+    <div class="game-topline">
 
       <button
         class="secondary-btn"
@@ -931,106 +570,1046 @@ function gameTop(
         ← Games
       </button>
 
-
-      <div
-        class="game-status"
-      >
-        ${escapeHTML(message)}
+      <div class="game-status">
+        ${esc(message || title)}
       </div>
 
-
-      ${extra}
-
     </div>
-
   `;
 }
 
+/* =========================================================
+   TIC TAC TOE
+   ========================================================= */
 
-function modeSelect(game) {
+const TTT_WINS = [
+  [0, 1, 2],
+  [3, 4, 5],
+  [6, 7, 8],
+  [0, 3, 6],
+  [1, 4, 7],
+  [2, 5, 8],
+  [0, 4, 8],
+  [2, 4, 6]
+];
 
-  return `
+let ttt = null;
 
-    <div
-      class="game-toolbar"
-    >
+function tttWinner(board) {
+  for (
+    const [a, b, c]
+    of TTT_WINS
+  ) {
+    if (
+      board[a] &&
+      board[a] === board[b] &&
+      board[a] === board[c]
+    ) {
+      return board[a];
+    }
+  }
 
-      <select
-        data-mode
-      >
+  return board.every(Boolean)
+    ? "draw"
+    : null;
+}
 
-        <option
-          value="galaxy"
-          ${
-            game.mode ===
-            "galaxy"
-              ? "selected"
-              : ""
-          }
-        >
-          You vs GALAXY
-        </option>
+function openTTT() {
+  ttt = {
+    board:
+      Array(9).fill(""),
+    finished: false,
+    message: "Your turn"
+  };
 
-        <option
-          value="friend"
-          ${
-            game.mode ===
-            "friend"
-              ? "selected"
-              : ""
-          }
-        >
-          You vs Friend
-        </option>
+  renderTTT();
+}
 
-      </select>
+function renderTTT() {
+  GameCenter.current =
+    "tictactoe";
 
+  $("#contentBody").innerHTML = `
+    <div class="game-shell">
 
-      <select
-        data-level
+      ${gameTop(
+        "Tic-Tac-Toe",
+        ttt.message
+      )}
+
+      <div class="ttt-board">
+
         ${
-          game.mode ===
-          "friend"
-            ? "disabled"
-            : ""
-        }
-      >
-
-        ${
-          GAME_LEVELS
+          ttt.board
             .map(
-              level => `
-
-                <option
-                  ${
-                    level ===
-                    game.elo
-                      ? "selected"
-                      : ""
-                  }
+              (value, index) => `
+                <button
+                  class="ttt-cell"
+                  data-ttt="${index}"
                 >
-                  ${level}
-                </option>
-
+                  ${value}
+                </button>
               `
             )
             .join("")
         }
 
-      </select>
+      </div>
+
+      <button
+        class="primary-btn"
+        data-ttt-reset
+      >
+        New Game
+      </button>
 
     </div>
-
   `;
 }
 
+function tttMove(index) {
+  if (
+    ttt.finished ||
+    ttt.board[index]
+  ) {
+    return;
+  }
 
-/* ============================================================
+  ttt.board[index] = "X";
+
+  let winner =
+    tttWinner(ttt.board);
+
+  if (winner) {
+    ttt.finished = true;
+
+    ttt.message =
+      winner === "draw"
+        ? "Draw"
+        : "You win";
+
+    renderTTT();
+
+    return;
+  }
+
+  const empty =
+    ttt.board
+      .map(
+        (value, i) =>
+          value
+            ? null
+            : i
+      )
+      .filter(
+        value =>
+          value !== null
+      );
+
+  let ai =
+    empty.find(i => {
+      const copy =
+        [...ttt.board];
+
+      copy[i] = "O";
+
+      return (
+        tttWinner(copy) === "O"
+      );
+    });
+
+  if (ai == null) {
+    ai =
+      empty.find(i => {
+        const copy =
+          [...ttt.board];
+
+        copy[i] = "X";
+
+        return (
+          tttWinner(copy) === "X"
+        );
+      });
+  }
+
+  if (ai == null) {
+    ai =
+      empty.includes(4)
+        ? 4
+        : pick(empty);
+  }
+
+  if (ai != null) {
+    ttt.board[ai] = "O";
+  }
+
+  winner =
+    tttWinner(ttt.board);
+
+  if (winner) {
+    ttt.finished = true;
+
+    ttt.message =
+      winner === "draw"
+        ? "Draw"
+        : "GALAXY wins";
+  }
+
+  renderTTT();
+}
+
+/* =========================================================
+   CONNECT FOUR
+   ========================================================= */
+
+let connect4 = null;
+
+function openConnect4() {
+  connect4 = {
+    board:
+      Array.from(
+        { length: 6 },
+        () =>
+          Array(7).fill("")
+      ),
+
+    finished: false,
+
+    message:
+      "Your turn"
+  };
+
+  renderConnect4();
+}
+
+function connect4Win(
+  board,
+  player
+) {
+  for (
+    let row = 0;
+    row < 6;
+    row++
+  ) {
+    for (
+      let col = 0;
+      col < 7;
+      col++
+    ) {
+      for (
+        const [dr, dc]
+        of [
+          [0, 1],
+          [1, 0],
+          [1, 1],
+          [1, -1]
+        ]
+      ) {
+        if (
+          [0, 1, 2, 3]
+            .every(
+              step =>
+                board[
+                  row +
+                  dr *
+                  step
+                ]?.[
+                  col +
+                  dc *
+                  step
+                ] === player
+            )
+        ) {
+          return true;
+        }
+      }
+    }
+  }
+
+  return false;
+}
+
+function connectDrop(
+  col,
+  player
+) {
+  for (
+    let row = 5;
+    row >= 0;
+    row--
+  ) {
+    if (
+      !connect4.board[row][col]
+    ) {
+      connect4.board[row][col] =
+        player;
+
+      return true;
+    }
+  }
+
+  return false;
+}
+
+function connectMove(col) {
+  if (
+    connect4.finished ||
+    !connectDrop(
+      col,
+      "R"
+    )
+  ) {
+    return;
+  }
+
+  if (
+    connect4Win(
+      connect4.board,
+      "R"
+    )
+  ) {
+    connect4.finished = true;
+    connect4.message =
+      "You win";
+
+    renderConnect4();
+
+    return;
+  }
+
+  const choices =
+    [
+      3,
+      2,
+      4,
+      1,
+      5,
+      0,
+      6
+    ]
+      .filter(
+        col =>
+          !connect4.board[0][col]
+      );
+
+  if (choices.length) {
+    connectDrop(
+      pick(
+        choices.slice(
+          0,
+          Math.min(
+            3,
+            choices.length
+          )
+        )
+      ),
+      "Y"
+    );
+  }
+
+  if (
+    connect4Win(
+      connect4.board,
+      "Y"
+    )
+  ) {
+    connect4.finished = true;
+    connect4.message =
+      "GALAXY wins";
+  }
+
+  renderConnect4();
+}
+
+function renderConnect4() {
+  GameCenter.current =
+    "connect4";
+
+  $("#contentBody").innerHTML = `
+    <div class="game-shell">
+
+      ${gameTop(
+        "Connect Four",
+        connect4.message
+      )}
+
+      <div class="connect-board">
+
+        ${
+          connect4.board
+            .flatMap(
+              row =>
+                row.map(
+                  (
+                    value,
+                    col
+                  ) => `
+                    <button
+                      class="
+                        connect-cell
+                        ${
+                          value === "R"
+                            ? "red"
+                            : value === "Y"
+                            ? "yellow"
+                            : ""
+                        }
+                      "
+                      data-c4="${col}"
+                    >
+                      <span></span>
+                    </button>
+                  `
+                )
+            )
+            .join("")
+        }
+
+      </div>
+
+      <button
+        class="primary-btn"
+        data-c4-reset
+      >
+        New Game
+      </button>
+
+    </div>
+  `;
+}
+
+/* =========================================================
+   MEMORY
+   ========================================================= */
+
+let memory = null;
+
+function openMemory() {
+  const values = [
+    "✦",
+    "☾",
+    "◆",
+    "⚡",
+    "❄",
+    "🔥",
+    "🌿",
+    "💧"
+  ];
+
+  memory = {
+    cards:
+      [
+        ...values,
+        ...values
+      ].sort(
+        () =>
+          Math.random() -
+          0.5
+      ),
+
+    open: [],
+
+    done:
+      new Set(),
+
+    moves: 0,
+
+    lock: false
+  };
+
+  renderMemory();
+}
+
+function memoryFlip(index) {
+  if (
+    memory.lock ||
+    memory.done.has(index) ||
+    memory.open.includes(index)
+  ) {
+    return;
+  }
+
+  memory.open.push(index);
+
+  if (
+    memory.open.length === 2
+  ) {
+    memory.moves++;
+
+    const [a, b] =
+      memory.open;
+
+    if (
+      memory.cards[a] ===
+      memory.cards[b]
+    ) {
+      memory.done.add(a);
+      memory.done.add(b);
+
+      memory.open = [];
+
+      renderMemory();
+    } else {
+      memory.lock = true;
+
+      renderMemory();
+
+      setTimeout(
+        () => {
+          memory.open = [];
+          memory.lock = false;
+
+          renderMemory();
+        },
+        600
+      );
+    }
+  } else {
+    renderMemory();
+  }
+}
+
+function renderMemory() {
+  GameCenter.current =
+    "memory";
+
+  $("#contentBody").innerHTML = `
+    <div class="game-shell">
+
+      ${gameTop(
+        "Memory",
+        `Moves ${memory.moves}`
+      )}
+
+      <div class="memory-board">
+
+        ${
+          memory.cards
+            .map(
+              (
+                value,
+                index
+              ) => `
+                <button
+                  class="
+                    memory-card
+                    ${
+                      memory.open.includes(
+                        index
+                      ) ||
+                      memory.done.has(
+                        index
+                      )
+                        ? "flipped"
+                        : ""
+                    }
+                  "
+                  data-memory="${index}"
+                >
+                  <span>
+                    ${
+                      memory.open.includes(
+                        index
+                      ) ||
+                      memory.done.has(
+                        index
+                      )
+                        ? value
+                        : "?"
+                    }
+                  </span>
+                </button>
+              `
+            )
+            .join("")
+        }
+
+      </div>
+
+      <button
+        class="primary-btn"
+        data-memory-reset
+      >
+        New Game
+      </button>
+
+    </div>
+  `;
+}
+
+/* =========================================================
+   SNAKE
+   ========================================================= */
+
+function openSnake() {
+  GameCenter.snake = {
+    size: 20,
+
+    body: [
+      [10, 10],
+      [9, 10]
+    ],
+
+    direction:
+      [1, 0],
+
+    nextDirection:
+      [1, 0],
+
+    food:
+      [15, 10],
+
+    score: 0,
+
+    over: false,
+
+    timer: null
+  };
+
+  renderSnake();
+  runSnake();
+}
+
+function newSnakeFood(game) {
+  do {
+    game.food = [
+      Math.floor(
+        rand(
+          0,
+          game.size
+        )
+      ),
+
+      Math.floor(
+        rand(
+          0,
+          game.size
+        )
+      )
+    ];
+  } while (
+    game.body.some(
+      point =>
+        point[0] ===
+          game.food[0] &&
+        point[1] ===
+          game.food[1]
+    )
+  );
+}
+
+function runSnake() {
+  clearInterval(
+    GameCenter.snake.timer
+  );
+
+  GameCenter.snake.timer =
+    setInterval(
+      () => {
+        const game =
+          GameCenter.snake;
+
+        if (
+          !game ||
+          game.over
+        ) {
+          return;
+        }
+
+        game.direction =
+          game.nextDirection;
+
+        const head = [
+          game.body[0][0] +
+            game.direction[0],
+
+          game.body[0][1] +
+            game.direction[1]
+        ];
+
+        if (
+          head[0] < 0 ||
+          head[1] < 0 ||
+          head[0] >=
+            game.size ||
+          head[1] >=
+            game.size ||
+          game.body.some(
+            point =>
+              point[0] ===
+                head[0] &&
+              point[1] ===
+                head[1]
+          )
+        ) {
+          game.over = true;
+
+          clearInterval(
+            game.timer
+          );
+
+          renderSnake();
+
+          return;
+        }
+
+        game.body.unshift(
+          head
+        );
+
+        if (
+          head[0] ===
+            game.food[0] &&
+          head[1] ===
+            game.food[1]
+        ) {
+          game.score++;
+
+          newSnakeFood(game);
+        } else {
+          game.body.pop();
+        }
+
+        renderSnake();
+      },
+      120
+    );
+}
+
+function renderSnake() {
+  GameCenter.current =
+    "snake";
+
+  const game =
+    GameCenter.snake;
+
+  $("#contentBody").innerHTML = `
+    <div class="game-shell">
+
+      ${
+        gameTop(
+          "Snake",
+          game.over
+            ? `Game over • ${game.score}`
+            : `Score ${game.score}`
+        )
+      }
+
+      <div class="snake-board">
+
+        ${
+          Array.from(
+            {
+              length:
+                game.size *
+                game.size
+            },
+            (_, index) => {
+              const x =
+                index %
+                game.size;
+
+              const y =
+                Math.floor(
+                  index /
+                  game.size
+                );
+
+              const snake =
+                game.body.some(
+                  point =>
+                    point[0] === x &&
+                    point[1] === y
+                );
+
+              const food =
+                game.food[0] === x &&
+                game.food[1] === y;
+
+              return `
+                <div
+                  class="
+                    snake-cell
+                    ${
+                      snake
+                        ? "snake-body"
+                        : ""
+                    }
+                    ${
+                      food
+                        ? "snake-food"
+                        : ""
+                    }
+                  "
+                ></div>
+              `;
+            }
+          )
+          .join("")
+        }
+
+      </div>
+
+      <button
+        class="primary-btn"
+        data-snake-reset
+      >
+        New Game
+      </button>
+
+    </div>
+  `;
+}
+
+/* =========================================================
+   CHICKEN CROSSING
+   ========================================================= */
+
+function openChicken() {
+  GameCenter.chicken = {
+    row: 6,
+    col: 4,
+    score: 0,
+
+    cars:
+      Array.from(
+        { length: 10 },
+        (_, index) => ({
+          row:
+            [1, 3, 5][
+              index % 3
+            ],
+
+          x:
+            rand(
+              -1,
+              8
+            ),
+
+          speed:
+            rand(
+              0.7,
+              1.6
+            ) *
+            (
+              index % 2
+                ? 1
+                : -1
+            )
+        })
+      ),
+
+    timer: null,
+
+    over: false
+  };
+
+  renderChicken();
+  runChicken();
+}
+
+function runChicken() {
+  clearInterval(
+    GameCenter.chicken.timer
+  );
+
+  GameCenter.chicken.timer =
+    setInterval(
+      () => {
+        const game =
+          GameCenter.chicken;
+
+        if (
+          !game ||
+          game.over
+        ) {
+          return;
+        }
+
+        for (
+          const car
+          of game.cars
+        ) {
+          car.x +=
+            car.speed *
+            0.15;
+
+          if (
+            car.x > 9
+          ) {
+            car.x = -1;
+          }
+
+          if (
+            car.x < -1
+          ) {
+            car.x = 9;
+          }
+
+          if (
+            car.row ===
+              game.row &&
+            Math.abs(
+              car.x -
+              game.col
+            ) < 0.55
+          ) {
+            game.over = true;
+
+            clearInterval(
+              game.timer
+            );
+          }
+        }
+
+        renderChicken();
+      },
+      90
+    );
+}
+
+function chickenMove(
+  dx,
+  dy
+) {
+  const game =
+    GameCenter.chicken;
+
+  if (
+    !game ||
+    game.over
+  ) {
+    return;
+  }
+
+  game.col =
+    clamp(
+      game.col + dx,
+      0,
+      8
+    );
+
+  game.row =
+    clamp(
+      game.row + dy,
+      0,
+      6
+    );
+
+  if (
+    game.row === 0
+  ) {
+    game.score++;
+    game.row = 6;
+    game.col = 4;
+  }
+
+  renderChicken();
+}
+
+function renderChicken() {
+  GameCenter.current =
+    "chicken";
+
+  const game =
+    GameCenter.chicken;
+
+  $("#contentBody").innerHTML = `
+    <div class="game-shell">
+
+      ${
+        gameTop(
+          "Chicken Crossing",
+
+          game.over
+            ? `Hit! Score ${game.score}`
+            : `Score ${game.score}`
+        )
+      }
+
+      <div class="chicken-board">
+
+        ${
+          Array.from(
+            {
+              length: 63
+            },
+            (_, index) => {
+              const col =
+                index % 9;
+
+              const row =
+                Math.floor(
+                  index / 9
+                );
+
+              const road =
+                [1, 3, 5]
+                  .includes(row);
+
+              const player =
+                game.row === row &&
+                game.col === col;
+
+              const car =
+                game.cars.some(
+                  vehicle =>
+                    vehicle.row ===
+                      row &&
+                    Math.round(
+                      vehicle.x
+                    ) === col
+                );
+
+              return `
+                <div
+                  class="
+                    chicken-cell
+                    ${
+                      road
+                        ? "road"
+                        : "grass"
+                    }
+                  "
+                >
+                  ${
+                    player
+                      ? "🐔"
+                      : car
+                      ? "🚗"
+                      : ""
+                  }
+                </div>
+              `;
+            }
+          )
+          .join("")
+        }
+
+      </div>
+
+      <p>
+        Arrow keys / WASD
+      </p>
+
+      <button
+        class="primary-btn"
+        data-chicken-reset
+      >
+        New Game
+      </button>
+
+    </div>
+  `;
+}
+
+/* =========================================================
    CHESS
-   ============================================================ */
+   ========================================================= */
 
-const CHESS_P = {
+let chess = null;
 
+const CHESS_SYMBOLS = {
   r: "♜",
   n: "♞",
   b: "♝",
@@ -1046,287 +1625,204 @@ const CHESS_P = {
   P: "♙"
 };
 
-
-const CHESS_V = {
-
-  p: 1,
-  n: 3,
-  b: 3,
-  r: 5,
-  q: 9,
-  k: 100
-};
-
-
-function chessBoard() {
-
-  return [
-
-    "rnbqkbnr"
-      .split(""),
-
-    "pppppppp"
-      .split(""),
-
-    ...Array.from(
-      {
-        length: 4
-      },
-      () =>
-        Array(8)
-          .fill("")
+function openChess() {
+  chess = {
+    board: [
+      "rnbqkbnr",
+      "pppppppp",
+      "........",
+      "........",
+      "........",
+      "........",
+      "PPPPPPPP",
+      "RNBQKBNR"
+    ].map(
+      row =>
+        [...row]
+          .map(
+            char =>
+              char === "."
+                ? ""
+                : char
+          )
     ),
 
-    "PPPPPPPP"
-      .split(""),
+    selected: null,
 
-    "RNBQKBNR"
-      .split("")
-  ];
+    message:
+      "Select a white piece"
+  };
+
+  renderChess();
 }
 
+function getChessMoves(
+  row,
+  col
+) {
+  const piece =
+    chess.board[row][col];
 
-const white =
-  piece =>
+  const white =
     piece &&
     piece ===
       piece.toUpperCase();
 
-
-const same =
-  (
-    a,
-    b
-  ) =>
-    a &&
-    b &&
-    white(a) ===
-      white(b);
-
-
-function chessMoves(
-  board,
-  r,
-  c
-) {
-
-  const piece =
-    board[r][c];
-
-  if (!piece) {
-    return [];
-  }
-
-
-  const isWhite =
-    white(piece);
-
   const type =
-    piece.toLowerCase();
+    piece
+      ?.toLowerCase();
 
-  const moves =
-    [];
+  const moves = [];
 
-
-  const add =
-    (
-      rr,
-      cc
-    ) => {
-
-      if (
-        rr < 0 ||
-        rr > 7 ||
-        cc < 0 ||
-        cc > 7
-      ) {
-        return false;
-      }
-
-
-      if (
-        !board[rr][cc]
-      ) {
-
-        moves.push([
-          rr,
-          cc
-        ]);
-
-        return true;
-      }
-
-
-      if (
-        !same(
-          piece,
-          board[rr][cc]
-        )
-      ) {
-
-        moves.push([
-          rr,
-          cc
-        ]);
-      }
-
-
+  const add = (
+    r,
+    c
+  ) => {
+    if (
+      r < 0 ||
+      c < 0 ||
+      r > 7 ||
+      c > 7
+    ) {
       return false;
-    };
+    }
 
+    const target =
+      chess.board[r][c];
+
+    if (!target) {
+      moves.push([
+        r,
+        c
+      ]);
+
+      return true;
+    }
+
+    const sameSide =
+      (
+        target ===
+        target.toUpperCase()
+      ) === white;
+
+    if (!sameSide) {
+      moves.push([
+        r,
+        c
+      ]);
+    }
+
+    return false;
+  };
 
   if (
     type === "p"
   ) {
-
     const direction =
-      isWhite
+      white
         ? -1
         : 1;
 
-    const start =
-      isWhite
-        ? 6
-        : 1;
-
-
     if (
-      r + direction >= 0 &&
-      r + direction < 8 &&
-      !board[
-        r + direction
-      ][c]
+      !chess.board[
+        row +
+        direction
+      ]?.[col]
     ) {
-
       moves.push([
-        r + direction,
-        c
+        row +
+        direction,
+        col
       ]);
+    }
 
+    for (
+      const dc
+      of [-1, 1]
+    ) {
+      const target =
+        chess.board[
+          row +
+          direction
+        ]?.[
+          col +
+          dc
+        ];
 
       if (
-        r === start &&
-        !board[
-          r +
-          2 *
-          direction
-        ][c]
+        target &&
+        (
+          target ===
+          target.toUpperCase()
+        ) !== white
       ) {
-
         moves.push([
-          r +
-          2 *
+          row +
           direction,
-          c
+          col +
+          dc
         ]);
       }
     }
-
-
-    [-1, 1]
-      .forEach(
-        dc => {
-
-          const rr =
-            r +
-            direction;
-
-          const cc =
-            c +
-            dc;
-
-
-          if (
-            rr >= 0 &&
-            rr < 8 &&
-            cc >= 0 &&
-            cc < 8 &&
-            board[rr][cc] &&
-            !same(
-              piece,
-              board[rr][cc]
-            )
-          ) {
-
-            moves.push([
-              rr,
-              cc
-            ]);
-          }
-        }
-      );
   }
-
 
   if (
     type === "n"
   ) {
-
-    [
-      [2, 1],
-      [2, -1],
-      [-2, 1],
-      [-2, -1],
-      [1, 2],
-      [1, -2],
-      [-1, 2],
-      [-1, -2]
-    ]
-      .forEach(
-        ([dr, dc]) =>
-          add(
-            r + dr,
-            c + dc
-          )
+    for (
+      const [dr, dc]
+      of [
+        [2, 1],
+        [2, -1],
+        [-2, 1],
+        [-2, -1],
+        [1, 2],
+        [1, -2],
+        [-1, 2],
+        [-1, -2]
+      ]
+    ) {
+      add(
+        row + dr,
+        col + dc
       );
+    }
   }
-
 
   if (
     type === "k"
   ) {
-
     for (
       let dr = -1;
       dr <= 1;
       dr++
     ) {
-
       for (
         let dc = -1;
         dc <= 1;
         dc++
       ) {
-
         if (
           dr ||
           dc
         ) {
-
           add(
-            r + dr,
-            c + dc
+            row + dr,
+            col + dc
           );
         }
       }
     }
   }
 
-
   if (
-    "rbq"
-      .includes(type)
+    "rbq".includes(type)
   ) {
-
-    const directions =
-      [];
-
+    const directions = [];
 
     if (
-      "rq"
-        .includes(type)
+      "rq".includes(type)
     ) {
-
       directions.push(
         [1, 0],
         [-1, 0],
@@ -1335,12 +1831,9 @@ function chessMoves(
       );
     }
 
-
     if (
-      "bq"
-        .includes(type)
+      "bq".includes(type)
     ) {
-
       directions.push(
         [1, 1],
         [1, -1],
@@ -1349,5410 +1842,358 @@ function chessMoves(
       );
     }
 
+    for (
+      const [dr, dc]
+      of directions
+    ) {
+      let r =
+        row + dr;
 
-    directions.forEach(
-      ([dr, dc]) => {
+      let c =
+        col + dc;
 
-        let rr =
-          r + dr;
-
-        let cc =
-          c + dc;
-
-
-        while (
-          rr >= 0 &&
-          rr < 8 &&
-          cc >= 0 &&
-          cc < 8
-        ) {
-
-          if (
-            !add(
-              rr,
-              cc
-            )
-          ) {
-            break;
-          }
-
-          rr += dr;
-          cc += dc;
-        }
+      while (
+        add(
+          r,
+          c
+        )
+      ) {
+        r += dr;
+        c += dc;
       }
-    );
+    }
   }
-
 
   return moves;
 }
 
+function chessClick(
+  row,
+  col
+) {
+  const piece =
+    chess.board[row][col];
 
-function allChess(side) {
+  if (
+    chess.selected
+  ) {
+    const [
+      fromRow,
+      fromCol
+    ] =
+      chess.selected;
 
-  const game =
-    GameCenter.chess;
-
-  const result =
-    [];
-
-
-  game.board.forEach(
-    (
-      row,
-      r
-    ) => {
-
-      row.forEach(
+    const legal =
+      getChessMoves(
+        fromRow,
+        fromCol
+      )
+      .some(
         (
-          piece,
-          c
-        ) => {
-
-          if (
-            piece &&
-            (
-              (
-                side ===
-                "white"
-              ) ===
-              white(piece)
-            )
-          ) {
-
-            chessMoves(
-              game.board,
-              r,
-              c
-            )
-              .forEach(
-                to => {
-
-                  result.push({
-
-                    from: [
-                      r,
-                      c
-                    ],
-
-                    to,
-
-                    p:
-                      piece,
-
-                    target:
-                      game.board[
-                        to[0]
-                      ][
-                        to[1]
-                      ]
-                  });
-                }
-              );
-          }
-        }
-      );
-    }
-  );
-
-
-  return result;
-}
-
-
-function scoreChess(move) {
-
-  return (
-
-    (
-      move.target
-
-        ? (
-            CHESS_V[
-              move.target
-                .toLowerCase()
-            ] ||
-            0
-          ) *
-          10
-
-        : 0
-    )
-
-    +
-
-    Math.max(
-      0,
-      7 -
-      (
-        Math.abs(
-          3.5 -
-          move.to[0]
-        )
-        +
-        Math.abs(
-          3.5 -
-          move.to[1]
-        )
-      )
-    )
-  );
-}
-
-
-function resetChess(
-  keep = true
-) {
-
-  const old =
-    GameCenter.chess ||
-    {};
-
-
-  GameCenter.chess = {
-
-    board:
-      chessBoard(),
-
-    turn:
-      "white",
-
-    selected:
-      null,
-
-    legal:
-      [],
-
-    mode:
-      keep
-        ? old.mode ||
-          "galaxy"
-        : "galaxy",
-
-    elo:
-      keep
-        ? old.elo ||
-          500
-        : 500,
-
-    history:
-      [],
-
-    snapshots:
-      [],
-
-    finished:
-      false,
-
-    message:
-      "Your turn"
-  };
-
-
-  renderChess();
-}
-
-
-function applyChess(
-  move,
-  actor
-) {
-
-  const game =
-    GameCenter.chess;
-
-
-  game.snapshots.push(
-    clone({
-
-      board:
-        game.board,
-
-      turn:
-        game.turn,
-
-      history:
-        game.history,
-
-      finished:
-        game.finished,
-
-      message:
-        game.message
-    })
-  );
-
-
-  game.board[
-    move.to[0]
-  ][
-    move.to[1]
-  ] =
-    move.p;
-
-
-  game.board[
-    move.from[0]
-  ][
-    move.from[1]
-  ] =
-    "";
-
-
-  if (
-    move.p === "P" &&
-    move.to[0] === 0
-  ) {
-
-    game.board[
-      move.to[0]
-    ][
-      move.to[1]
-    ] =
-      "Q";
-  }
-
-
-  if (
-    move.p === "p" &&
-    move.to[0] === 7
-  ) {
-
-    game.board[
-      move.to[0]
-    ][
-      move.to[1]
-    ] =
-      "q";
-  }
-
-
-  game.history.push(
-    `${actor}: ${move.from.join(",")} → ${move.to.join(",")}`
-  );
-
-
-  game.selected =
-    null;
-
-  game.legal =
-    [];
-
-
-  game.turn =
-    game.turn ===
-    "white"
-      ? "black"
-      : "white";
-
-
-  const pieces =
-    game.board.flat();
-
-
-  if (
-    !pieces.includes(
-      "K"
-    ) ||
-    !pieces.includes(
-      "k"
-    )
-  ) {
-
-    game.finished =
-      true;
-
-    game.message =
-      pieces.includes(
-        "K"
-      )
-        ? "🏆 You Win!"
-        : `🏆 ${
-            game.mode ===
-            "friend"
-              ? "Friend"
-              : "GALAXY"
-          } Wins!`;
-  }
-}
-
-
-function clickChess(
-  r,
-  c
-) {
-
-  const game =
-    GameCenter.chess;
-
-
-  if (
-    !game ||
-    game.finished ||
-    (
-      game.mode ===
-      "galaxy" &&
-      game.turn !==
-      "white"
-    )
-  ) {
-    return;
-  }
-
-
-  if (
-    game.selected
-  ) {
-
-    const allowed =
-      game.legal.some(
-        position =>
-          position[0] === r &&
-          position[1] === c
-      );
-
-
-    if (allowed) {
-
-      const [
-        fromR,
-        fromC
-      ] =
-        game.selected;
-
-
-      const piece =
-        game.board[
-          fromR
-        ][
-          fromC
-        ];
-
-
-      applyChess(
-        {
-
-          from: [
-            fromR,
-            fromC
-          ],
-
-          to: [
+          [
             r,
             c
-          ],
-
-          p:
-            piece,
-
-          target:
-            game.board[r][c]
-        },
-
-        game.mode ===
-        "friend"
-          ? (
-              game.turn ===
-              "white"
-                ? "Player 1"
-                : "Friend"
-            )
-          : "You"
+          ]
+        ) =>
+          r === row &&
+          c === col
       );
 
+    if (legal) {
+      chess.board[row][col] =
+        chess.board[
+          fromRow
+        ][
+          fromCol
+        ];
 
-      game.message =
-        game.finished
+      chess.board[
+        fromRow
+      ][
+        fromCol
+      ] = "";
 
-          ? game.message
+      chess.selected = null;
 
-          : (
-              game.mode ===
-              "friend"
-
-                ? `${
-                    game.turn ===
-                    "white"
-                      ? "Player 1"
-                      : "Friend"
-                  } turn`
-
-                : "GALAXY is thinking…"
-            );
-
+      chess.message =
+        "Move complete";
 
       renderChess();
-
-
-      if (
-        game.mode ===
-        "galaxy" &&
-        !game.finished
-      ) {
-
-        trackTimer(
-          setTimeout(
-            galaxyChess,
-            250
-          )
-        );
-      }
-
 
       return;
     }
   }
 
-
-  const piece =
-    game.board[r][c];
-
-
-  const side =
-    game.mode ===
-    "friend"
-      ? game.turn
-      : "white";
-
-
   if (
     piece &&
-    (
-      (
-        side === "white"
-      ) ===
-      white(piece)
-    )
+    piece ===
+      piece.toUpperCase()
   ) {
-
-    game.selected = [
-      r,
-      c
+    chess.selected = [
+      row,
+      col
     ];
 
-    game.legal =
-      chessMoves(
-        game.board,
-        r,
-        c
-      );
-
+    chess.message =
+      "Choose destination";
   } else {
-
-    game.selected =
-      null;
-
-    game.legal =
-      [];
+    chess.selected = null;
   }
-
 
   renderChess();
 }
-
-
-function galaxyChess() {
-
-  const game =
-    GameCenter.chess;
-
-
-  if (
-    !game ||
-    game.finished
-  ) {
-    return;
-  }
-
-
-  const moves =
-    allChess(
-      "black"
-    );
-
-
-  if (
-    !moves.length
-  ) {
-
-    game.finished =
-      true;
-
-    game.message =
-      "Draw";
-
-    renderChess();
-
-    return;
-  }
-
-
-  moves.sort(
-    (
-      a,
-      b
-    ) =>
-      scoreChess(b) -
-      scoreChess(a)
-  );
-
-
-  const smart =
-    Math.random() <
-    clamp(
-      0.25 +
-      game.elo /
-      1600,
-      0.25,
-      0.95
-    );
-
-
-  const move =
-    smart
-
-      ? pick(
-          moves.slice(
-            0,
-            Math.min(
-              4,
-              moves.length
-            )
-          )
-        )
-
-      : pick(
-          moves
-        );
-
-
-  applyChess(
-    move,
-    "GALAXY"
-  );
-
-
-  game.message =
-    game.finished
-      ? game.message
-      : "Your turn";
-
-
-  renderChess();
-}
-
 
 function renderChess() {
-
-  const game =
-    GameCenter.chess;
-
-
-  if (!game) {
-
-    resetChess();
-
-    return;
-  }
-
-
   GameCenter.current =
     "chess";
 
-
-  const body =
-    $("#contentBody");
-
-
-  body.innerHTML = `
-
-    <div
-      class="game-shell"
-    >
+  $("#contentBody").innerHTML = `
+    <div class="game-shell">
 
       ${
         gameTop(
           "Chess",
-          game.message,
-          modeSelect(game)
+          chess.message
         )
       }
 
-
-      <div
-        class="game-layout"
-      >
-
-        <div
-          class="chess-board-wrap"
-        >
-
-          <div
-            class="chess-board"
-          >
-
-            ${
-              game.board
-                .map(
-                  (
-                    row,
-                    r
-                  ) =>
-
-                    row
-                      .map(
-                        (
-                          piece,
-                          c
-                        ) => {
-
-                          const selected =
-                            game.selected?.[0] === r &&
-                            game.selected?.[1] === c;
-
-
-                          const legal =
-                            game.legal.some(
-                              position =>
-                                position[0] === r &&
-                                position[1] === c
-                            );
-
-
-                          return `
-
-                            <button
-
-                              class="
-                                chess-square
-                                ${
-                                  (r + c) %
-                                  2
-                                    ? "dark"
-                                    : "light"
-                                }
-
-                                ${
-                                  selected
-                                    ? "selected"
-                                    : ""
-                                }
-
-                                ${
-                                  legal
-                                    ? "legal"
-                                    : ""
-                                }
-
-                                ${
-                                  legal &&
-                                  piece
-                                    ? "capture"
-                                    : ""
-                                }
-                              "
-
-                              data-chess="${r},${c}"
-
-                            >
-
-                              ${
-                                piece
-
-                                  ? `
-                                    <span
-                                      class="
-                                        chess-piece
-                                        ${
-                                          white(
-                                            piece
-                                          )
-                                            ? "silver-piece"
-                                            : "gold-piece"
-                                        }
-                                      "
-                                    >
-                                      ${CHESS_P[piece]}
-                                    </span>
-                                  `
-
-                                  : ""
-                              }
-
-                            </button>
-
-                          `;
-                        }
-                      )
-                      .join("")
-                )
-                .join("")
-            }
-
-          </div>
-
-        </div>
-
-
-        <div
-          class="game-side-panel"
-        >
-
-          <div
-            class="player-card"
-          >
-
-            <strong>
-              You
-            </strong>
-
-            <span>
-              White
-            </span>
-
-          </div>
-
-
-          <div
-            class="player-card"
-          >
-
-            <strong>
-              ${
-                game.mode ===
-                "friend"
-                  ? "Friend"
-                  : "GALAXY"
-              }
-            </strong>
-
-            <span>
-              Black •
-              ${game.elo} ELO
-            </span>
-
-          </div>
-
-
-          <div
-            class="move-history"
-          >
-
-            <strong>
-              Moves
-            </strong>
-
-            <div
-              class="move-history-list"
-            >
-
-              ${
-                game.history
-                  .map(
-                    escapeHTML
-                  )
-                  .map(
-                    move =>
-                      `<div>${move}</div>`
-                  )
-                  .join("")
-                ||
-                "No moves yet"
-              }
-
-            </div>
-
-          </div>
-
-
-          <button
-            class="secondary-btn"
-            data-chess-undo
-          >
-            Undo
-          </button>
-
-
-          <button
-            class="primary-btn"
-            data-chess-reset
-          >
-            New Game
-          </button>
-
-        </div>
-
-      </div>
-
-    </div>
-
-  `;
-}
-
-
-/* ============================================================
-   TIC TAC TOE
-   ============================================================ */
-
-const TWIN = [
-
-  [0, 1, 2],
-  [3, 4, 5],
-  [6, 7, 8],
-
-  [0, 3, 6],
-  [1, 4, 7],
-  [2, 5, 8],
-
-  [0, 4, 8],
-  [2, 4, 6]
-];
-
-
-function tWinner(board) {
-
-  for (
-    const [
-      a,
-      b,
-      c
-    ] of TWIN
-  ) {
-
-    if (
-      board[a] &&
-      board[a] ===
-      board[b] &&
-      board[a] ===
-      board[c]
-    ) {
-
-      return board[a];
-    }
-  }
-
-
-  return board.every(
-    Boolean
-  )
-    ? "draw"
-    : null;
-}
-
-
-function tBest(
-  board,
-  symbol
-) {
-
-  for (
-    let i = 0;
-    i < 9;
-    i++
-  ) {
-
-    if (
-      !board[i]
-    ) {
-
-      const test =
-        [...board];
-
-      test[i] =
-        symbol;
-
-
-      if (
-        tWinner(test) ===
-        symbol
-      ) {
-
-        return i;
-      }
-    }
-  }
-
-
-  const enemy =
-    symbol === "X"
-      ? "O"
-      : "X";
-
-
-  for (
-    let i = 0;
-    i < 9;
-    i++
-  ) {
-
-    if (
-      !board[i]
-    ) {
-
-      const test =
-        [...board];
-
-      test[i] =
-        enemy;
-
-
-      if (
-        tWinner(test) ===
-        enemy
-      ) {
-
-        return i;
-      }
-    }
-  }
-
-
-  if (
-    !board[4]
-  ) {
-
-    return 4;
-  }
-
-
-  return (
-    pick(
-      board
-        .map(
-          (
-            value,
-            index
-          ) =>
-            value
-              ? null
-              : index
-        )
-        .filter(
-          value =>
-            value !==
-            null
-        )
-    )
-    ??
-    -1
-  );
-}
-
-
-function resetTTT(
-  keep = true
-) {
-
-  const old =
-    GameCenter.ttt ||
-    {};
-
-
-  GameCenter.ttt = {
-
-    board:
-      Array(9)
-        .fill(""),
-
-    turn:
-      "X",
-
-    mode:
-      keep
-        ? old.mode ||
-          "galaxy"
-        : "galaxy",
-
-    elo:
-      keep
-        ? old.elo ||
-          500
-        : 500,
-
-    finished:
-      false,
-
-    message:
-      "Your turn",
-
-    snapshots:
-      []
-  };
-
-
-  renderTTT();
-}
-
-
-function tMove(index) {
-
-  const game =
-    GameCenter.ttt;
-
-
-  if (
-    !game ||
-    game.finished ||
-    game.board[index] ||
-    (
-      game.mode ===
-      "galaxy" &&
-      game.turn !==
-      "X"
-    )
-  ) {
-    return;
-  }
-
-
-  game.snapshots.push(
-    clone(game)
-  );
-
-
-  game.board[index] =
-    game.turn;
-
-
-  const winner =
-    tWinner(
-      game.board
-    );
-
-
-  if (winner) {
-
-    game.finished =
-      true;
-
-
-    game.message =
-
-      winner === "draw"
-
-        ? "Draw"
-
-        : (
-            winner === "X"
-
-              ? "🏆 You Win!"
-
-              : `🏆 ${
-                  game.mode ===
-                  "friend"
-                    ? "Friend"
-                    : "GALAXY"
-                } Wins!`
-          );
-
-
-    renderTTT();
-
-    return;
-  }
-
-
-  game.turn =
-    game.turn === "X"
-      ? "O"
-      : "X";
-
-
-  if (
-    game.mode ===
-    "friend"
-  ) {
-
-    game.message =
-      `${
-        game.turn ===
-        "X"
-          ? "Player 1"
-          : "Friend"
-      } turn`;
-
-    renderTTT();
-
-    return;
-  }
-
-
-  game.message =
-    "GALAXY is thinking…";
-
-  renderTTT();
-
-
-  trackTimer(
-    setTimeout(
-      () => {
-
-        const move =
-
-          Math.random() <
-          clamp(
-            0.25 +
-            game.elo /
-            1500,
-            0.25,
-            0.95
-          )
-
-            ? tBest(
-                game.board,
-                "O"
-              )
-
-            : pick(
-                game.board
-                  .map(
-                    (
-                      value,
-                      i
-                    ) =>
-                      value
-                        ? null
-                        : i
-                  )
-                  .filter(
-                    value =>
-                      value !==
-                      null
-                  )
-              );
-
-
-        if (
-          move == null
-        ) {
-          return;
-        }
-
-
-        game.board[move] =
-          "O";
-
-
-        const result =
-          tWinner(
-            game.board
-          );
-
-
-        if (result) {
-
-          game.finished =
-            true;
-
-          game.message =
-            result ===
-            "draw"
-              ? "Draw"
-              : "🤖 GALAXY Wins!";
-
-        } else {
-
-          game.turn =
-            "X";
-
-          game.message =
-            "Your turn";
-        }
-
-
-        renderTTT();
-
-      },
-      240
-    )
-  );
-}
-
-
-function renderTTT() {
-
-  const game =
-    GameCenter.ttt;
-
-
-  if (!game) {
-
-    resetTTT();
-
-    return;
-  }
-
-
-  GameCenter.current =
-    "tictactoe";
-
-
-  $("#contentBody")
-    .innerHTML = `
-
-      <div
-        class="game-shell"
-      >
+      <div class="chess-board">
 
         ${
-          gameTop(
-            "Tic-Tac-Toe",
-            game.message,
-            modeSelect(game)
-          )
-        }
-
-
-        <div
-          class="game-layout"
-        >
-
-          <div
-            class="ttt-board"
-          >
-
-            ${
-              game.board
-                .map(
-                  (
-                    value,
-                    index
-                  ) => `
-
-                    <button
-
-                      class="
-                        ttt-cell
-                        ${
-                          value
-                            ? `filled ${value.toLowerCase()}`
-                            : ""
-                        }
-                      "
-
-                      data-ttt="${index}"
-
-                    >
-                      ${value}
-                    </button>
-
-                  `
-                )
-                .join("")
-            }
-
-          </div>
-
-
-          <div
-            class="game-side-panel"
-          >
-
-            <button
-              class="primary-btn"
-              data-ttt-reset
-            >
-              New Game
-            </button>
-
-          </div>
-
-        </div>
-
-      </div>
-
-    `;
-}
-
-
-/* ============================================================
-   CONNECT FOUR
-   ============================================================ */
-
-function newC4() {
-
-  return Array.from(
-    {
-      length: 6
-    },
-    () =>
-      Array(7)
-        .fill("")
-  );
-}
-
-
-function cRow(
-  board,
-  col
-) {
-
-  for (
-    let row = 5;
-    row >= 0;
-    row--
-  ) {
-
-    if (
-      !board[row][col]
-    ) {
-
-      return row;
-    }
-  }
-
-
-  return -1;
-}
-
-
-function cWin(board) {
-
-  for (
-    let r = 0;
-    r < 6;
-    r++
-  ) {
-
-    for (
-      let c = 0;
-      c < 7;
-      c++
-    ) {
-
-      const symbol =
-        board[r][c];
-
-      if (!symbol) {
-        continue;
-      }
-
-
-      for (
-        const [
-          dr,
-          dc
-        ] of
-        [
-          [0, 1],
-          [1, 0],
-          [1, 1],
-          [1, -1]
-        ]
-      ) {
-
-        let count =
-          1;
-
-
-        for (
-          let k = 1;
-          k < 4;
-          k++
-        ) {
-
-          const rr =
-            r +
-            dr *
-            k;
-
-          const cc =
-            c +
-            dc *
-            k;
-
-
-          if (
-            rr < 0 ||
-            rr > 5 ||
-            cc < 0 ||
-            cc > 6 ||
-            board[rr][cc] !==
-            symbol
-          ) {
-            break;
-          }
-
-
-          count++;
-        }
-
-
-        if (
-          count >= 4
-        ) {
-
-          return symbol;
-        }
-      }
-    }
-  }
-
-
-  return board
-    .flat()
-    .every(Boolean)
-
-      ? "draw"
-
-      : null;
-}
-
-
-function cBest(
-  board,
-  symbol
-) {
-
-  for (
-    let c = 0;
-    c < 7;
-    c++
-  ) {
-
-    const row =
-      cRow(
-        board,
-        c
-      );
-
-    if (
-      row < 0
-    ) {
-      continue;
-    }
-
-
-    const test =
-      board.map(
-        row =>
-          [...row]
-      );
-
-    test[row][c] =
-      symbol;
-
-
-    if (
-      cWin(test) ===
-      symbol
-    ) {
-
-      return c;
-    }
-  }
-
-
-  const enemy =
-    symbol === "R"
-      ? "Y"
-      : "R";
-
-
-  for (
-    let c = 0;
-    c < 7;
-    c++
-  ) {
-
-    const row =
-      cRow(
-        board,
-        c
-      );
-
-    if (
-      row < 0
-    ) {
-      continue;
-    }
-
-
-    const test =
-      board.map(
-        row =>
-          [...row]
-      );
-
-    test[row][c] =
-      enemy;
-
-
-    if (
-      cWin(test) ===
-      enemy
-    ) {
-
-      return c;
-    }
-  }
-
-
-  return (
-    [
-      3,
-      2,
-      4,
-      1,
-      5,
-      0,
-      6
-    ]
-      .find(
-        col =>
-          cRow(
-            board,
-            col
-          ) >= 0
-      )
-    ??
-    -1
-  );
-}
-
-
-function resetConnect(
-  keep = true
-) {
-
-  const old =
-    GameCenter.connect ||
-    {};
-
-
-  GameCenter.connect = {
-
-    board:
-      newC4(),
-
-    turn:
-      "R",
-
-    mode:
-      keep
-        ? old.mode ||
-          "galaxy"
-        : "galaxy",
-
-    elo:
-      keep
-        ? old.elo ||
-          500
-        : 500,
-
-    finished:
-      false,
-
-    message:
-      "Your turn"
-  };
-
-
-  renderConnect();
-}
-
-
-function cMove(col) {
-
-  const game =
-    GameCenter.connect;
-
-
-  if (
-    !game ||
-    game.finished ||
-    (
-      game.mode ===
-      "galaxy" &&
-      game.turn !==
-      "R"
-    )
-  ) {
-    return;
-  }
-
-
-  const row =
-    cRow(
-      game.board,
-      col
-    );
-
-
-  if (
-    row < 0
-  ) {
-
-    toast(
-      "Column full"
-    );
-
-    return;
-  }
-
-
-  game.board[row][col] =
-    game.turn;
-
-
-  let winner =
-    cWin(
-      game.board
-    );
-
-
-  if (winner) {
-
-    game.finished =
-      true;
-
-
-    game.message =
-
-      winner === "draw"
-
-        ? "Draw"
-
-        : (
-            winner === "R"
-
-              ? "🏆 You Win!"
-
-              : `🏆 ${
-                  game.mode ===
-                  "friend"
-                    ? "Friend"
-                    : "GALAXY"
-                } Wins!`
-          );
-
-
-    renderConnect();
-
-    return;
-  }
-
-
-  game.turn =
-    game.turn === "R"
-      ? "Y"
-      : "R";
-
-
-  if (
-    game.mode ===
-    "friend"
-  ) {
-
-    game.message =
-      `${
-        game.turn ===
-        "R"
-          ? "Player 1"
-          : "Friend"
-      } turn`;
-
-    renderConnect();
-
-    return;
-  }
-
-
-  game.message =
-    "GALAXY is thinking…";
-
-  renderConnect();
-
-
-  trackTimer(
-    setTimeout(
-      () => {
-
-        const move =
-
-          Math.random() <
-          clamp(
-            0.25 +
-            game.elo /
-            1500,
-            0.25,
-            0.95
-          )
-
-            ? cBest(
-                game.board,
-                "Y"
-              )
-
-            : pick(
-                [
-                  ...Array(7)
-                    .keys()
-                ]
-                  .filter(
-                    col =>
-                      cRow(
-                        game.board,
-                        col
-                      ) >= 0
-                  )
-              );
-
-
-        const row =
-          cRow(
-            game.board,
-            move
-          );
-
-
-        if (
-          row >= 0
-        ) {
-
-          game.board[row][move] =
-            "Y";
-        }
-
-
-        winner =
-          cWin(
-            game.board
-          );
-
-
-        if (winner) {
-
-          game.finished =
-            true;
-
-          game.message =
-            winner === "draw"
-              ? "Draw"
-              : "🤖 GALAXY Wins!";
-
-        } else {
-
-          game.turn =
-            "R";
-
-          game.message =
-            "Your turn";
-        }
-
-
-        renderConnect();
-
-      },
-      260
-    )
-  );
-}
-
-
-function renderConnect() {
-
-  const game =
-    GameCenter.connect;
-
-
-  if (!game) {
-
-    resetConnect();
-
-    return;
-  }
-
-
-  GameCenter.current =
-    "connect4";
-
-
-  $("#contentBody")
-    .innerHTML = `
-
-      <div
-        class="game-shell"
-      >
-
-        ${
-          gameTop(
-            "Connect Four",
-            game.message,
-            modeSelect(game)
-          )
-        }
-
-
-        <div
-          class="game-layout"
-        >
-
-          <div
-            class="connect-board"
-          >
-
-            ${
-              game.board
-                .map(
-                  row =>
-                    row
-                      .map(
-                        (
-                          value,
-                          col
-                        ) => `
-
-                          <button
-
-                            class="
-                              connect-cell
-                              ${
-                                value ===
-                                "R"
-                                  ? "red"
-                                  : (
-                                      value ===
-                                      "Y"
-                                        ? "yellow"
-                                        : ""
-                                    )
-                              }
-                            "
-
-                            data-c4="${col}"
-
-                            aria-label="Column ${col + 1}"
-
-                          >
-                            <span></span>
-                          </button>
-
-                        `
-                      )
-                      .join("")
-                )
-                .join("")
-            }
-
-          </div>
-
-
-          <div
-            class="game-side-panel"
-          >
-
-            <button
-              class="primary-btn"
-              data-c4-reset
-            >
-              New Game
-            </button>
-
-          </div>
-
-        </div>
-
-      </div>
-
-    `;
-}
-
-
-/* ============================================================
-   MEMORY
-   ============================================================ */
-
-const MEM_ICONS = [
-  "✦",
-  "☀",
-  "☁",
-  "☂",
-  "★",
-  "◆",
-  "●",
-  "▲"
-];
-
-
-function resetMemory() {
-
-  const values = [
-    ...MEM_ICONS,
-    ...MEM_ICONS
-  ]
-    .sort(
-      () =>
-        Math.random() -
-        0.5
-    );
-
-
-  GameCenter.memory = {
-
-    cards:
-      values.map(
-        (
-          value,
-          index
-        ) => ({
-          v: value,
-          i: index,
-          open: false,
-          done: false
-        })
-      ),
-
-    first:
-      null,
-
-    locked:
-      false,
-
-    moves:
-      0,
-
-    pairs:
-      0,
-
-    message:
-      "Find all pairs"
-  };
-
-
-  renderMemory();
-}
-
-
-function memClick(index) {
-
-  const game =
-    GameCenter.memory;
-
-  const card =
-    game.cards[index];
-
-
-  if (
-    !game ||
-    game.locked ||
-    card.open ||
-    card.done
-  ) {
-    return;
-  }
-
-
-  card.open =
-    true;
-
-
-  if (
-    game.first == null
-  ) {
-
-    game.first =
-      index;
-
-    renderMemory();
-
-    return;
-  }
-
-
-  game.moves++;
-
-
-  const first =
-    game.cards[
-      game.first
-    ];
-
-
-  if (
-    first.v ===
-    card.v
-  ) {
-
-    first.done =
-      true;
-
-    card.done =
-      true;
-
-    game.pairs++;
-
-    game.first =
-      null;
-
-
-    game.message =
-      game.pairs === 8
-        ? `🏆 Completed in ${game.moves} moves`
-        : "Match!";
-
-
-    renderMemory();
-
-  } else {
-
-    game.locked =
-      true;
-
-    renderMemory();
-
-
-    trackTimer(
-      setTimeout(
-        () => {
-
-          first.open =
-            false;
-
-          card.open =
-            false;
-
-          game.first =
-            null;
-
-          game.locked =
-            false;
-
-          game.message =
-            "Try again";
-
-          renderMemory();
-
-        },
-        650
-      )
-    );
-  }
-}
-
-
-function renderMemory() {
-
-  const game =
-    GameCenter.memory;
-
-
-  if (!game) {
-
-    resetMemory();
-
-    return;
-  }
-
-
-  GameCenter.current =
-    "memory";
-
-
-  $("#contentBody")
-    .innerHTML = `
-
-      <div
-        class="game-shell"
-      >
-
-        ${
-          gameTop(
-            "Memory",
-            game.message
-          )
-        }
-
-
-        <div
-          class="game-layout"
-        >
-
-          <div
-            class="memory-board"
-          >
-
-            ${
-              game.cards
-                .map(
-                  card => `
-
-                    <button
-
-                      class="
-                        memory-card
-                        ${
-                          card.open ||
-                          card.done
-                            ? "open"
-                            : ""
-                        }
-
-                        ${
-                          card.done
-                            ? "matched"
-                            : ""
-                        }
-                      "
-
-                      data-mem="${card.i}"
-
-                    >
-
-                      ${
-                        card.open ||
-                        card.done
-                          ? card.v
-                          : "?"
-                      }
-
-                    </button>
-
-                  `
-                )
-                .join("")
-            }
-
-          </div>
-
-
-          <div
-            class="game-side-panel"
-          >
-
-            <div
-              class="score-card"
-            >
-
-              <span>
-                Moves
-              </span>
-
-              <strong>
-                ${game.moves}
-              </strong>
-
-            </div>
-
-
-            <div
-              class="score-card"
-            >
-
-              <span>
-                Pairs
-              </span>
-
-              <strong>
-                ${game.pairs}/8
-              </strong>
-
-            </div>
-
-
-            <button
-              class="primary-btn"
-              data-mem-reset
-            >
-              New Game
-            </button>
-
-          </div>
-
-        </div>
-
-      </div>
-
-    `;
-}
-
-
-/* ============================================================
-   SNAKE
-   ============================================================ */
-
-const SNAKE_KEY =
-  "galaxy.snake.high.v2";
-
-
-function resetSnake(
-  level =
-    GameCenter.snake?.level ||
-    3
-) {
-
-  clearGameTimers();
-
-
-  GameCenter.snake = {
-
-    grid:
-      20,
-
-    snake: [
-      [10, 10],
-      [9, 10],
-      [8, 10]
-    ],
-
-    dir: [
-      1,
-      0
-    ],
-
-    next: [
-      1,
-      0
-    ],
-
-    food: [
-      15,
-      10
-    ],
-
-    score:
-      0,
-
-    high:
-      Number(
-        storage.get(
-          SNAKE_KEY,
-          0
-        )
-      ) ||
-      0,
-
-    running:
-      false,
-
-    over:
-      false,
-
-    level,
-
-    message:
-      "Press Start"
-  };
-
-
-  renderSnake();
-}
-
-
-function snakeFood(game) {
-
-  do {
-
-    game.food = [
-
-      Math.floor(
-        Math.random() *
-        game.grid
-      ),
-
-      Math.floor(
-        Math.random() *
-        game.grid
-      )
-    ];
-
-  } while (
-    game.snake.some(
-      ([x, y]) =>
-        x ===
-        game.food[0] &&
-        y ===
-        game.food[1]
-    )
-  );
-}
-
-
-function snakeTick() {
-
-  const game =
-    GameCenter.snake;
-
-
-  if (
-    !game?.running ||
-    game.over
-  ) {
-    return;
-  }
-
-
-  game.dir =
-    game.next;
-
-
-  const head =
-    game.snake[0];
-
-
-  const next = [
-
-    head[0] +
-    game.dir[0],
-
-    head[1] +
-    game.dir[1]
-  ];
-
-
-  if (
-    next[0] < 0 ||
-    next[0] >=
-    game.grid ||
-    next[1] < 0 ||
-    next[1] >=
-    game.grid ||
-    game.snake.some(
-      ([x, y]) =>
-        x === next[0] &&
-        y === next[1]
-    )
-  ) {
-
-    game.over =
-      true;
-
-    game.running =
-      false;
-
-    game.message =
-      "Game Over";
-
-    renderSnake();
-
-    return;
-  }
-
-
-  game.snake.unshift(
-    next
-  );
-
-
-  if (
-    next[0] ===
-    game.food[0] &&
-    next[1] ===
-    game.food[1]
-  ) {
-
-    game.score +=
-      10 *
-      game.level;
-
-
-    game.high =
-      Math.max(
-        game.high,
-        game.score
-      );
-
-
-    storage.set(
-      SNAKE_KEY,
-      game.high
-    );
-
-
-    snakeFood(
-      game
-    );
-
-  } else {
-
-    game.snake.pop();
-  }
-
-
-  renderSnakeBoard();
-}
-
-
-function snakeStart() {
-
-  const game =
-    GameCenter.snake;
-
-
-  if (
-    !game ||
-    game.over
-  ) {
-
-    resetSnake();
-
-    return;
-  }
-
-
-  if (
-    game.running
-  ) {
-    return;
-  }
-
-
-  game.running =
-    true;
-
-  game.message =
-    "Running";
-
-
-  const speeds = {
-
-    1: 260,
-    2: 210,
-    3: 165,
-    4: 125,
-    5: 90
-  };
-
-
-  trackTimer(
-    setInterval(
-      snakeTick,
-      speeds[
-        game.level
-      ]
-    )
-  );
-
-
-  renderSnake();
-}
-
-
-function snakeDir(
-  dx,
-  dy
-) {
-
-  const game =
-    GameCenter.snake;
-
-
-  if (!game) {
-    return;
-  }
-
-
-  if (
-    game.dir[0] ===
-    -dx &&
-    game.dir[1] ===
-    -dy
-  ) {
-    return;
-  }
-
-
-  game.next = [
-    dx,
-    dy
-  ];
-
-
-  if (
-    !game.running
-  ) {
-    snakeStart();
-  }
-}
-
-
-function snakeCells() {
-
-  const game =
-    GameCenter.snake;
-
-
-  let html =
-    "";
-
-
-  for (
-    let y = 0;
-    y <
-    game.grid;
-    y++
-  ) {
-
-    for (
-      let x = 0;
-      x <
-      game.grid;
-      x++
-    ) {
-
-      const index =
-        game.snake
-          .findIndex(
-            point =>
-              point[0] === x &&
-              point[1] === y
-          );
-
-
-      const food =
-        game.food[0] === x &&
-        game.food[1] === y;
-
-
-      html += `
-
-        <span
-
-          class="
-            snake-cell
-
-            ${
-              index === 0
-                ? "snake-head"
-                : (
-                    index > 0
-                      ? "snake-body"
-                      : (
-                          food
-                            ? "snake-food"
-                            : ""
-                        )
-                  )
-            }
-          "
-
-        ></span>
-
-      `;
-    }
-  }
-
-
-  return html;
-}
-
-
-function renderSnakeBoard() {
-
-  const board =
-    $("#snakeBoard");
-
-
-  if (board) {
-
-    board.innerHTML =
-      snakeCells();
-  }
-
-
-  if (
-    $("#snakeScore")
-  ) {
-
-    $("#snakeScore")
-      .textContent =
-      GameCenter.snake.score;
-  }
-
-
-  if (
-    $("#snakeHigh")
-  ) {
-
-    $("#snakeHigh")
-      .textContent =
-      GameCenter.snake.high;
-  }
-}
-
-
-function renderSnake() {
-
-  const game =
-    GameCenter.snake;
-
-
-  if (!game) {
-
-    resetSnake();
-
-    return;
-  }
-
-
-  GameCenter.current =
-    "snake";
-
-
-  $("#contentBody")
-    .innerHTML = `
-
-      <div
-        class="
-          game-shell
-          snake-game
-        "
-      >
-
-        ${
-          gameTop(
-            "Snake",
-            game.message
-          )
-        }
-
-
-        <div
-          class="chicken-hud"
-        >
-
-          <span>
-            Score
-            <strong
-              id="snakeScore"
-            >
-              ${game.score}
-            </strong>
-          </span>
-
-
-          <span>
-            High
-            <strong
-              id="snakeHigh"
-            >
-              ${game.high}
-            </strong>
-          </span>
-
-
-          <label>
-
-            Level
-
-            <select
-              data-snake-level
-            >
-
-              ${
-                [
-                  1,
-                  2,
-                  3,
-                  4,
-                  5
-                ]
-                  .map(
-                    value => `
-
-                      <option
-                        ${
-                          value ===
-                          game.level
-                            ? "selected"
-                            : ""
-                        }
-                      >
-                        ${value}
-                      </option>
-
-                    `
-                  )
-                  .join("")
-              }
-
-            </select>
-
-          </label>
-
-
-          <button
-            class="secondary-btn"
-            data-snake-start
-          >
-            ${
-              game.running
-                ? "Running"
-                : "Start"
-            }
-          </button>
-
-
-          <button
-            class="primary-btn"
-            data-snake-new
-          >
-            New Game
-          </button>
-
-        </div>
-
-
-        <div
-
-          id="snakeBoard"
-
-          class="snake-board"
-
-          style="
-            grid-template-columns:
-            repeat(20,1fr);
-          "
-
-        >
-
-          ${snakeCells()}
-
-        </div>
-
-
-        <div
-          class="chicken-controls"
-        >
-
-          <button
-            data-snake-dir="up"
-          >
-            ▲
-          </button>
-
-          <button
-            data-snake-dir="left"
-          >
-            ◀
-          </button>
-
-          <button
-            data-snake-dir="down"
-          >
-            ▼
-          </button>
-
-          <button
-            data-snake-dir="right"
-          >
-            ▶
-          </button>
-
-        </div>
-
-      </div>
-
-    `;
-}
-
-
-/* ============================================================
-   CHICKEN CROSSING
-   ============================================================ */
-
-const CHICK_Y = [
-  6,
-  22,
-  36.5,
-  51,
-  65.5,
-  80,
-  94.5
-];
-
-
-const CHICK_ROADS =
-  new Set([
-    1,
-    3,
-    5
-  ]);
-
-
-const CHICK_KEY =
-  "galaxy.chicken.high.v2";
-
-
-function chickCars(level) {
-
-  const cars =
-    [];
-
-
-  [1, 3, 5]
-    .forEach(
-      (
-        row,
-        roadIndex
-      ) => {
-
-        [-1, 1]
-          .forEach(
-            (
-              direction,
-              lane
-            ) => {
-
-              cars.push({
-
+          chess.board
+            .map(
+              (
                 row,
-
-                y:
-                  CHICK_Y[row] +
+                r
+              ) =>
+                row.map(
                   (
-                    lane
-                      ? 3
-                      : -3
-                  ),
-
-                x:
-                  rand(
-                    0,
-                    100
-                  ),
-
-                dir:
-                  roadIndex %
-                  2
-                    ? direction
-                    : -direction,
-
-                speed:
-                  0.5 +
-                  level *
-                  0.12 +
-                  roadIndex *
-                  0.07,
-
-                type:
-                  (
-                    roadIndex +
-                    lane
-                  ) %
-                  3 ===
-                  0
-
-                    ? "bus"
-
-                    : (
-                        (
-                          roadIndex +
-                          lane
-                        ) %
-                        3 ===
-                        1
-
-                          ? "truck"
-
-                          : "car"
-                      )
-              });
-            }
-          );
-      }
-    );
-
-
-  return cars;
-}
-
-
-function resetChicken(
-  level =
-    GameCenter.chicken?.level ||
-    3
-) {
-
-  clearGameTimers();
-
-
-  GameCenter.chicken = {
-
-    row:
-      6,
-
-    x:
-      50,
-
-    score:
-      0,
-
-    high:
-      Number(
-        storage.get(
-          CHICK_KEY,
-          0
-        )
-      ) ||
-      0,
-
-    level,
-
-    running:
-      false,
-
-    over:
-      false,
-
-    message:
-      "Ready — cross each road",
-
-    cars:
-      chickCars(level)
-  };
-
-
-  renderChicken();
-}
-
-
-function chickenCollide(game) {
-
-  if (
-    !CHICK_ROADS.has(
-      game.row
-    )
-  ) {
-
-    return false;
-  }
-
-
-  return game.cars.some(
-    car =>
-
-      Math.abs(
-        car.y -
-        CHICK_Y[
-          game.row
-        ]
-      ) < 5
-
-      &&
-
-      Math.abs(
-        car.x -
-        game.x
-      ) <
-
-      (
-        car.type ===
-        "bus"
-
-          ? 13
-
-          : (
-              car.type ===
-              "truck"
-                ? 11
-                : 8
-            )
-      )
-  );
-}
-
-
-function chickenTick() {
-
-  const game =
-    GameCenter.chicken;
-
-
-  if (
-    !game?.running ||
-    game.over
-  ) {
-
-    return;
-  }
-
-
-  game.cars.forEach(
-    car => {
-
-      car.x +=
-        car.dir *
-        car.speed;
-
-
-      if (
-        car.x > 114
-      ) {
-
-        car.x =
-          -14;
-      }
-
-
-      if (
-        car.x < -14
-      ) {
-
-        car.x =
-          114;
-      }
-    }
-  );
-
-
-  if (
-    chickenCollide(game)
-  ) {
-
-    game.over =
-      true;
-
-    game.running =
-      false;
-
-    game.message =
-      "Hit! Game Over";
-
-    renderChicken();
-
-    return;
-  }
-
-
-  renderChickenStage();
-}
-
-
-function chickenStart() {
-
-  const game =
-    GameCenter.chicken;
-
-
-  if (
-    !game ||
-    game.over
-  ) {
-
-    resetChicken();
-
-    return;
-  }
-
-
-  if (
-    game.running
-  ) {
-
-    return;
-  }
-
-
-  game.running =
-    true;
-
-  game.message =
-    "Cross the roads";
-
-
-  trackTimer(
-    setInterval(
-      chickenTick,
-
-      {
-        1: 80,
-        2: 65,
-        3: 50,
-        4: 38,
-        5: 28
-      }[
-        game.level
-      ]
-    )
-  );
-
-
-  renderChicken();
-}
-
-
-function chickenMove(
-  dx,
-  dr
-) {
-
-  const game =
-    GameCenter.chicken;
-
-
-  if (
-    !game ||
-    game.over
-  ) {
-
-    return;
-  }
-
-
-  if (
-    !game.running
-  ) {
-
-    chickenStart();
-  }
-
-
-  game.x =
-    clamp(
-      game.x +
-      dx,
-      4,
-      96
-    );
-
-
-  game.row =
-    clamp(
-      game.row +
-      dr,
-      0,
-      6
-    );
-
-
-  if (
-    chickenCollide(game)
-  ) {
-
-    game.over =
-      true;
-
-    game.running =
-      false;
-
-    game.message =
-      "Hit! Game Over";
-
-    renderChicken();
-
-    return;
-  }
-
-
-  if (
-    game.row === 0
-  ) {
-
-    game.score +=
-      100 *
-      game.level;
-
-
-    game.high =
-      Math.max(
-        game.high,
-        game.score
-      );
-
-
-    storage.set(
-      CHICK_KEY,
-      game.high
-    );
-
-
-    game.row =
-      6;
-
-    game.x =
-      50;
-
-    game.message =
-      "Crossed! Go again";
-
-  } else {
-
-    game.message =
-      CHICK_ROADS.has(
-        game.row
-      )
-        ? "Cross the road"
-        : "Safe on grass";
-  }
-
-
-  renderChickenStage();
-}
-
-
-function chickWorld() {
-
-  return `
-
-    <div
-      class="chicken-world"
-    >
-
-      <div
-        class="
-          chicken-zone
-          chicken-grass
-        "
-      >
-        <span
-          class="chicken-safe-label"
-        >
-          FINISH
-        </span>
-      </div>
-
-
-      <div
-        class="
-          chicken-zone
-          chicken-road-section
-        "
-      ></div>
-
-
-      <div
-        class="
-          chicken-zone
-          chicken-grass
-        "
-      >
-        <span
-          class="chicken-safe-label"
-        >
-          SAFE GRASS
-        </span>
-      </div>
-
-
-      <div
-        class="
-          chicken-zone
-          chicken-road-section
-        "
-      ></div>
-
-
-      <div
-        class="
-          chicken-zone
-          chicken-grass
-        "
-      >
-        <span
-          class="chicken-safe-label"
-        >
-          SAFE GRASS
-        </span>
-      </div>
-
-
-      <div
-        class="
-          chicken-zone
-          chicken-road-section
-        "
-      ></div>
-
-
-      <div
-        class="
-          chicken-zone
-          chicken-grass
-        "
-      >
-        <span
-          class="chicken-safe-label"
-        >
-          START
-        </span>
-      </div>
-
-    </div>
-
-  `;
-}
-
-
-function chickCarsHTML(game) {
-
-  return game.cars
-    .map(
-      (
-        car,
-        index
-      ) => `
-
-        <div
-
-          class="
-            chicken-car
-
-            ${
-              car.type ===
-              "bus"
-
-                ? "chicken-bus"
-
-                : (
-                    car.type ===
-                    "truck"
-
-                      ? "chicken-truck"
-
-                      : "chicken-small-car"
-                  )
-            }
-          "
-
-          data-chick-car="${index}"
-
-          style="
-            left:${car.x}%;
-            top:${car.y}%;
-          "
-
-        ></div>
-
-      `
-    )
-    .join("");
-}
-
-
-function renderChickenStage() {
-
-  const game =
-    GameCenter.chicken;
-
-
-  const player =
-    $("#chickenPlayer");
-
-
-  if (player) {
-
-    player.style.left =
-      `${game.x}%`;
-
-    player.style.top =
-      `${CHICK_Y[
-        game.row
-      ]}%`;
-  }
-
-
-  game.cars.forEach(
-    (
-      car,
-      index
-    ) => {
-
-      const element =
-        $(
-          `[data-chick-car="${index}"]`
-        );
-
-
-      if (element) {
-
-        element.style.left =
-          `${car.x}%`;
-      }
-    }
-  );
-
-
-  if (
-    $("#chickScore")
-  ) {
-
-    $("#chickScore")
-      .textContent =
-      game.score;
-  }
-
-
-  if (
-    $("#chickHigh")
-  ) {
-
-    $("#chickHigh")
-      .textContent =
-      game.high;
-  }
-}
-
-
-function renderChicken() {
-
-  const game =
-    GameCenter.chicken;
-
-
-  if (!game) {
-
-    resetChicken();
-
-    return;
-  }
-
-
-  GameCenter.current =
-    "chicken";
-
-
-  $("#contentBody")
-    .innerHTML = `
-
-      <div
-        class="
-          game-shell
-          chicken-game
-        "
-      >
-
-        ${
-          gameTop(
-            "Chicken Crossing",
-            game.message
-          )
-        }
-
-
-        <div
-          class="chicken-hud"
-        >
-
-          <span>
-
-            Score
-
-            <strong
-              id="chickScore"
-            >
-              ${game.score}
-            </strong>
-
-          </span>
-
-
-          <span>
-
-            High
-
-            <strong
-              id="chickHigh"
-            >
-              ${game.high}
-            </strong>
-
-          </span>
-
-
-          <label>
-
-            Level
-
-            <select
-              data-chick-level
-            >
-
-              ${
-                [
-                  1,
-                  2,
-                  3,
-                  4,
-                  5
-                ]
-                  .map(
-                    value => `
-
-                      <option
+                    piece,
+                    c
+                  ) => `
+                    <button
+                      class="
+                        chess-square
                         ${
-                          value ===
-                          game.level
+                          (
+                            r +
+                            c
+                          ) %
+                          2
+                            ? "dark"
+                            : "light"
+                        }
+                        ${
+                          chess.selected?.[0] ===
+                            r &&
+                          chess.selected?.[1] ===
+                            c
                             ? "selected"
                             : ""
                         }
-                      >
-                        ${value}
-                      </option>
-
-                    `
-                  )
-                  .join("")
-              }
-
-            </select>
-
-          </label>
-
-
-          <button
-            class="secondary-btn"
-            data-chick-start
-          >
-            ${
-              game.running
-                ? "Running"
-                : "Start"
-            }
-          </button>
-
-
-          <button
-            class="primary-btn"
-            data-chick-new
-          >
-            New Game
-          </button>
-
-        </div>
-
-
-        <div
-          class="
-            chicken-stage
-            retro-game-board
-          "
-        >
-
-          ${chickWorld()}
-
-          ${chickCarsHTML(game)}
-
-
-          <div
-
-            id="chickenPlayer"
-
-            class="chicken-player"
-
-            style="
-              left:${game.x}%;
-              top:${CHICK_Y[game.row]}%;
-            "
-
-          ></div>
-
-        </div>
-
-
-        <div
-          class="chicken-controls"
-        >
-
-          <button
-            data-chick-dir="up"
-          >
-            ▲
-          </button>
-
-          <button
-            data-chick-dir="left"
-          >
-            ◀
-          </button>
-
-          <button
-            data-chick-dir="down"
-          >
-            ▼
-          </button>
-
-          <button
-            data-chick-dir="right"
-          >
-            ▶
-          </button>
-
-        </div>
+                      "
+                      data-chess="${r},${c}"
+                    >
+                      <span class="chess-piece">
+                        ${
+                          piece
+                            ? CHESS_SYMBOLS[piece]
+                            : ""
+                        }
+                      </span>
+                    </button>
+                  `
+                )
+                .join("")
+            )
+            .join("")
+        }
 
       </div>
 
-    `;
+      <button
+        class="primary-btn"
+        data-chess-reset
+      >
+        New Game
+      </button>
+
+    </div>
+  `;
 }
 
+/* =========================================================
+   THREE.JS
+   ========================================================= */
 
-/* ============================================================
-   THREE JS LOADER
-   ============================================================ */
-
-let THREE_PROMISE =
-  null;
-
+let THREE_PROMISE = null;
 
 function loadThree() {
-
   if (
     window.THREE
   ) {
-
     return Promise.resolve(
       window.THREE
     );
   }
 
-
   if (
     !THREE_PROMISE
   ) {
-
     THREE_PROMISE =
       import(
         "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js"
       );
   }
 
-
   return THREE_PROMISE;
 }
 
-
-const THREE_ACTIVE = {
-
-  kind:
-    null,
-
-  raf:
-    0,
-
-  renderer:
-    null,
-
-  scene:
-    null,
-
-  camera:
-    null,
-
-  canvas:
-    null,
-
-  cleanup:
-    []
-};
-
-
-function cleanup3D() {
-
-  if (
-    THREE_ACTIVE.raf
-  ) {
-
-    cancelAnimationFrame(
-      THREE_ACTIVE.raf
-    );
-  }
-
-
-  THREE_ACTIVE.raf =
-    0;
-
-
-  THREE_ACTIVE.cleanup
-    .splice(0)
-    .forEach(
-      fn => {
-
-        try {
-          fn();
-        } catch {}
-      }
-    );
-
-
-  try {
-
-    THREE_ACTIVE.renderer
-      ?.dispose();
-
-  } catch {}
-
-
-  if (
-    document.pointerLockElement
-  ) {
-
-    document
-      .exitPointerLock
-      ?.();
-  }
-
-
-  Object.assign(
-    THREE_ACTIVE,
-    {
-
-      kind:
-        null,
-
-      renderer:
-        null,
-
-      scene:
-        null,
-
-      camera:
-        null,
-
-      canvas:
-        null
-    }
-  );
-}
-
-
-function on3D(
-  target,
-  type,
-  fn,
-  options
-) {
-
-  target.addEventListener(
-    type,
-    fn,
-    options
-  );
-
-
-  THREE_ACTIVE.cleanup.push(
-    () =>
-      target.removeEventListener(
-        type,
-        fn,
-        options
-      )
-  );
-}
-
-
-/* ============================================================
+/* =========================================================
    GALAXY ARENA
-   ============================================================ */
+   ========================================================= */
 
-const ARENA_WEAPONS = [
-
-  {
-    name:
-      "Vortex AR",
-
-    damage:
-      28,
-
-    rate:
-      110,
-
-    mag:
-      30,
-
-    reserve:
-      120,
-
-    spread:
-      0.006,
-
-    reload:
-      1300
-  },
-
-
-  {
-    name:
-      "Pulse SMG",
-
-    damage:
-      19,
-
-    rate:
-      75,
-
-    mag:
-      36,
-
-    reserve:
-      144,
-
-    spread:
-      0.012,
-
-    reload:
-      1150
-  },
-
-
-  {
-    name:
-      "Nova Shotgun",
-
-    damage:
-      13,
-
-    rate:
-      620,
-
-    mag:
-      8,
-
-    reserve:
-      40,
-
-    spread:
-      0.045,
-
-    reload:
-      1500,
-
-    pellets:
-      8
-  },
-
-
-  {
-    name:
-      "Eclipse Sniper",
-
-    damage:
-      92,
-
-    rate:
-      900,
-
-    mag:
-      5,
-
-    reserve:
-      25,
-
-    spread:
-      0.001,
-
-    reload:
-      1800
-  }
-];
-
-
-const ARENA_MODES = {
-
-  ffa: {
-    name: "Free For All",
-    bots: 7,
-    target: 20,
-    time: 300
-  },
-
-  duel: {
-    name: "1v1 Duel",
-    bots: 1,
-    target: 10,
-    time: 240
-  },
-
-  gun: {
-    name: "Gun Game",
-    bots: 6,
-    target: 8,
-    time: 360
-  },
-
-  practice: {
-    name: "Practice Range",
-    bots: 6,
-    target: 999,
-    time: 9999
-  }
-};
-
-
-const ARENA_PROFILE_KEY =
-  "galaxy.arena.profile.v2";
-
-
-function arenaProfile() {
-
-  return {
-
-    level:
-      1,
-
-    xp:
-      0,
-
-    coins:
-      0,
-
-    kills:
-      0,
-
-    deaths:
-      0,
-
-    wins:
-      0,
-
-    ...storage.get(
-      ARENA_PROFILE_KEY,
-      {}
-    )
-  };
-}
-
-
-function openArena() {
-
+async function openArena() {
   cleanup3D();
-
 
   GameCenter.current =
     "arena";
 
+  $("#contentBody").innerHTML = `
+    <div class="arena-shell">
 
-  const profile =
-    arenaProfile();
-
-
-  if (
-    $("#contentTitle")
-  ) {
-
-    $("#contentTitle")
-      .textContent =
-      "GALAXY Arena";
-  }
-
-
-  if (
-    $("#contentEyebrow")
-  ) {
-
-    $("#contentEyebrow")
-      .textContent =
-      "3D FPS";
-  }
-
-
-  $("#contentBody")
-    .innerHTML = `
-
-      <div
-        class="arena-shell"
-      >
-
-        <div
-          class="arena-home"
-        >
-
-          <section
-            class="arena-hero"
-          >
-
-            <span
-              class="arena-hero-badge"
-            >
-              FAST 3D FPS
-            </span>
-
-
-            <h2>
-              GALAXY ARENA
-            </h2>
-
-
-            <p>
-
-              Mouse aim,
-              WASD,
-              sprint,
-              jump,
-              reload,
-              headshots,
-              bots and
-              instant respawns.
-
-            </p>
-
-
-            <div
-              class="arena-hero-actions"
-            >
-
-              <button
-                class="arena-primary"
-                data-arena-start
-              >
-                PLAY
-              </button>
-
-
-              <button
-                class="arena-secondary"
-                data-game-back
-              >
-                ← GAMING CENTER
-              </button>
-
-            </div>
-
-          </section>
-
-
-          <aside
-            class="arena-side"
-          >
-
-            <section
-              class="arena-card"
-            >
-
-              <h3>
-                Mode
-              </h3>
-
-
-              <div
-                class="arena-mode-list"
-              >
-
-                ${
-                  Object.entries(
-                    ARENA_MODES
-                  )
-                    .map(
-                      (
-                        [
-                          id,
-                          mode
-                        ]
-                      ) => `
-
-                        <button
-
-                          class="
-                            arena-mode-button
-                            ${
-                              id ===
-                              "ffa"
-                                ? "active"
-                                : ""
-                            }
-                          "
-
-                          data-arena-mode="${id}"
-
-                        >
-
-                          <span
-                            class="arena-mode-icon"
-                          >
-
-                            ${
-                              id ===
-                              "duel"
-
-                                ? "1v1"
-
-                                : (
-                                    id ===
-                                    "gun"
-
-                                      ? "↟"
-
-                                      : (
-                                          id ===
-                                          "practice"
-
-                                            ? "◎"
-
-                                            : "⌖"
-                                        )
-                                  )
-                            }
-
-                          </span>
-
-
-                          <span
-                            class="arena-mode-copy"
-                          >
-
-                            <strong>
-                              ${mode.name}
-                            </strong>
-
-                            <span>
-                              ${mode.bots} bots
-                            </span>
-
-                          </span>
-
-                        </button>
-
-                      `
-                    )
-                    .join("")
-                }
-
-              </div>
-
-            </section>
-
-
-            <section
-              class="arena-card"
-            >
-
-              <h3>
-                Profile
-              </h3>
-
-
-              <div
-                class="arena-stat-grid"
-              >
-
-                <div
-                  class="arena-stat"
-                >
-                  <span>
-                    LEVEL
-                  </span>
-                  <strong>
-                    ${profile.level}
-                  </strong>
-                </div>
-
-
-                <div
-                  class="arena-stat"
-                >
-                  <span>
-                    COINS
-                  </span>
-                  <strong>
-                    ${profile.coins}
-                  </strong>
-                </div>
-
-
-                <div
-                  class="arena-stat"
-                >
-                  <span>
-                    KILLS
-                  </span>
-                  <strong>
-                    ${profile.kills}
-                  </strong>
-                </div>
-
-
-                <div
-                  class="arena-stat"
-                >
-                  <span>
-                    WINS
-                  </span>
-                  <strong>
-                    ${profile.wins}
-                  </strong>
-                </div>
-
-              </div>
-
-            </section>
-
-          </aside>
-
-        </div>
-
-      </div>
-
-    `;
-
-
-  GameCenter.arena = {
-    mode: "ffa"
-  };
-}
-
-
-async function startArena() {
-
-  cleanup3D();
-
-
-  const mode =
-    GameCenter.arena?.mode ||
-    "ffa";
-
-
-  const config =
-    ARENA_MODES[mode];
-
-
-  const body =
-    $("#contentBody");
-
-
-  body.innerHTML = `
-
-    <div
-      class="arena-shell"
-    >
-
-      <div
-        class="arena-game"
-        id="arenaGame"
-      >
+      <div class="arena-game">
 
         <canvas
           id="arenaCanvas"
           class="arena-canvas"
         ></canvas>
 
+        <div class="arena-crosshair"></div>
 
-        <div
-          class="arena-vignette"
-        ></div>
-
-
-        <div
-          class="arena-crosshair"
-        ></div>
-
-
-        <div
-          class="arena-hud-top"
-        >
-
-          <div
-            class="arena-score-pill"
-          >
-            KILLS
-            <strong
-              id="aKills"
-            >
-              0
-            </strong>
-          </div>
-
-
-          <div
-            class="arena-timer"
-            id="aTimer"
-          >
-            05:00
-          </div>
-
-
-          <div
-            class="arena-score-pill"
-          >
-            HP
-            <strong
-              id="aHp"
-            >
-              100
-            </strong>
-          </div>
-
-        </div>
-
-
-        <div
-          class="arena-hud-bottom-right"
-        >
-
-          <div
-            class="arena-weapon-name"
-            id="aWeapon"
-          >
-            Vortex AR
-          </div>
-
-
-          <div
-            class="arena-ammo"
-          >
-
-            <strong
-              id="aAmmo"
-            >
-              30
-            </strong>
-
-            <span
-              id="aReserve"
-            >
-              /120
-            </span>
-
-          </div>
-
-        </div>
-
-
-        <div
-          class="arena-center-message"
-          id="aMsg"
-        >
-
-          <strong>
-            CLICK TO DEPLOY
-          </strong>
-
-          <span>
-            WASD • Mouse •
-            LMB fire •
-            R reload •
-            Shift sprint •
-            Space jump
-          </span>
-
+        <div class="arena-center-message">
+          Click to look • WASD to move
         </div>
 
       </div>
 
     </div>
-
   `;
 
-
   try {
-
     const THREE =
       await loadThree();
-
 
     const canvas =
       $("#arenaCanvas");
 
-
     const scene =
       new THREE.Scene();
 
-
-    const camera =
-      new THREE.PerspectiveCamera(
-        75,
-        1,
-        0.05,
-        120
-      );
-
-
-    const renderer =
-      new THREE.WebGLRenderer({
-
-        canvas,
-
-        antialias:
-          true
-      });
-
-
-    Object.assign(
-      THREE_ACTIVE,
-      {
-
-        kind:
-          "arena",
-
-        renderer,
-
-        scene,
-
-        camera,
-
-        canvas
-      }
-    );
-
-
     scene.background =
       new THREE.Color(
-        0x0b1018
+        0x7fa8c8
       );
 
+    const camera =
+      new THREE
+        .PerspectiveCamera(
+          70,
+          1,
+          0.1,
+          200
+        );
 
-    scene.fog =
-      new THREE.Fog(
-        0x0b1018,
-        25,
-        70
+    const renderer =
+      new THREE
+        .WebGLRenderer({
+          canvas,
+          antialias: true
+        });
+
+    const ground =
+      new THREE.Mesh(
+        new THREE
+          .PlaneGeometry(
+            100,
+            100
+          ),
+
+        new THREE
+          .MeshStandardMaterial({
+            color:
+              0x6a7f62
+          })
       );
 
+    ground.rotation.x =
+      -Math.PI / 2;
+
+    scene.add(ground);
 
     scene.add(
       new THREE
         .HemisphereLight(
-          0xbad8ff,
-          0x25311f,
-          1.8
-        )
-    );
-
-
-    const directional =
-      new THREE
-        .DirectionalLight(
           0xffffff,
-          1.4
-        );
-
-
-    directional.position.set(
-      10,
-      20,
-      8
-    );
-
-
-    scene.add(
-      directional
-    );
-
-
-    const floor =
-      new THREE.Mesh(
-
-        new THREE
-          .PlaneGeometry(
-            60,
-            60
-          ),
-
-        new THREE
-          .MeshStandardMaterial({
-            color:
-              0x293239,
-
-            roughness:
-              0.95
-          })
-      );
-
-
-    floor.rotation.x =
-      -Math.PI /
-      2;
-
-
-    scene.add(
-      floor
-    );
-
-
-    scene.add(
-      new THREE.GridHelper(
-        60,
-        30,
-        0x52606a,
-        0x39444b
-      )
-    );
-
-
-    const obstacles = [
-
-      [-10, -8, 7, 2, 3],
-      [10, 8, 7, 2, 3],
-      [0, 0, 5, 5, 3],
-      [-16, 8, 3, 7, 4],
-      [16, -8, 3, 7, 4],
-      [0, 15, 10, 2, 2],
-      [0, -15, 10, 2, 2]
-    ];
-
-
-    const walls =
-      [];
-
-
-    for (
-      const [
-        x,
-        z,
-        w,
-        d,
-        h
-      ] of obstacles
-    ) {
-
-      const mesh =
-        new THREE.Mesh(
-
-          new THREE
-            .BoxGeometry(
-              w,
-              h,
-              d
-            ),
-
-          new THREE
-            .MeshStandardMaterial({
-              color:
-                0x58636d,
-
-              roughness:
-                0.85
-            })
-        );
-
-
-      mesh.position.set(
-        x,
-        h / 2,
-        z
-      );
-
-
-      mesh.userData.wall =
-        true;
-
-
-      scene.add(
-        mesh
-      );
-
-
-      walls.push(
-        mesh
-      );
-    }
-
-
-    for (
-      const [
-        x,
-        z,
-        w,
-        d
-      ] of
-      [
-        [0, -30, 60, 1],
-        [0, 30, 60, 1],
-        [-30, 0, 1, 60],
-        [30, 0, 1, 60]
-      ]
-    ) {
-
-      const mesh =
-        new THREE.Mesh(
-
-          new THREE
-            .BoxGeometry(
-              w,
-              4,
-              d
-            ),
-
-          new THREE
-            .MeshStandardMaterial({
-              color:
-                0x353e45
-            })
-        );
-
-
-      mesh.position.set(
-        x,
-        2,
-        z
-      );
-
-
-      scene.add(
-        mesh
-      );
-
-
-      walls.push(
-        mesh
-      );
-    }
-
-
-    const player = {
-
-      x:
-        0,
-
-      z:
-        12,
-
-      yaw:
-        Math.PI,
-
-      pitch:
-        0,
-
-      hp:
-        100,
-
-      kills:
-        0,
-
-      deaths:
-        0,
-
-      alive:
-        true,
-
-      weapon:
-        0,
-
-      ammo:
-        ARENA_WEAPONS
-          .map(
-            weapon => ({
-              mag:
-                weapon.mag,
-
-              res:
-                weapon.reserve
-            })
-          ),
-
-      last:
-        0,
-
-      reloading:
-        false,
-
-      jump:
-        0,
-
-      ground:
-        true
-    };
-
-
-    const keys =
-      new Set();
-
-
-    const ray =
-      new THREE
-        .Raycaster();
-
-
-    const bots =
-      [];
-
-
-    camera.position.set(
-      player.x,
-      1.7,
-      player.z
-    );
-
-
-    scene.add(
-      camera
-    );
-
-
-    const weaponGroup =
-      new THREE.Group();
-
-
-    const gun =
-      new THREE.Mesh(
-
-        new THREE
-          .BoxGeometry(
-            0.18,
-            0.16,
-            0.7
-          ),
-
-        new THREE
-          .MeshStandardMaterial({
-
-            color:
-              0x303842,
-
-            metalness:
-              0.3
-          })
-      );
-
-
-    gun.position.set(
-      0.28,
-      -0.24,
-      -0.7
-    );
-
-
-    weaponGroup.add(
-      gun
-    );
-
-
-    camera.add(
-      weaponGroup
-    );
-
-
-    function blocked(
-      x,
-      z,
-      radius = 0.42
-    ) {
-
-      if (
-        Math.abs(x) > 28 ||
-        Math.abs(z) > 28
-      ) {
-
-        return true;
-      }
-
-
-      return obstacles.some(
-        (
-          [
-            ox,
-            oz,
-            w,
-            d
-          ]
-        ) =>
-
-          x + radius >
-            ox -
-            w / 2
-
-          &&
-
-          x - radius <
-            ox +
-            w / 2
-
-          &&
-
-          z + radius >
-            oz -
-            d / 2
-
-          &&
-
-          z - radius <
-            oz +
-            d / 2
-      );
-    }
-
-
-    function moveEntity(
-      entity,
-      dx,
-      dz,
-      radius = 0.42
-    ) {
-
-      if (
-        !blocked(
-          entity.x +
-          dx,
-          entity.z,
-          radius
+          0x334422,
+          2
         )
-      ) {
-
-        entity.x +=
-          dx;
-      }
-
-
-      if (
-        !blocked(
-          entity.x,
-          entity.z +
-          dz,
-          radius
-        )
-      ) {
-
-        entity.z +=
-          dz;
-      }
-    }
-
-
-    function botMesh(index) {
-
-      const group =
-        new THREE.Group();
-
-
-      const body =
-        new THREE.Mesh(
-
-          new THREE
-            .CapsuleGeometry(
-              0.38,
-              0.65,
-              4,
-              8
-            ),
-
-          new THREE
-            .MeshStandardMaterial({
-              color:
-                index %
-                2
-                  ? 0x8d5965
-                  : 0x6172aa
-            })
-        );
-
-
-      const head =
-        new THREE.Mesh(
-
-          new THREE
-            .SphereGeometry(
-              0.23,
-              12,
-              10
-            ),
-
-          new THREE
-            .MeshStandardMaterial({
-              color:
-                0xcba98e
-            })
-        );
-
-
-      body.position.y =
-        0.95;
-
-
-      head.position.y =
-        1.68;
-
-
-      group.add(
-        body,
-        head
-      );
-
-
-      return {
-        group,
-        body,
-        head
-      };
-    }
-
-
-    const spawns = [
-
-      [0, -12],
-      [14, 14],
-      [-14, -14],
-      [14, -14],
-      [-14, 14],
-      [20, 8],
-      [-20, -8]
-    ];
-
+    );
 
     for (
       let i = 0;
-      i <
-      config.bots;
+      i < 20;
       i++
     ) {
-
-      const model =
-        botMesh(i);
-
-
-      const [
-        x,
-        z
-      ] =
-        spawns[
-          i %
-          spawns.length
-        ];
-
-
-      const bot = {
-
-        name:
-          `BOT ${i + 1}`,
-
-        x,
-
-        z,
-
-        hp:
-          100,
-
-        alive:
-          true,
-
-        respawn:
-          0,
-
-        next:
-          performance.now() +
-          rand(
-            700,
-            1400
-          ),
-
-        kills:
-          0,
-
-        group:
-          model.group,
-
-        body:
-          model.body,
-
-        head:
-          model.head
-      };
-
-
-      bot.body.userData = {
-        bot,
-        part:
-          "body"
-      };
-
-
-      bot.head.userData = {
-        bot,
-        part:
-          "head"
-      };
-
-
-      bot.group.position.set(
-        x,
-        0,
-        z
-      );
-
-
-      scene.add(
-        bot.group
-      );
-
-
-      bots.push(
-        bot
-      );
-    }
-
-
-    const profile =
-      arenaProfile();
-
-
-    const end =
-      Date.now() +
-      config.time *
-      1000;
-
-
-    let running =
-      true;
-
-
-    let last =
-      performance.now();
-
-
-    function hud() {
-
-      const weapon =
-        ARENA_WEAPONS[
-          player.weapon
-        ];
-
-
-      const ammo =
-        player.ammo[
-          player.weapon
-        ];
-
-
-      if (
-        $("#aKills")
-      ) {
-
-        $("#aKills")
-          .textContent =
-          player.kills;
-      }
-
-
-      if (
-        $("#aHp")
-      ) {
-
-        $("#aHp")
-          .textContent =
-          Math.max(
-            0,
-            Math.ceil(
-              player.hp
-            )
-          );
-      }
-
-
-      if (
-        $("#aWeapon")
-      ) {
-
-        $("#aWeapon")
-          .textContent =
-          weapon.name;
-      }
-
-
-      if (
-        $("#aAmmo")
-      ) {
-
-        $("#aAmmo")
-          .textContent =
-          ammo.mag;
-      }
-
-
-      if (
-        $("#aReserve")
-      ) {
-
-        $("#aReserve")
-          .textContent =
-          `/${ammo.res}`;
-      }
-    }
-
-
-    function reload() {
-
-      const weapon =
-        ARENA_WEAPONS[
-          player.weapon
-        ];
-
-
-      const ammo =
-        player.ammo[
-          player.weapon
-        ];
-
-
-      if (
-        player.reloading ||
-        ammo.mag >=
-        weapon.mag ||
-        !ammo.res
-      ) {
-
-        return;
-      }
-
-
-      player.reloading =
-        true;
-
-
-      setTimeout(
-        () => {
-
-          if (
-            THREE_ACTIVE.kind !==
-            "arena"
-          ) {
-            return;
-          }
-
-
-          const amount =
-            Math.min(
-              weapon.mag -
-              ammo.mag,
-              ammo.res
-            );
-
-
-          ammo.mag +=
-            amount;
-
-          ammo.res -=
-            amount;
-
-          player.reloading =
-            false;
-
-          hud();
-
-        },
-        weapon.reload
-      );
-    }
-
-
-    function respawnPlayer() {
-
-      player.x =
-        0;
-
-      player.z =
-        12;
-
-      player.hp =
-        100;
-
-      player.alive =
-        true;
-
-      hud();
-    }
-
-
-    function shoot() {
-
-      if (
-        !running ||
-        !player.alive ||
-        player.reloading
-      ) {
-        return;
-      }
-
-
-      const weapon =
-        ARENA_WEAPONS[
-          player.weapon
-        ];
-
-
-      const ammo =
-        player.ammo[
-          player.weapon
-        ];
-
-
-      const now =
-        performance.now();
-
-
-      if (
-        now -
-        player.last <
-        weapon.rate
-      ) {
-        return;
-      }
-
-
-      if (
-        ammo.mag <= 0
-      ) {
-
-        reload();
-
-        return;
-      }
-
-
-      player.last =
-        now;
-
-      ammo.mag--;
-
-
-      const targets = [
-
-        ...walls,
-
-        ...bots.flatMap(
-          bot =>
-            bot.alive
-              ? [
-                  bot.body,
-                  bot.head
-                ]
-              : []
-        )
-      ];
-
-
-      for (
-        let pellet = 0;
-        pellet <
-        (
-          weapon.pellets ||
-          1
-        );
-        pellet++
-      ) {
-
-        ray.setFromCamera(
-
-          new THREE.Vector2(
-
-            rand(
-              -weapon.spread,
-              weapon.spread
+      const width =
+        rand(1, 4);
+
+      const height =
+        rand(1, 5);
+
+      const depth =
+        rand(1, 4);
+
+      const block =
+        new THREE.Mesh(
+          new THREE
+            .BoxGeometry(
+              width,
+              height,
+              depth
             ),
 
-            rand(
-              -weapon.spread,
-              weapon.spread
-            )
-          ),
-
-          camera
+          new THREE
+            .MeshStandardMaterial({
+              color:
+                0x777777
+            })
         );
 
+      block.position.set(
+        rand(
+          -40,
+          40
+        ),
 
-        const hit =
-          ray.intersectObjects(
-            targets,
-            false
-          )[0];
+        height / 2,
 
+        rand(
+          -40,
+          40
+        )
+      );
 
-        const bot =
-          hit
-            ?.object
-            ?.userData
-            ?.bot;
-
-
-        if (
-          bot &&
-          bot.alive
-        ) {
-
-          bot.hp -=
-
-            weapon.damage
-
-            *
-
-            (
-              hit.object.userData
-                .part ===
-              "head"
-
-                ? 1.75
-
-                : 1
-            );
-
-
-          if (
-            bot.hp <= 0
-          ) {
-
-            bot.alive =
-              false;
-
-            bot.group.visible =
-              false;
-
-            bot.respawn =
-              performance.now() +
-              1800;
-
-
-            player.kills++;
-
-            profile.kills++;
-
-            profile.xp +=
-              20;
-
-            profile.coins +=
-              5;
-
-
-            if (
-              mode ===
-              "gun"
-            ) {
-
-              player.weapon =
-                (
-                  player.weapon +
-                  1
-                ) %
-                ARENA_WEAPONS.length;
-            }
-
-
-            if (
-              player.kills >=
-              config.target &&
-              mode !==
-              "practice"
-            ) {
-
-              running =
-                false;
-
-              profile.wins++;
-
-              profile.coins +=
-                50;
-
-
-              $("#aMsg")
-                .innerHTML = `
-
-                  <strong>
-                    VICTORY
-                  </strong>
-
-                  <span>
-                    ${player.kills}
-                    kills
-                  </span>
-
-                  <button
-                    class="arena-primary"
-                    data-arena-home
-                  >
-                    ARENA HOME
-                  </button>
-
-                `;
-            }
-
-
-            storage.set(
-              ARENA_PROFILE_KEY,
-              profile
-            );
-          }
-        }
-      }
-
-
-      hud();
+      scene.add(block);
     }
 
+    let x = 0;
+    let z = 8;
+    let yaw = 0;
+    let pitch = 0;
+
+    const keys =
+      new Set();
 
     on3D(
       canvas,
@@ -6763,109 +2204,41 @@ async function startArena() {
           ?.()
     );
 
-
     on3D(
       document,
       "mousemove",
       event => {
-
         if (
           document.pointerLockElement !==
-          canvas ||
-          !player.alive
+          canvas
         ) {
           return;
         }
 
-
-        player.yaw -=
+        yaw -=
           event.movementX *
-          0.0022;
+          0.0025;
 
-
-        player.pitch =
+        pitch =
           clamp(
-
-            player.pitch -
+            pitch -
             event.movementY *
-            0.0022,
+            0.002,
 
-            -1.25,
-            1.25
+            -0.5,
+            0.5
           );
       }
     );
 
-
-    on3D(
-      document,
-      "mousedown",
-      event => {
-
-        if (
-          THREE_ACTIVE.kind !==
-          "arena"
-        ) {
-          return;
-        }
-
-
-        if (
-          event.button === 0
-        ) {
-
-          shoot();
-        }
-      }
-    );
-
-
     on3D(
       document,
       "keydown",
-      event => {
-
-        if (
-          THREE_ACTIVE.kind !==
-          "arena"
-        ) {
-          return;
-        }
-
-
+      event =>
         keys.add(
           event.code
-        );
-
-
-        if (
-          event.code ===
-          "KeyR"
-        ) {
-
-          reload();
-        }
-
-
-        if (
-          /^Digit[1-4]$/
-            .test(
-              event.code
-            )
-        ) {
-
-          player.weapon =
-            Number(
-              event.code
-                .slice(-1)
-            ) -
-            1;
-
-          hud();
-        }
-      }
+        )
     );
-
 
     on3D(
       document,
@@ -6876,6 +2249,23 @@ async function startArena() {
         )
     );
 
+    function resize() {
+      const parent =
+        canvas.parentElement;
+
+      renderer.setSize(
+        parent.clientWidth,
+        parent.clientHeight,
+        false
+      );
+
+      camera.aspect =
+        parent.clientWidth /
+        parent.clientHeight;
+
+      camera
+        .updateProjectionMatrix();
+    }
 
     on3D(
       window,
@@ -6883,1142 +2273,3475 @@ async function startArena() {
       resize
     );
 
-
-    function resize() {
-
-      const width =
-        canvas
-          .parentElement
-          .clientWidth ||
-        800;
-
-
-      const height =
-        canvas
-          .parentElement
-          .clientHeight ||
-        600;
-
-
-      renderer.setSize(
-        width,
-        height,
-        false
-      );
-
-
-      camera.aspect =
-        width /
-        height;
-
-
-      camera
-        .updateProjectionMatrix();
-    }
-
-
     resize();
 
-    hud();
-
+    let last =
+      performance.now();
 
     function loop(now) {
-
       if (
-        THREE_ACTIVE.kind !==
+        GameCenter.current !==
         "arena"
       ) {
         return;
       }
 
-
       const dt =
-        clamp(
+        Math.min(
+          0.05,
           (
             now -
             last
           ) /
-          1000,
-          0,
-          0.05
+          1000
         );
 
+      last = now;
 
-      last =
-        now;
+      const forward =
+        (
+          keys.has("KeyW")
+            ? 1
+            : 0
+        ) -
+        (
+          keys.has("KeyS")
+            ? 1
+            : 0
+        );
 
+      const right =
+        (
+          keys.has("KeyD")
+            ? 1
+            : 0
+        ) -
+        (
+          keys.has("KeyA")
+            ? 1
+            : 0
+        );
 
-      if (running) {
+      const speed = 6;
 
-        const forward =
-          (
-            keys.has(
-              "KeyW"
-            )
-              ? 1
-              : 0
-          )
-          -
-          (
-            keys.has(
-              "KeyS"
-            )
-              ? 1
-              : 0
-          );
-
-
-        const right =
-          (
-            keys.has(
-              "KeyD"
-            )
-              ? 1
-              : 0
-          )
-          -
-          (
-            keys.has(
-              "KeyA"
-            )
-              ? 1
-              : 0
-          );
-
-
-        const speed =
-          keys.has(
-            "ShiftLeft"
-          )
-            ? 8
-            : 5.2;
-
-
-        const sin =
-          Math.sin(
-            player.yaw
-          );
-
-
-        const cos =
-          Math.cos(
-            player.yaw
-          );
-
-
-        moveEntity(
-
-          player,
-
-          (
-            -sin *
-            forward
-            +
-            cos *
+      x +=
+        (
+          -Math.sin(yaw) *
+            forward +
+          Math.cos(yaw) *
             right
-          ) *
-          speed *
-          dt,
+        ) *
+        speed *
+        dt;
 
-          (
-            -cos *
-            forward
-            -
-            sin *
+      z +=
+        (
+          -Math.cos(yaw) *
+            forward -
+          Math.sin(yaw) *
             right
-          ) *
-          speed *
-          dt
-        );
-
-
-        if (
-          keys.has(
-            "Space"
-          ) &&
-          player.ground
-        ) {
-
-          player.jump =
-            5.8;
-
-          player.ground =
-            false;
-        }
-
-
-        let cameraHeight =
-          1.7;
-
-
-        if (
-          !player.ground
-        ) {
-
-          player.jump -=
-            15 *
-            dt;
-
-
-          cameraHeight +=
-            player.jump *
-            dt;
-
-
-          if (
-            cameraHeight <=
-            1.7
-          ) {
-
-            cameraHeight =
-              1.7;
-
-            player.ground =
-              true;
-
-            player.jump =
-              0;
-          }
-        }
-
-
-        camera.position.set(
-          player.x,
-          cameraHeight,
-          player.z
-        );
-
-
-        camera.rotation.order =
-          "YXZ";
-
-
-        camera.rotation.y =
-          player.yaw;
-
-
-        camera.rotation.x =
-          player.pitch;
-
-
-        for (
-          const bot of
-          bots
-        ) {
-
-          if (
-            !bot.alive
-          ) {
-
-            if (
-              now >=
-              bot.respawn
-            ) {
-
-              bot.hp =
-                100;
-
-              bot.alive =
-                true;
-
-              bot.group.visible =
-                true;
-
-
-              const spawn =
-                pick(
-                  spawns
-                );
-
-
-              bot.x =
-                spawn[0];
-
-              bot.z =
-                spawn[1];
-
-
-              bot.group.position.set(
-                bot.x,
-                0,
-                bot.z
-              );
-            }
-
-
-            continue;
-          }
-
-
-          const dx =
-            player.x -
-            bot.x;
-
-
-          const dz =
-            player.z -
-            bot.z;
-
-
-          const distance =
-            Math.hypot(
-              dx,
-              dz
-            ) ||
-            1;
-
-
-          moveEntity(
-
-            bot,
-
-            dx /
-            distance *
-            2.2 *
-            dt,
-
-            dz /
-            distance *
-            2.2 *
-            dt,
-
-            0.4
-          );
-
-
-          bot.group.position.set(
-            bot.x,
-            0,
-            bot.z
-          );
-
-
-          bot.group.rotation.y =
-            Math.atan2(
-              dx,
-              dz
-            ) +
-            Math.PI;
-
-
-          if (
-            mode !==
-            "practice" &&
-            player.alive &&
-            distance < 18 &&
-            now >
-            bot.next
-          ) {
-
-            if (
-              Math.random() <
-              0.42
-            ) {
-
-              player.hp -=
-                rand(
-                  6,
-                  12
-                );
-
-
-              if (
-                player.hp <= 0
-              ) {
-
-                player.deaths++;
-
-                profile.deaths++;
-
-                player.alive =
-                  false;
-
-
-                setTimeout(
-                  respawnPlayer,
-                  1800
-                );
-              }
-            }
-
-
-            bot.next =
-              now +
-              rand(
-                600,
-                1100
-              );
-
-
-            hud();
-          }
-        }
-
-
-        if (
-          mode !==
-          "practice"
-        ) {
-
-          const remaining =
-            end -
-            Date.now();
-
-
-          if (
-            $("#aTimer")
-          ) {
-
-            $("#aTimer")
-              .textContent =
-
-              `${String(
-                Math.max(
-                  0,
-                  Math.floor(
-                    remaining /
-                    60000
-                  )
-                )
-              ).padStart(
-                2,
-                "0"
-              )}`
-
-              +
-
-              ":"
-
-              +
-
-              `${String(
-                Math.max(
-                  0,
-                  Math.floor(
-                    remaining /
-                    1000
-                  ) %
-                  60
-                )
-              ).padStart(
-                2,
-                "0"
-              )}`;
-          }
-
-
-          if (
-            remaining <= 0
-          ) {
-
-            running =
-              false;
-
-
-            $("#aMsg")
-              .innerHTML = `
-
-                <strong>
-                  MATCH OVER
-                </strong>
-
-                <span>
-                  ${player.kills}
-                  kills
-                </span>
-
-                <button
-                  class="arena-primary"
-                  data-arena-home
-                >
-                  ARENA HOME
-                </button>
-
-              `;
-          }
-        }
-      }
-
+        ) *
+        speed *
+        dt;
+
+      camera.position.set(
+        x,
+        1.7,
+        z
+      );
+
+      camera.rotation.order =
+        "YXZ";
+
+      camera.rotation.y =
+        yaw;
+
+      camera.rotation.x =
+        pitch;
 
       renderer.render(
         scene,
         camera
       );
 
-
-      THREE_ACTIVE.raf =
+      GameCenter.raf =
         requestAnimationFrame(
           loop
         );
     }
 
-
-    THREE_ACTIVE.raf =
+    GameCenter.raf =
       requestAnimationFrame(
         loop
       );
-
   } catch (error) {
-
-    console.error(
-      error
-    );
-
-
-    body.innerHTML = `
-
-      <div
-        class="arena-card"
-      >
+    $("#contentBody").innerHTML = `
+      <div class="panel">
 
         <h3>
           Arena could not start
         </h3>
 
         <p>
-          ${escapeHTML(
-            error.message
-          )}
+          ${esc(error.message)}
         </p>
 
-        <button
-          class="arena-primary"
-          data-arena-home
-        >
-          Back
-        </button>
-
       </div>
-
     `;
   }
 }
 
-
-/* ============================================================
+/* =========================================================
    GALAXY PALS
-   ============================================================ */
+   ========================================================= */
 
 const PALS_SAVE =
-  "galaxy.pals.save.v2";
-
-
-const PALS_CREATURES = [
-
-  {
-    id: "emberfox",
-    name: "Emberfox",
-    element: "Flame",
-    emoji: "🦊",
-    color: 0xe86c4a,
-    hp: 85,
-    atk: 18,
-    speed: 2.8,
-    rarity: 1
-  },
-
-  {
-    id: "mossbun",
-    name: "Mossbun",
-    element: "Nature",
-    emoji: "🐰",
-    color: 0x6ebf72,
-    hp: 95,
-    atk: 14,
-    speed: 2.4,
-    rarity: 1
-  },
-
-  {
-    id: "aquafin",
-    name: "Aquafin",
-    element: "Tide",
-    emoji: "🐟",
-    color: 0x52a8e8,
-    hp: 82,
-    atk: 17,
-    speed: 2.6,
-    rarity: 1
-  },
-
-  {
-    id: "voltkit",
-    name: "Voltkit",
-    element: "Spark",
-    emoji: "🐱",
-    color: 0xe7cd4d,
-    hp: 78,
-    atk: 20,
-    speed: 3.1,
-    rarity: 2
-  },
-
-  {
-    id: "stonehorn",
-    name: "Stonehorn",
-    element: "Earth",
-    emoji: "🦬",
-    color: 0x9b8065,
-    hp: 135,
-    atk: 22,
-    speed: 1.8,
-    rarity: 2
-  },
-
-  {
-    id: "frostwing",
-    name: "Frostwing",
-    element: "Frost",
-    emoji: "🦅",
-    color: 0x9ad8ef,
-    hp: 92,
-    atk: 24,
-    speed: 3.2,
-    rarity: 2
-  },
-
-  {
-    id: "shadebat",
-    name: "Shadebat",
-    element: "Dark",
-    emoji: "🦇",
-    color: 0x765d9c,
-    hp: 75,
-    atk: 26,
-    speed: 3.4,
-    rarity: 2
-  },
-
-  {
-    id: "lumel",
-    name: "Lumel",
-    element: "Light",
-    emoji: "🦌",
-    color: 0xe9df9a,
-    hp: 110,
-    atk: 21,
-    speed: 2.7,
-    rarity: 3
-  },
-
-  {
-    id: "ironape",
-    name: "Ironape",
-    element: "Metal",
-    emoji: "🦍",
-    color: 0x7c8a94,
-    hp: 150,
-    atk: 30,
-    speed: 2,
-    rarity: 3
-  },
-
-  {
-    id: "bloomtail",
-    name: "Bloomtail",
-    element: "Nature",
-    emoji: "🦚",
-    color: 0x7dd3a2,
-    hp: 100,
-    atk: 23,
-    speed: 2.8,
-    rarity: 3
-  },
-
-  {
-    id: "cinderdrake",
-    name: "Cinderdrake",
-    element: "Flame",
-    emoji: "🐉",
-    color: 0xcc4734,
-    hp: 170,
-    atk: 36,
-    speed: 2.5,
-    rarity: 4
-  },
-
-  {
-    id: "tidetitan",
-    name: "Tidetitan",
-    element: "Tide",
-    emoji: "🐋",
-    color: 0x367cb8,
-    hp: 200,
-    atk: 34,
-    speed: 1.7,
-    rarity: 4
-  },
-
-  {
-    id: "stormgryph",
-    name: "Stormgryph",
-    element: "Spark",
-    emoji: "🦅",
-    color: 0xd4bd3c,
-    hp: 165,
-    atk: 38,
-    speed: 3,
-    rarity: 4
-  },
-
-  {
-    id: "glacierox",
-    name: "Glacierox",
-    element: "Frost",
-    emoji: "🐂",
-    color: 0x83c4dc,
-    hp: 210,
-    atk: 32,
-    speed: 1.6,
-    rarity: 4
-  },
-
-  {
-    id: "voidlion",
-    name: "Voidlion",
-    element: "Dark",
-    emoji: "🦁",
-    color: 0x4f3b70,
-    hp: 190,
-    atk: 42,
-    speed: 2.7,
-    rarity: 5
-  },
-
-  {
-    id: "solara",
-    name: "Solara",
-    element: "Light",
-    emoji: "🪽",
-    color: 0xf0cc73,
-    hp: 185,
-    atk: 40,
-    speed: 3.3,
-    rarity: 5
-  }
-];
-
+  "galaxy.pals.v4";
 
 const PALS_ORBS = [
-
   {
-    id: "basic",
-    name: "Basic Orb",
-    emoji: "🔵",
-    bonus: 1,
-    cost: {
-      wood: 2,
-      stone: 2
-    }
+    name:
+      "Basic Orb",
+    bonus: 1
   },
-
   {
-    id: "mega",
-    name: "Mega Orb",
-    emoji: "🟢",
-    bonus: 1.45,
-    cost: {
-      wood: 3,
-      stone: 4,
-      ore: 2
-    }
+    name:
+      "Mega Orb",
+    bonus: 1.35
   },
-
   {
-    id: "giga",
-    name: "Giga Orb",
-    emoji: "🟡",
-    bonus: 1.9,
-    cost: {
-      stone: 5,
-      ore: 5
-    }
+    name:
+      "Giga Orb",
+    bonus: 1.7
   },
-
   {
-    id: "ultra",
-    name: "Ultra Orb",
-    emoji: "🟣",
-    bonus: 2.5,
-    cost: {
-      ore: 8,
-      crystal: 2
-    }
+    name:
+      "Hyper Orb",
+    bonus: 2.1
   },
-
   {
-    id: "stellar",
-    name: "Stellar Orb",
-    emoji: "⚪",
-    bonus: 3.3,
-    cost: {
-      ore: 12,
-      crystal: 6
-    }
+    name:
+      "Ultra Orb",
+    bonus: 2.6
   }
 ];
 
+const PALS = [
+
+  [
+    "emberfox",
+    "Emberfox",
+    "fox",
+    "Fire",
+    0xe76c45,
+    0xffd06b,
+    1,
+    90,
+    2.8,
+    "🦊"
+  ],
+
+  [
+    "mossbun",
+    "Mossbun",
+    "rabbit",
+    "Grass",
+    0x70b66a,
+    0xe9ffd2,
+    1,
+    92,
+    2.7,
+    "🐰"
+  ],
+
+  [
+    "voltlynx",
+    "Voltlynx",
+    "lynx",
+    "Electric",
+    0xe3c94e,
+    0x2b2b35,
+    2,
+    96,
+    3.2,
+    "🐱"
+  ],
+
+  [
+    "aquafin",
+    "Aquafin",
+    "shark",
+    "Water",
+    0x4d9fd4,
+    0xc8f4ff,
+    2,
+    110,
+    2.8,
+    "🦈"
+  ],
+
+  [
+    "stonehorn",
+    "Stonehorn",
+    "rhino",
+    "Ground",
+    0x8b7d6a,
+    0xd8c4a5,
+    2,
+    145,
+    2,
+    "🦏"
+  ],
+
+  [
+    "frostwolf",
+    "Frostwolf",
+    "wolf",
+    "Ice",
+    0xa3d7e8,
+    0xffffff,
+    3,
+    125,
+    3.4,
+    "🐺"
+  ],
+
+  [
+    "shadebat",
+    "Shadebat",
+    "bat",
+    "Dark",
+    0x544269,
+    0xbda3e3,
+    2,
+    82,
+    3.8,
+    "🦇"
+  ],
+
+  [
+    "ironape",
+    "Ironape",
+    "ape",
+    "Metal",
+    0x77828c,
+    0x2d3439,
+    3,
+    165,
+    2.1,
+    "🦍"
+  ],
+
+  [
+    "stormgryph",
+    "Stormgryph",
+    "gryphon",
+    "Electric",
+    0xd5b949,
+    0x674b2d,
+    4,
+    170,
+    3.6,
+    "🦅"
+  ],
+
+  [
+    "cinderdrake",
+    "Cinderdrake",
+    "dragon",
+    "Fire",
+    0xb94c37,
+    0xff985d,
+    4,
+    190,
+    3.1,
+    "🐉"
+  ],
+
+  [
+    "glacierox",
+    "Glacierox",
+    "ox",
+    "Ice",
+    0x8fc7da,
+    0xeafcff,
+    4,
+    215,
+    1.8,
+    "🐂"
+  ],
+
+  [
+    "voidlion",
+    "Voidlion",
+    "lion",
+    "Dark",
+    0x4d3b66,
+    0xc57aff,
+    5,
+    205,
+    3.2,
+    "🦁"
+  ],
+
+  [
+    "solara",
+    "Solara",
+    "phoenix",
+    "Light",
+    0xe4bd59,
+    0xfff0a8,
+    5,
+    195,
+    4,
+    "🪽"
+  ],
+
+  [
+    "bloomdeer",
+    "Bloomdeer",
+    "deer",
+    "Grass",
+    0x77b76a,
+    0xf2b6db,
+    2,
+    118,
+    3,
+    "🦌"
+  ],
+
+  [
+    "tidefin",
+    "Tidefin",
+    "whale",
+    "Water",
+    0x4f8eaa,
+    0xa7e5ef,
+    3,
+    180,
+    2,
+    "🐋"
+  ],
+
+  [
+    "sparkmouse",
+    "Sparkmouse",
+    "mouse",
+    "Electric",
+    0xf0d65d,
+    0x8f6849,
+    1,
+    65,
+    3.8,
+    "🐭"
+  ],
+
+  [
+    "flarepanda",
+    "Flarepanda",
+    "panda",
+    "Fire",
+    0x28282b,
+    0xe77648,
+    3,
+    160,
+    2,
+    "🐼"
+  ],
+
+  [
+    "moonowl",
+    "Moonowl",
+    "owl",
+    "Dark",
+    0x665678,
+    0xcbb7e4,
+    2,
+    90,
+    3.4,
+    "🦉"
+  ],
+
+  [
+    "thornzilla",
+    "Thornzilla",
+    "dino",
+    "Grass",
+    0x5e9b56,
+    0x9fcb59,
+    4,
+    220,
+    2.3,
+    "🦖"
+  ],
+
+  [
+    "shelltide",
+    "Shelltide",
+    "turtle",
+    "Water",
+    0x4d8e85,
+    0x9fc496,
+    2,
+    160,
+    1.5,
+    "🐢"
+  ],
+
+  [
+    "fluffhorn",
+    "Fluffhorn",
+    "sheep",
+    "Neutral",
+    0xe9e4d6,
+    0x8a725e,
+    1,
+    105,
+    2.2,
+    "🐑"
+  ],
+
+  [
+    "nightfang",
+    "Nightfang",
+    "wolf",
+    "Dark",
+    0x292d38,
+    0x7b62a6,
+    3,
+    140,
+    3.7,
+    "🐺"
+  ],
+
+  [
+    "skywhale",
+    "Skywhale",
+    "whale",
+    "Air",
+    0x86b9d2,
+    0xf5fbff,
+    5,
+    230,
+    2.5,
+    "🐋"
+  ],
+
+  [
+    "venomantis",
+    "Venomantis",
+    "mantis",
+    "Poison",
+    0x6eaa50,
+    0xb6e95d,
+    4,
+    135,
+    3,
+    "🦗"
+  ],
+
+  [
+    "starwyrm",
+    "Starwyrm",
+    "serpent",
+    "Dragon",
+    0x6554a4,
+    0xf0c9ff,
+    5,
+    240,
+    3.5,
+    "🐲"
+  ],
+
+  [
+    "sunmare",
+    "Sunmare",
+    "horse",
+    "Light",
+    0xe7b75b,
+    0xfff2b0,
+    3,
+    155,
+    4,
+    "🐎"
+  ],
+
+  [
+    "boghopper",
+    "Boghopper",
+    "frog",
+    "Water",
+    0x68a95e,
+    0xb7e67d,
+    1,
+    88,
+    2.6,
+    "🐸"
+  ],
+
+  [
+    "magmaboar",
+    "Magmaboar",
+    "boar",
+    "Fire",
+    0x743f32,
+    0xff6b3c,
+    3,
+    175,
+    2.5,
+    "🐗"
+  ],
+
+  [
+    "crystalstag",
+    "Crystalstag",
+    "stag",
+    "Ice",
+    0xa8d8e6,
+    0xcba8ff,
+    4,
+    165,
+    3.1,
+    "🦌"
+  ],
+
+  [
+    "webclaw",
+    "Webclaw",
+    "spider",
+    "Dark",
+    0x493d52,
+    0xbd88df,
+    3,
+    120,
+    3.2,
+    "🕷️"
+  ],
+
+  [
+    "rockgolem",
+    "Rockgolem",
+    "golem",
+    "Ground",
+    0x777368,
+    0xb7aa8e,
+    4,
+    260,
+    1.4,
+    "🗿"
+  ],
+
+  [
+    "frostpeng",
+    "Frostpeng",
+    "penguin",
+    "Ice",
+    0x222d39,
+    0xeefaff,
+    1,
+    82,
+    2.4,
+    "🐧"
+  ]
+
+].map(
+  (
+    [
+      id,
+      name,
+      form,
+      element,
+      body,
+      accent,
+      rarity,
+      hp,
+      speed,
+      emoji
+    ]
+  ) => ({
+    id,
+    name,
+    form,
+    element,
+    body,
+    accent,
+    rarity,
+    hp,
+    speed,
+    emoji
+  })
+);
 
 function palsDefault() {
-
-  return {
-
-    level:
-      1,
-
-    xp:
-      0,
-
-    hp:
-      100,
-
-    stamina:
-      100,
-
-    hunger:
-      100,
-
-    coins:
-      0,
-
-    inventory: {
-
-      wood:
-        18,
-
-      stone:
-        14,
-
-      ore:
-        4,
-
-      crystal:
-        0,
-
-      berry:
-        6,
-
-      orbs: [
-        8,
-        2,
-        0,
-        0,
-        0
-      ]
-    },
-
-    party:
-      [],
-
-    box:
-      [],
-
-    orb:
-      0,
-
-    bases:
-      [],
-
-    day:
-      1,
-
-    time:
-      0.28,
-
-    x:
-      0,
-
-    z:
-      8,
-
-    quests: {
-      capture: 0,
-      gather: 0
-    }
-  };
-}
-
-
-function palsSave(game) {
-
-  storage.set(
+  return store.get(
     PALS_SAVE,
     {
-      ...game,
-      wild: undefined,
-      nodes: undefined,
-      three: undefined
+      level: 1,
+      xp: 0,
+
+      hp: 100,
+      stamina: 100,
+      hunger: 100,
+
+      x: 0,
+      z: 8,
+
+      orb: 0,
+
+      inventory: {
+        wood: 20,
+        stone: 16,
+        ore: 6,
+
+        orbs: [
+          12,
+          4,
+          1,
+          0,
+          0
+        ]
+      },
+
+      party: [],
+      box: [],
+      bases: []
     }
   );
 }
 
+function palsSave(game) {
+  store.set(
+    PALS_SAVE,
+    game
+  );
+}
+
+/* =========================================================
+   CREATURE GEOMETRY HELPERS
+   ========================================================= */
+
+function palMaterial(
+  THREE,
+  color,
+  extras = {}
+) {
+  return new THREE
+    .MeshStandardMaterial({
+      color,
+      roughness: 0.68,
+      ...extras
+    });
+}
+
+function palSphere(
+  THREE,
+  radius,
+  color,
+
+  x = 0,
+  y = 0,
+  z = 0,
+
+  sx = 1,
+  sy = 1,
+  sz = 1
+) {
+  const mesh =
+    new THREE.Mesh(
+      new THREE
+        .SphereGeometry(
+          radius,
+          16,
+          12
+        ),
+
+      palMaterial(
+        THREE,
+        color
+      )
+    );
+
+  mesh.position.set(
+    x,
+    y,
+    z
+  );
+
+  mesh.scale.set(
+    sx,
+    sy,
+    sz
+  );
+
+  mesh.castShadow = true;
+
+  return mesh;
+}
+
+function palBox(
+  THREE,
+  width,
+  height,
+  depth,
+  color,
+
+  x = 0,
+  y = 0,
+  z = 0
+) {
+  const mesh =
+    new THREE.Mesh(
+      new THREE
+        .BoxGeometry(
+          width,
+          height,
+          depth
+        ),
+
+      palMaterial(
+        THREE,
+        color
+      )
+    );
+
+  mesh.position.set(
+    x,
+    y,
+    z
+  );
+
+  mesh.castShadow = true;
+
+  return mesh;
+}
+
+function palCone(
+  THREE,
+  radius,
+  height,
+  color,
+
+  x = 0,
+  y = 0,
+  z = 0
+) {
+  const mesh =
+    new THREE.Mesh(
+      new THREE
+        .ConeGeometry(
+          radius,
+          height,
+          8
+        ),
+
+      palMaterial(
+        THREE,
+        color
+      )
+    );
+
+  mesh.position.set(
+    x,
+    y,
+    z
+  );
+
+  mesh.castShadow = true;
+
+  return mesh;
+}
+
+function palCylinder(
+  THREE,
+  radiusTop,
+  radiusBottom,
+  height,
+  color,
+
+  x = 0,
+  y = 0,
+  z = 0
+) {
+  const mesh =
+    new THREE.Mesh(
+      new THREE
+        .CylinderGeometry(
+          radiusTop,
+          radiusBottom,
+          height,
+          10
+        ),
+
+      palMaterial(
+        THREE,
+        color
+      )
+    );
+
+  mesh.position.set(
+    x,
+    y,
+    z
+  );
+
+  mesh.castShadow = true;
+
+  return mesh;
+}
+
+function addEyes(
+  THREE,
+  group,
+  y,
+  z,
+  spread = 0.18
+) {
+  for (
+    const x
+    of [
+      -spread,
+      spread
+    ]
+  ) {
+    group.add(
+      palSphere(
+        THREE,
+        0.065,
+        0xffffff,
+        x,
+        y,
+        z
+      ),
+
+      palSphere(
+        THREE,
+        0.028,
+        0x101015,
+        x,
+        y,
+        z - 0.065
+      )
+    );
+  }
+}
+
+function addFourLegs(
+  THREE,
+  group,
+  color,
+  points = [
+    [-0.38, -0.45],
+    [0.38, -0.45],
+    [-0.4, 0.45],
+    [0.4, 0.45]
+  ],
+  length = 0.65
+) {
+  const result = [];
+
+  for (
+    const [
+      x,
+      z
+    ]
+    of points
+  ) {
+    const pivot =
+      new THREE.Group();
+
+    pivot.position.set(
+      x,
+      0.75,
+      z
+    );
+
+    pivot.add(
+      palBox(
+        THREE,
+        0.2,
+        length,
+        0.22,
+        color,
+        0,
+        -length / 2,
+        0
+      )
+    );
+
+    group.add(pivot);
+
+    result.push(pivot);
+  }
+
+  return result;
+}
+
+function makeWing(
+  THREE,
+  color,
+  side
+) {
+  const wing =
+    new THREE.Mesh(
+      new THREE
+        .ConeGeometry(
+          0.48,
+          1.5,
+          3
+        ),
+
+      palMaterial(
+        THREE,
+        color
+      )
+    );
+
+  wing.rotation.z =
+    side *
+    Math.PI /
+    2;
+
+  wing.scale.z =
+    0.28;
+
+  return wing;
+}
+
+/* =========================================================
+   DIFFERENT PAL BODY BUILDERS
+   ========================================================= */
+
+function buildPal(
+  THREE,
+  species
+) {
+  const group =
+    new THREE.Group();
+
+  const bodyColor =
+    species.body;
+
+  const accent =
+    species.accent;
+
+  let legs = [];
+  let wings = [];
+  let tail = null;
+  let head = null;
+  let body = null;
+
+  const addTail = (
+    length = 0.9,
+    thickness = 0.15,
+    y = 1.05
+  ) => {
+    tail =
+      new THREE.Group();
+
+    tail.position.set(
+      0,
+      y,
+      0.5
+    );
+
+    const mesh =
+      palCylinder(
+        THREE,
+        thickness,
+        thickness * 0.65,
+        length,
+        accent,
+        0,
+        0,
+        length / 2
+      );
+
+    mesh.rotation.x =
+      Math.PI / 2;
+
+    tail.add(mesh);
+    group.add(tail);
+  };
+
+  switch (
+    species.form
+  ) {
+
+    /* FOX / WOLF / LYNX */
+    case "fox":
+    case "wolf":
+    case "lynx": {
+      body =
+        palSphere(
+          THREE,
+          0.55,
+          bodyColor,
+          0,
+          1,
+          0,
+          1.4,
+          0.8,
+          1.65
+        );
+
+      head =
+        palSphere(
+          THREE,
+          0.38,
+          bodyColor,
+          0,
+          1.55,
+          -0.75,
+          1,
+          0.9,
+          1
+        );
+
+      group.add(
+        body,
+        head
+      );
+
+      addEyes(
+        THREE,
+        group,
+        1.63,
+        -1.08
+      );
+
+      group.add(
+        palCone(
+          THREE,
+          0.14,
+          0.52,
+          accent,
+          -0.24,
+          1.98,
+          -0.72
+        ),
+
+        palCone(
+          THREE,
+          0.14,
+          0.52,
+          accent,
+          0.24,
+          1.98,
+          -0.72
+        ),
+
+        palSphere(
+          THREE,
+          0.18,
+          accent,
+          0,
+          1.45,
+          -1.09,
+          1.1,
+          0.7,
+          1
+        )
+      );
+
+      legs =
+        addFourLegs(
+          THREE,
+          group,
+          bodyColor,
+          undefined,
+          0.68
+        );
+
+      addTail(
+        species.form === "fox"
+          ? 1.4
+          : 1,
+
+        0.18,
+        1.05
+      );
+
+      if (
+        species.form ===
+        "lynx"
+      ) {
+        group.add(
+          palCone(
+            THREE,
+            0.06,
+            0.22,
+            0x222222,
+            -0.24,
+            2.18,
+            -0.72
+          ),
+
+          palCone(
+            THREE,
+            0.06,
+            0.22,
+            0x222222,
+            0.24,
+            2.18,
+            -0.72
+          )
+        );
+      }
+
+      break;
+    }
+
+    /* RABBIT */
+    case "rabbit": {
+      body =
+        palSphere(
+          THREE,
+          0.52,
+          bodyColor,
+          0,
+          0.9,
+          0,
+          1.05,
+          1.15,
+          1.1
+        );
+
+      head =
+        palSphere(
+          THREE,
+          0.38,
+          bodyColor,
+          0,
+          1.55,
+          -0.42
+        );
+
+      group.add(
+        body,
+        head
+      );
+
+      addEyes(
+        THREE,
+        group,
+        1.65,
+        -0.73,
+        0.16
+      );
+
+      for (
+        const x
+        of [
+          -0.18,
+          0.18
+        ]
+      ) {
+        const ear =
+          palSphere(
+            THREE,
+            0.18,
+            accent,
+            x,
+            2.23,
+            -0.35,
+            0.45,
+            2.3,
+            0.55
+          );
+
+        ear.rotation.z =
+          x < 0
+            ? -0.08
+            : 0.08;
+
+        group.add(ear);
+      }
+
+      legs =
+        addFourLegs(
+          THREE,
+          group,
+          bodyColor,
+
+          [
+            [-0.32, -0.18],
+            [0.32, -0.18],
+            [-0.38, 0.38],
+            [0.38, 0.38]
+          ],
+
+          0.55
+        );
+
+      group.add(
+        palSphere(
+          THREE,
+          0.18,
+          0xffffff,
+          0,
+          0.9,
+          0.65
+        )
+      );
+
+      break;
+    }
+
+    /* RHINO */
+    case "rhino": {
+      body =
+        palSphere(
+          THREE,
+          0.75,
+          bodyColor,
+          0,
+          1,
+          0,
+          1.45,
+          0.85,
+          1.6
+        );
+
+      head =
+        palSphere(
+          THREE,
+          0.5,
+          bodyColor,
+          0,
+          1.35,
+          -1,
+          1.1,
+          0.75,
+          1.1
+        );
+
+      group.add(
+        body,
+        head,
+
+        palCone(
+          THREE,
+          0.13,
+          0.75,
+          accent,
+          0,
+          1.55,
+          -1.58
+        )
+      );
+
+      addEyes(
+        THREE,
+        group,
+        1.48,
+        -1.45,
+        0.2
+      );
+
+      legs =
+        addFourLegs(
+          THREE,
+          group,
+          bodyColor,
+
+          [
+            [-0.5, -0.5],
+            [0.5, -0.5],
+            [-0.5, 0.5],
+            [0.5, 0.5]
+          ],
+
+          0.75
+        );
+
+      addTail(
+        0.55,
+        0.08,
+        0.95
+      );
+
+      break;
+    }
+
+    /* BAT */
+    case "bat": {
+      body =
+        palSphere(
+          THREE,
+          0.42,
+          bodyColor,
+          0,
+          1.2,
+          0,
+          1,
+          0.85,
+          1.25
+        );
+
+      head =
+        palSphere(
+          THREE,
+          0.31,
+          bodyColor,
+          0,
+          1.62,
+          -0.42
+        );
+
+      group.add(
+        body,
+        head
+      );
+
+      addEyes(
+        THREE,
+        group,
+        1.68,
+        -0.72,
+        0.13
+      );
+
+      group.add(
+        palCone(
+          THREE,
+          0.1,
+          0.4,
+          accent,
+          -0.2,
+          2,
+          -0.4
+        ),
+
+        palCone(
+          THREE,
+          0.1,
+          0.4,
+          accent,
+          0.2,
+          2,
+          -0.4
+        )
+      );
+
+      for (
+        const side
+        of [-1, 1]
+      ) {
+        const pivot =
+          new THREE.Group();
+
+        pivot.position.set(
+          side * 0.4,
+          1.35,
+          0
+        );
+
+        pivot.add(
+          makeWing(
+            THREE,
+            accent,
+            side
+          )
+        );
+
+        group.add(pivot);
+
+        wings.push(pivot);
+      }
+
+      break;
+    }
+
+    /* APE */
+    case "ape": {
+      body =
+        palSphere(
+          THREE,
+          0.75,
+          bodyColor,
+          0,
+          1.05,
+          0,
+          1.1,
+          1.2,
+          0.8
+        );
+
+      head =
+        palSphere(
+          THREE,
+          0.43,
+          bodyColor,
+          0,
+          1.95,
+          -0.2
+        );
+
+      group.add(
+        body,
+        head,
+
+        palSphere(
+          THREE,
+          0.28,
+          accent,
+          0,
+          1.82,
+          -0.5,
+          1.2,
+          0.65,
+          0.7
+        )
+      );
+
+      addEyes(
+        THREE,
+        group,
+        2.02,
+        -0.55,
+        0.16
+      );
+
+      for (
+        const side
+        of [-1, 1]
+      ) {
+        const arm =
+          new THREE.Group();
+
+        arm.position.set(
+          side * 0.7,
+          1.35,
+          0
+        );
+
+        const limb =
+          palCylinder(
+            THREE,
+            0.18,
+            0.2,
+            1.25,
+            bodyColor,
+            0,
+            -0.48,
+            0
+          );
+
+        limb.rotation.z =
+          side * 0.22;
+
+        arm.add(limb);
+
+        group.add(arm);
+
+        legs.push(arm);
+      }
+
+      legs.push(
+        ...addFourLegs(
+          THREE,
+          group,
+          bodyColor,
+
+          [
+            [-0.3, 0.15],
+            [0.3, 0.15]
+          ],
+
+          0.75
+        )
+      );
+
+      break;
+    }
+
+    /* GRYPHON / PHOENIX */
+    case "gryphon":
+    case "phoenix": {
+      body =
+        palSphere(
+          THREE,
+          0.58,
+          bodyColor,
+          0,
+          1.15,
+          0,
+          1,
+          0.9,
+          1.55
+        );
+
+      head =
+        palSphere(
+          THREE,
+          0.34,
+          bodyColor,
+          0,
+          1.75,
+          -0.7
+        );
+
+      group.add(
+        body,
+        head,
+
+        palCone(
+          THREE,
+          0.12,
+          0.45,
+          accent,
+          0,
+          1.7,
+          -1.18
+        )
+      );
+
+      addEyes(
+        THREE,
+        group,
+        1.83,
+        -0.98,
+        0.14
+      );
+
+      for (
+        const side
+        of [-1, 1]
+      ) {
+        const pivot =
+          new THREE.Group();
+
+        pivot.position.set(
+          side * 0.48,
+          1.3,
+          0
+        );
+
+        const wing =
+          makeWing(
+            THREE,
+            accent,
+            side
+          );
+
+        wing.scale.multiplyScalar(
+          species.form ===
+          "phoenix"
+            ? 1.5
+            : 1.2
+        );
+
+        pivot.add(wing);
+
+        group.add(pivot);
+
+        wings.push(pivot);
+      }
+
+      legs =
+        addFourLegs(
+          THREE,
+          group,
+          accent,
+
+          [
+            [-0.24, -0.15],
+            [0.24, -0.15]
+          ],
+
+          0.55
+        );
+
+      addTail(
+        species.form ===
+        "phoenix"
+          ? 1.5
+          : 0.9,
+
+        0.1,
+        1.1
+      );
+
+      break;
+    }
+
+    /* DRAGON */
+    case "dragon": {
+      body =
+        palSphere(
+          THREE,
+          0.68,
+          bodyColor,
+          0,
+          1.15,
+          0,
+          1.15,
+          0.85,
+          1.7
+        );
+
+      head =
+        palSphere(
+          THREE,
+          0.42,
+          bodyColor,
+          0,
+          1.72,
+          -0.9,
+          1,
+          0.8,
+          1.2
+        );
+
+      group.add(
+        body,
+        head,
+
+        palCone(
+          THREE,
+          0.12,
+          0.5,
+          accent,
+          -0.23,
+          2.15,
+          -0.85
+        ),
+
+        palCone(
+          THREE,
+          0.12,
+          0.5,
+          accent,
+          0.23,
+          2.15,
+          -0.85
+        )
+      );
+
+      addEyes(
+        THREE,
+        group,
+        1.82,
+        -1.28,
+        0.17
+      );
+
+      legs =
+        addFourLegs(
+          THREE,
+          group,
+          bodyColor,
+          undefined,
+          0.7
+        );
+
+      for (
+        const side
+        of [-1, 1]
+      ) {
+        const pivot =
+          new THREE.Group();
+
+        pivot.position.set(
+          side * 0.5,
+          1.45,
+          0.1
+        );
+
+        pivot.add(
+          makeWing(
+            THREE,
+            accent,
+            side
+          )
+        );
+
+        group.add(pivot);
+
+        wings.push(pivot);
+      }
+
+      addTail(
+        1.7,
+        0.16,
+        1.1
+      );
+
+      break;
+    }
+
+    /* OX / BOAR */
+    case "ox":
+    case "boar": {
+      body =
+        palSphere(
+          THREE,
+          0.72,
+          bodyColor,
+          0,
+          0.95,
+          0,
+          1.45,
+          0.9,
+          1.55
+        );
+
+      head =
+        palSphere(
+          THREE,
+          0.46,
+          bodyColor,
+          0,
+          1.35,
+          -1,
+          1.1,
+          0.85,
+          1.1
+        );
+
+      group.add(
+        body,
+        head
+      );
+
+      addEyes(
+        THREE,
+        group,
+        1.48,
+        -1.4,
+        0.18
+      );
+
+      legs =
+        addFourLegs(
+          THREE,
+          group,
+          bodyColor,
+          undefined,
+          0.68
+        );
+
+      if (
+        species.form ===
+        "ox"
+      ) {
+        group.add(
+          palCone(
+            THREE,
+            0.13,
+            0.65,
+            accent,
+            -0.38,
+            1.75,
+            -0.9
+          ),
+
+          palCone(
+            THREE,
+            0.13,
+            0.65,
+            accent,
+            0.38,
+            1.75,
+            -0.9
+          )
+        );
+      } else {
+        group.add(
+          palCone(
+            THREE,
+            0.08,
+            0.32,
+            accent,
+            -0.18,
+            1.18,
+            -1.45
+          ),
+
+          palCone(
+            THREE,
+            0.08,
+            0.32,
+            accent,
+            0.18,
+            1.18,
+            -1.45
+          )
+        );
+      }
+
+      addTail(
+        0.45,
+        0.07,
+        0.95
+      );
+
+      break;
+    }
+
+    /* LION */
+    case "lion": {
+      body =
+        palSphere(
+          THREE,
+          0.65,
+          bodyColor,
+          0,
+          1,
+          0,
+          1.35,
+          0.85,
+          1.45
+        );
+
+      head =
+        palSphere(
+          THREE,
+          0.45,
+          accent,
+          0,
+          1.62,
+          -0.75,
+          1.3,
+          1.3,
+          1.1
+        );
+
+      group.add(
+        body,
+        head,
+
+        palSphere(
+          THREE,
+          0.34,
+          bodyColor,
+          0,
+          1.62,
+          -0.84
+        )
+      );
+
+      addEyes(
+        THREE,
+        group,
+        1.72,
+        -1.13,
+        0.17
+      );
+
+      legs =
+        addFourLegs(
+          THREE,
+          group,
+          bodyColor
+        );
+
+      addTail(
+        1.15,
+        0.08,
+        1
+      );
+
+      break;
+    }
+
+    /* DEER / STAG */
+    case "deer":
+    case "stag": {
+      body =
+        palSphere(
+          THREE,
+          0.56,
+          bodyColor,
+          0,
+          1.1,
+          0,
+          1.2,
+          0.85,
+          1.55
+        );
+
+      const neck =
+        palCylinder(
+          THREE,
+          0.24,
+          0.32,
+          0.95,
+          bodyColor,
+          0,
+          1.55,
+          -0.55
+        );
+
+      neck.rotation.x =
+        -0.42;
+
+      head =
+        palSphere(
+          THREE,
+          0.34,
+          bodyColor,
+          0,
+          2.05,
+          -0.85,
+          1,
+          0.75,
+          1.1
+        );
+
+      group.add(
+        body,
+        neck,
+        head
+      );
+
+      addEyes(
+        THREE,
+        group,
+        2.12,
+        -1.17,
+        0.14
+      );
+
+      legs =
+        addFourLegs(
+          THREE,
+          group,
+          bodyColor,
+          undefined,
+          0.85
+        );
+
+      for (
+        const side
+        of [-1, 1]
+      ) {
+        const horn =
+          palCone(
+            THREE,
+            0.08,
+            0.75,
+            accent,
+            side * 0.22,
+            2.6,
+            -0.8
+          );
+
+        horn.rotation.z =
+          side * 0.2;
+
+        group.add(horn);
+      }
+
+      addTail(
+        0.45,
+        0.1,
+        1.15
+      );
+
+      break;
+    }
+
+    /* SHARK / WHALE */
+    case "shark":
+    case "whale": {
+      body =
+        palSphere(
+          THREE,
+          0.75,
+          bodyColor,
+          0,
+          1.25,
+          0,
+          1.1,
+          0.75,
+
+          species.form ===
+          "whale"
+            ? 2.3
+            : 1.8
+        );
+
+      head =
+        palSphere(
+          THREE,
+          0.48,
+          bodyColor,
+          0,
+          1.25,
+          -1.15,
+          1.2,
+          0.75,
+          1.2
+        );
+
+      group.add(
+        body,
+        head
+      );
+
+      addEyes(
+        THREE,
+        group,
+        1.38,
+        -1.54,
+        0.22
+      );
+
+      const dorsal =
+        palCone(
+          THREE,
+          0.18,
+          0.9,
+          accent,
+          0,
+          2,
+          0.15
+        );
+
+      dorsal.rotation.x =
+        Math.PI;
+
+      group.add(dorsal);
+
+      for (
+        const side
+        of [-1, 1]
+      ) {
+        const fin =
+          palCone(
+            THREE,
+            0.14,
+            0.8,
+            accent,
+            side * 0.78,
+            1.25,
+            0
+          );
+
+        fin.rotation.z =
+          side *
+          Math.PI /
+          2;
+
+        group.add(fin);
+      }
+
+      addTail(
+        1.1,
+        0.16,
+        1.25
+      );
+
+      group.position.y =
+        0.35;
+
+      break;
+    }
+
+    /* MOUSE */
+    case "mouse": {
+      body =
+        palSphere(
+          THREE,
+          0.35,
+          bodyColor,
+          0,
+          0.55,
+          0,
+          1,
+          0.8,
+          1.3
+        );
+
+      head =
+        palSphere(
+          THREE,
+          0.28,
+          bodyColor,
+          0,
+          0.88,
+          -0.42
+        );
+
+      group.add(
+        body,
+        head,
+
+        palSphere(
+          THREE,
+          0.15,
+          accent,
+          -0.24,
+          1.12,
+          -0.38
+        ),
+
+        palSphere(
+          THREE,
+          0.15,
+          accent,
+          0.24,
+          1.12,
+          -0.38
+        )
+      );
+
+      addEyes(
+        THREE,
+        group,
+        0.96,
+        -0.67,
+        0.11
+      );
+
+      legs =
+        addFourLegs(
+          THREE,
+          group,
+          bodyColor,
+
+          [
+            [-0.2, -0.1],
+            [0.2, -0.1],
+            [-0.2, 0.2],
+            [0.2, 0.2]
+          ],
+
+          0.28
+        );
+
+      addTail(
+        1.2,
+        0.045,
+        0.55
+      );
+
+      break;
+    }
+
+    /* PANDA */
+    case "panda": {
+      body =
+        palSphere(
+          THREE,
+          0.68,
+          0xf2f2ed,
+          0,
+          1,
+          0,
+          1.1,
+          1.15,
+          0.9
+        );
+
+      head =
+        palSphere(
+          THREE,
+          0.48,
+          0xf2f2ed,
+          0,
+          1.82,
+          -0.15
+        );
+
+      group.add(
+        body,
+        head,
+
+        palSphere(
+          THREE,
+          0.17,
+          0x222222,
+          -0.34,
+          2.15,
+          -0.15
+        ),
+
+        palSphere(
+          THREE,
+          0.17,
+          0x222222,
+          0.34,
+          2.15,
+          -0.15
+        ),
+
+        palSphere(
+          THREE,
+          0.12,
+          0x222222,
+          -0.17,
+          1.88,
+          -0.52
+        ),
+
+        palSphere(
+          THREE,
+          0.12,
+          0x222222,
+          0.17,
+          1.88,
+          -0.52
+        )
+      );
+
+      addEyes(
+        THREE,
+        group,
+        1.9,
+        -0.61,
+        0.16
+      );
+
+      legs =
+        addFourLegs(
+          THREE,
+          group,
+          0x222222,
+          undefined,
+          0.65
+        );
+
+      break;
+    }
+
+    /* OWL */
+    case "owl": {
+      body =
+        palSphere(
+          THREE,
+          0.5,
+          bodyColor,
+          0,
+          1.15,
+          0,
+          1,
+          1.2,
+          0.9
+        );
+
+      head =
+        palSphere(
+          THREE,
+          0.48,
+          bodyColor,
+          0,
+          1.72,
+          -0.12,
+          1.1,
+          1,
+          0.85
+        );
+
+      group.add(
+        body,
+        head,
+
+        palSphere(
+          THREE,
+          0.22,
+          accent,
+          -0.2,
+          1.8,
+          -0.42
+        ),
+
+        palSphere(
+          THREE,
+          0.22,
+          accent,
+          0.2,
+          1.8,
+          -0.42
+        ),
+
+        palCone(
+          THREE,
+          0.09,
+          0.3,
+          accent,
+          0,
+          1.62,
+          -0.66
+        )
+      );
+
+      addEyes(
+        THREE,
+        group,
+        1.83,
+        -0.61,
+        0.16
+      );
+
+      for (
+        const side
+        of [-1, 1]
+      ) {
+        const pivot =
+          new THREE.Group();
+
+        pivot.position.set(
+          side * 0.45,
+          1.25,
+          0
+        );
+
+        pivot.add(
+          makeWing(
+            THREE,
+            accent,
+            side
+          )
+        );
+
+        group.add(pivot);
+
+        wings.push(pivot);
+      }
+
+      break;
+    }
+
+    /* DINOSAUR */
+    case "dino": {
+      body =
+        palSphere(
+          THREE,
+          0.72,
+          bodyColor,
+          0,
+          1.05,
+          0,
+          1.2,
+          1,
+          1.8
+        );
+
+      head =
+        palSphere(
+          THREE,
+          0.42,
+          bodyColor,
+          0,
+          1.65,
+          -1.1,
+          1.1,
+          0.75,
+          1.2
+        );
+
+      group.add(
+        body,
+        head
+      );
+
+      addEyes(
+        THREE,
+        group,
+        1.75,
+        -1.48,
+        0.16
+      );
+
+      legs =
+        addFourLegs(
+          THREE,
+          group,
+          bodyColor,
+
+          [
+            [-0.42, -0.35],
+            [0.42, -0.35],
+            [-0.45, 0.45],
+            [0.45, 0.45]
+          ],
+
+          0.78
+        );
+
+      for (
+        let i = 0;
+        i < 5;
+        i++
+      ) {
+        group.add(
+          palCone(
+            THREE,
+            0.1,
+            0.38,
+            accent,
+            0,
+            1.75,
+            -0.3 +
+            i *
+            0.27
+          )
+        );
+      }
+
+      addTail(
+        1.8,
+        0.18,
+        1.05
+      );
+
+      break;
+    }
+
+    /* TURTLE */
+    case "turtle": {
+      body =
+        palSphere(
+          THREE,
+          0.72,
+          accent,
+          0,
+          0.65,
+          0,
+          1.2,
+          0.45,
+          1.35
+        );
+
+      const shell =
+        palSphere(
+          THREE,
+          0.68,
+          bodyColor,
+          0,
+          0.9,
+          0.15,
+          1.05,
+          0.55,
+          1.2
+        );
+
+      head =
+        palSphere(
+          THREE,
+          0.3,
+          bodyColor,
+          0,
+          0.72,
+          -0.85
+        );
+
+      group.add(
+        body,
+        shell,
+        head
+      );
+
+      addEyes(
+        THREE,
+        group,
+        0.79,
+        -1.12,
+        0.12
+      );
+
+      legs =
+        addFourLegs(
+          THREE,
+          group,
+          bodyColor,
+
+          [
+            [-0.48, -0.25],
+            [0.48, -0.25],
+            [-0.48, 0.4],
+            [0.48, 0.4]
+          ],
+
+          0.35
+        );
+
+      break;
+    }
+
+    /* SHEEP */
+    case "sheep": {
+      body =
+        palSphere(
+          THREE,
+          0.72,
+          0xf0eee5,
+          0,
+          1,
+          0,
+          1.25,
+          1,
+          1.3
+        );
+
+      head =
+        palSphere(
+          THREE,
+          0.34,
+          bodyColor,
+          0,
+          1.38,
+          -0.78
+        );
+
+      group.add(
+        body,
+        head
+      );
+
+      addEyes(
+        THREE,
+        group,
+        1.48,
+        -1.07,
+        0.14
+      );
+
+      legs =
+        addFourLegs(
+          THREE,
+          group,
+          bodyColor,
+          undefined,
+          0.55
+        );
+
+      for (
+        const side
+        of [-1, 1]
+      ) {
+        const horn =
+          new THREE.Mesh(
+            new THREE
+              .TorusGeometry(
+                0.18,
+                0.05,
+                7,
+                12,
+                Math.PI *
+                1.4
+              ),
+
+            palMaterial(
+              THREE,
+              accent
+            )
+          );
+
+        horn.position.set(
+          side * 0.25,
+          1.67,
+          -0.72
+        );
+
+        horn.rotation.y =
+          side * 0.6;
+
+        group.add(horn);
+      }
+
+      break;
+    }
+
+    /* MANTIS */
+    case "mantis": {
+      body =
+        palCylinder(
+          THREE,
+          0.22,
+          0.28,
+          1.25,
+          bodyColor,
+          0,
+          1.2,
+          0
+        );
+
+      body.rotation.x =
+        Math.PI / 2;
+
+      head =
+        palSphere(
+          THREE,
+          0.28,
+          bodyColor,
+          0,
+          1.65,
+          -0.65,
+          1.2,
+          0.7,
+          0.9
+        );
+
+      group.add(
+        body,
+        head
+      );
+
+      addEyes(
+        THREE,
+        group,
+        1.78,
+        -0.88,
+        0.13
+      );
+
+      for (
+        const side
+        of [-1, 1]
+      ) {
+        const arm =
+          palCylinder(
+            THREE,
+            0.06,
+            0.08,
+            0.9,
+            accent,
+            side * 0.32,
+            1.5,
+            -0.25
+          );
+
+        arm.rotation.z =
+          side * 0.7;
+
+        group.add(arm);
+      }
+
+      legs =
+        addFourLegs(
+          THREE,
+          group,
+          bodyColor,
+
+          [
+            [-0.3, 0.1],
+            [0.3, 0.1],
+            [-0.32, 0.45],
+            [0.32, 0.45]
+          ],
+
+          0.65
+        );
+
+      break;
+    }
+
+    /* SERPENT */
+    case "serpent": {
+      for (
+        let i = 0;
+        i < 7;
+        i++
+      ) {
+        group.add(
+          palSphere(
+            THREE,
+            0.28 -
+            i *
+            0.018,
+
+            bodyColor,
+
+            0,
+            0.55 +
+            i *
+            0.07,
+
+            i *
+            0.38,
+
+            1,
+            1,
+            1.25
+          )
+        );
+      }
+
+      head =
+        palSphere(
+          THREE,
+          0.38,
+          bodyColor,
+          0,
+          1.05,
+          -0.35,
+          1.1,
+          0.8,
+          1.1
+        );
+
+      group.add(
+        head,
+
+        palCone(
+          THREE,
+          0.1,
+          0.42,
+          accent,
+          -0.18,
+          1.5,
+          -0.32
+        ),
+
+        palCone(
+          THREE,
+          0.1,
+          0.42,
+          accent,
+          0.18,
+          1.5,
+          -0.32
+        )
+      );
+
+      addEyes(
+        THREE,
+        group,
+        1.14,
+        -0.7,
+        0.14
+      );
+
+      break;
+    }
+
+    /* HORSE */
+    case "horse": {
+      body =
+        palSphere(
+          THREE,
+          0.62,
+          bodyColor,
+          0,
+          1.15,
+          0,
+          1.25,
+          0.8,
+          1.65
+        );
+
+      const neck =
+        palCylinder(
+          THREE,
+          0.22,
+          0.28,
+          1.05,
+          bodyColor,
+          0,
+          1.65,
+          -0.62
+        );
+
+      neck.rotation.x =
+        -0.42;
+
+      head =
+        palSphere(
+          THREE,
+          0.34,
+          bodyColor,
+          0,
+          2.12,
+          -0.95,
+          1,
+          0.75,
+          1.2
+        );
+
+      group.add(
+        body,
+        neck,
+        head,
+
+        palCone(
+          THREE,
+          0.11,
+          0.45,
+          accent,
+          -0.17,
+          2.5,
+          -0.9
+        ),
+
+        palCone(
+          THREE,
+          0.11,
+          0.45,
+          accent,
+          0.17,
+          2.5,
+          -0.9
+        )
+      );
+
+      addEyes(
+        THREE,
+        group,
+        2.2,
+        -1.27,
+        0.14
+      );
+
+      legs =
+        addFourLegs(
+          THREE,
+          group,
+          bodyColor,
+          undefined,
+          0.9
+        );
+
+      addTail(
+        1,
+        0.12,
+        1.2
+      );
+
+      break;
+    }
+
+    /* FROG */
+    case "frog": {
+      body =
+        palSphere(
+          THREE,
+          0.55,
+          bodyColor,
+          0,
+          0.55,
+          0,
+          1.25,
+          0.65,
+          1.05
+        );
+
+      head =
+        palSphere(
+          THREE,
+          0.48,
+          bodyColor,
+          0,
+          0.9,
+          -0.3,
+          1.15,
+          0.7,
+          1
+        );
+
+      group.add(
+        body,
+        head,
+
+        palSphere(
+          THREE,
+          0.16,
+          accent,
+          -0.24,
+          1.25,
+          -0.42
+        ),
+
+        palSphere(
+          THREE,
+          0.16,
+          accent,
+          0.24,
+          1.25,
+          -0.42
+        )
+      );
+
+      addEyes(
+        THREE,
+        group,
+        1.28,
+        -0.57,
+        0.23
+      );
+
+      legs =
+        addFourLegs(
+          THREE,
+          group,
+          bodyColor,
+
+          [
+            [-0.4, -0.05],
+            [0.4, -0.05],
+            [-0.5, 0.35],
+            [0.5, 0.35]
+          ],
+
+          0.35
+        );
+
+      break;
+    }
+
+    /* SPIDER */
+    case "spider": {
+      body =
+        palSphere(
+          THREE,
+          0.52,
+          bodyColor,
+          0,
+          0.55,
+          0.2,
+          1,
+          0.8,
+          1.1
+        );
+
+      head =
+        palSphere(
+          THREE,
+          0.35,
+          accent,
+          0,
+          0.55,
+          -0.55
+        );
+
+      group.add(
+        body,
+        head
+      );
+
+      addEyes(
+        THREE,
+        group,
+        0.65,
+        -0.86,
+        0.15
+      );
+
+      for (
+        const side
+        of [-1, 1]
+      ) {
+        for (
+          let i = 0;
+          i < 4;
+          i++
+        ) {
+          const leg =
+            palCylinder(
+              THREE,
+              0.045,
+              0.06,
+              0.95,
+              bodyColor,
+
+              side *
+              (
+                0.45 +
+                i *
+                0.06
+              ),
+
+              0.55,
+
+              -0.35 +
+              i *
+              0.25
+            );
+
+          leg.rotation.z =
+            side *
+            (
+              0.9 -
+              0.13 *
+              i
+            );
+
+          group.add(leg);
+        }
+      }
+
+      break;
+    }
+
+    /* GOLEM */
+    case "golem": {
+      body =
+        palBox(
+          THREE,
+          1.2,
+          1.35,
+          0.85,
+          bodyColor,
+          0,
+          1.1,
+          0
+        );
+
+      head =
+        palBox(
+          THREE,
+          0.78,
+          0.62,
+          0.65,
+          accent,
+          0,
+          2.05,
+          -0.08
+        );
+
+      group.add(
+        body,
+        head
+      );
+
+      addEyes(
+        THREE,
+        group,
+        2.1,
+        -0.43,
+        0.18
+      );
+
+      for (
+        const side
+        of [-1, 1]
+      ) {
+        group.add(
+          palBox(
+            THREE,
+            0.35,
+            1.05,
+            0.4,
+            bodyColor,
+            side * 0.82,
+            1.2,
+            0
+          )
+        );
+      }
+
+      legs =
+        addFourLegs(
+          THREE,
+          group,
+          bodyColor,
+
+          [
+            [-0.34, 0.15],
+            [0.34, 0.15]
+          ],
+
+          0.85
+        );
+
+      break;
+    }
+
+    /* PENGUIN */
+    case "penguin": {
+      body =
+        palSphere(
+          THREE,
+          0.52,
+          0x273545,
+          0,
+          0.9,
+          0,
+          0.9,
+          1.3,
+          0.85
+        );
+
+      const belly =
+        palSphere(
+          THREE,
+          0.4,
+          0xf4fbff,
+          0,
+          0.88,
+          -0.32,
+          0.75,
+          1,
+          0.45
+        );
+
+      head =
+        palSphere(
+          THREE,
+          0.38,
+          0x273545,
+          0,
+          1.55,
+          -0.08
+        );
+
+      group.add(
+        body,
+        belly,
+        head,
+
+        palCone(
+          THREE,
+          0.09,
+          0.28,
+          accent,
+          0,
+          1.48,
+          -0.47
+        )
+      );
+
+      addEyes(
+        THREE,
+        group,
+        1.65,
+        -0.4,
+        0.14
+      );
+
+      legs =
+        addFourLegs(
+          THREE,
+          group,
+          accent,
+
+          [
+            [-0.22, 0.05],
+            [0.22, 0.05]
+          ],
+
+          0.3
+        );
+
+      break;
+    }
+
+    default: {
+      body =
+        palSphere(
+          THREE,
+          0.6,
+          bodyColor,
+          0,
+          1,
+          0
+        );
+
+      head =
+        palSphere(
+          THREE,
+          0.35,
+          accent,
+          0,
+          1.6,
+          -0.5
+        );
+
+      group.add(
+        body,
+        head
+      );
+
+      legs =
+        addFourLegs(
+          THREE,
+          group,
+          bodyColor
+        );
+    }
+  }
+
+  group.userData = {
+    species,
+    body,
+    head,
+    legs,
+    wings,
+    tail,
+
+    animationTime:
+      Math.random() *
+      10
+  };
+
+  group.traverse(
+    object => {
+      if (
+        object.isMesh
+      ) {
+        object.castShadow = true;
+        object.receiveShadow = true;
+      }
+    }
+  );
+
+  return group;
+}
+
+function animatePal(
+  creature,
+  dt,
+  moving = true
+) {
+  const data =
+    creature.model.userData;
+
+  data.animationTime +=
+    dt;
+
+  const time =
+    data.animationTime;
+
+  if (
+    data.body
+  ) {
+    data.body.position.y +=
+      Math.sin(
+        time *
+        2
+      ) *
+      0.0007;
+  }
+
+  if (
+    data.head
+  ) {
+    data.head.rotation.y =
+      Math.sin(
+        time *
+        0.8
+      ) *
+      0.12;
+  }
+
+  if (
+    data.tail
+  ) {
+    data.tail.rotation.y =
+      Math.sin(
+        time *
+        3
+      ) *
+      0.35;
+  }
+
+  data.legs
+    ?.forEach(
+      (
+        leg,
+        index
+      ) => {
+        leg.rotation.x =
+          moving
+
+            ? Math.sin(
+                time *
+                6 +
+                index *
+                Math.PI
+              ) *
+              0.42
+
+            : 0;
+      }
+    );
+
+  data.wings
+    ?.forEach(
+      (
+        wing,
+        index
+      ) => {
+        wing.rotation.z =
+          Math.sin(
+            time *
+            4
+          ) *
+          0.35 *
+          (
+            index
+              ? 1
+              : -1
+          );
+      }
+    );
+}
+
+function createPlayerModel(
+  THREE
+) {
+  const group =
+    new THREE.Group();
+
+  group.add(
+    palBox(
+      THREE,
+      0.55,
+      0.85,
+      0.32,
+      0x39516e,
+      0,
+      1.15,
+      0
+    ),
+
+    palSphere(
+      THREE,
+      0.24,
+      0xd4ad8e,
+      0,
+      1.83,
+      0
+    )
+  );
+
+  const legs = [];
+
+  for (
+    const x
+    of [
+      -0.17,
+      0.17
+    ]
+  ) {
+    const pivot =
+      new THREE.Group();
+
+    pivot.position.set(
+      x,
+      0.75,
+      0
+    );
+
+    pivot.add(
+      palBox(
+        THREE,
+        0.18,
+        0.72,
+        0.2,
+        0x263448,
+        0,
+        -0.35,
+        0
+      )
+    );
+
+    group.add(pivot);
+
+    legs.push(pivot);
+  }
+
+  group.userData = {
+    legs,
+    time: 0
+  };
+
+  return group;
+}
+
+/* =========================================================
+   PALS HOME
+   ========================================================= */
 
 function openPals() {
-
   cleanup3D();
-
 
   GameCenter.current =
     "pals";
 
-
-  const game = {
-
-    ...palsDefault(),
-
-    ...storage.get(
-      PALS_SAVE,
-      {}
-    )
-  };
-
+  const game =
+    palsDefault();
 
   GameCenter.pals =
     game;
 
+  $("#contentBody").innerHTML = `
+    <div class="pals-shell">
 
-  if (
-    $("#contentTitle")
-  ) {
+      <div class="pals-home">
 
-    $("#contentTitle")
-      .textContent =
-      "GALAXY PALS";
-  }
+        <section class="pals-hero">
 
+          <span class="pals-hero-badge">
+            GALAXY PALS V4
+          </span>
 
-  if (
-    $("#contentEyebrow")
-  ) {
+          <h2>
+            30+ different creature silhouettes
+          </h2>
 
-    $("#contentEyebrow")
-      .textContent =
-      "3D CREATURE SURVIVAL";
-  }
+          <p>
+            Foxes, dragons, wolves, birds,
+            rhinos, apes, sharks, turtles,
+            golems and many more.
+            No single body recolored everywhere.
+          </p>
 
+          <div class="pals-hero-actions">
 
-  $("#contentBody")
-    .innerHTML = `
-
-      <div
-        class="pals-shell"
-      >
-
-        <div
-          class="pals-home"
-        >
-
-          <section
-            class="pals-hero"
-          >
-
-            <span
-              class="pals-hero-badge"
+            <button
+              class="pals-primary"
+              data-pals-start
             >
-              OPEN-WORLD CREATURE SURVIVAL
+              PLAY WORLD
+            </button>
+
+            <button
+              class="pals-secondary"
+              data-pals-reset
+            >
+              RESET SAVE
+            </button>
+
+          </div>
+
+        </section>
+
+        <aside class="pals-side">
+
+          <div class="pals-card">
+            <strong>Captured</strong>
+            <span>
+              ${game.box.length}
             </span>
+          </div>
 
+          <div class="pals-card">
+            <strong>Party</strong>
+            <span>
+              ${game.party.length}/5
+            </span>
+          </div>
 
-            <h2>
-              GALAXY PALS
-            </h2>
-
-
-            <p>
-
-              Explore a 3D world,
-              weaken and capture
-              original GALAXY creatures,
-              gather resources,
-              craft capture Orbs,
-              build a base
-              and grow your party.
-
-            </p>
-
-
-            <div
-              class="pals-hero-actions"
-            >
-
-              <button
-                class="pals-primary"
-                data-pals-play
-              >
-                PLAY WORLD
-              </button>
-
-
-              <button
-                class="pals-secondary"
-                data-pals-new
-              >
-                NEW WORLD
-              </button>
-
-
-              <button
-                class="pals-secondary"
-                data-game-back
-              >
-                ← GAMING CENTER
-              </button>
-
-            </div>
-
-          </section>
-
-
-          <aside
-            class="pals-side"
-          >
-
-            <section
-              class="pals-card"
-            >
-
-              <h3>
-                Save
-              </h3>
-
-
-              <div
-                class="pals-stat-grid"
-              >
-
-                <div
-                  class="pals-stat"
-                >
-                  <span>
-                    LEVEL
-                  </span>
-                  <strong>
-                    ${game.level}
-                  </strong>
-                </div>
-
-
-                <div
-                  class="pals-stat"
-                >
-                  <span>
-                    CAPTURED
-                  </span>
-                  <strong>
-                    ${game.box.length}
-                  </strong>
-                </div>
-
-
-                <div
-                  class="pals-stat"
-                >
-                  <span>
-                    BASES
-                  </span>
-                  <strong>
-                    ${game.bases.length}
-                  </strong>
-                </div>
-
-
-                <div
-                  class="pals-stat"
-                >
-                  <span>
-                    DAY
-                  </span>
-                  <strong>
-                    ${game.day}
-                  </strong>
-                </div>
-
-              </div>
-
-            </section>
-
-
-            <section
-              class="pals-card"
-            >
-
-              <h3>
-                Controls
-              </h3>
-
-              <p>
-
-                WASD move •
-                Mouse look •
-                Shift sprint •
-                Left click attack •
-                E gather •
-                Q throw Orb •
-                1–5 Orb tier •
-                F summon party Pal •
-                C craft •
-                B build •
-                I inventory
-
-              </p>
-
-            </section>
-
-          </aside>
-
-        </div>
+        </aside>
 
       </div>
 
-    `;
+    </div>
+  `;
 }
 
-
-function palsSpecies(id) {
-
-  return PALS_CREATURES
-    .find(
-      creature =>
-        creature.id === id
-    );
-}
-
-
-function palsInvText(game) {
-
-  return (
-    `Wood ${game.inventory.wood}` +
-    ` • Stone ${game.inventory.stone}` +
-    ` • Ore ${game.inventory.ore}` +
-    ` • Crystal ${game.inventory.crystal}` +
-    ` • Berries ${game.inventory.berry}`
-  );
-}
-
+/* =========================================================
+   PALS 3D WORLD
+   ========================================================= */
 
 async function startPals() {
-
   cleanup3D();
 
+  GameCenter.current =
+    "pals";
 
   const game =
     GameCenter.pals ||
     palsDefault();
 
-
   GameCenter.pals =
     game;
 
-
-  const body =
-    $("#contentBody");
-
-
-  body.innerHTML = `
-
-    <div
-      class="pals-shell"
-    >
+  $("#contentBody").innerHTML = `
+    <div class="pals-shell">
 
       <div
         class="pals-world"
@@ -8030,986 +5753,421 @@ async function startPals() {
           class="pals-canvas"
         ></canvas>
 
+        <div class="pals-vignette"></div>
 
-        <div
-          class="pals-vignette"
-        ></div>
-
-
-        <div
-          class="pals-hud-top"
-        >
+        <div class="pals-hud-top">
 
           <div
             class="pals-zone"
+            id="palsZone"
           >
-            Verdant Reach
+            Verdant Wilds
           </div>
 
-
-          <div
-            class="pals-clock"
-            id="pTime"
-          >
-            DAY ${game.day}
+          <div class="pals-clock">
+            GALAXY PALS
           </div>
 
-
-          <div
-            class="pals-level"
-          >
-            LV
-            <strong
-              id="pLevel"
-            >
-              ${game.level}
-            </strong>
+          <div class="pals-level">
+            LV ${game.level}
           </div>
 
         </div>
 
+        <div
+          id="palsTarget"
+          class="pals-target-card"
+          hidden
+        ></div>
 
         <div
-          class="pals-party"
           id="pParty"
+          class="pals-party"
         ></div>
 
-
         <div
-          class="pals-minimap"
-        >
-          <span
-            class="pals-minimap-player"
-          ></span>
-        </div>
-
-
-        <div
+          id="palsFeed"
           class="pals-feed"
-          id="pFeed"
         ></div>
 
+        <div class="pals-crosshair"></div>
 
-        <div
-          class="pals-crosshair"
-        ></div>
-
-
-        <div
-          class="pals-interact"
-          id="pInteract"
-        >
-          Click world to control camera
+        <div class="pals-interact">
+          Click world • WASD move • Shift sprint •
+          Click attack • Q capture • F summon •
+          1–5 Orbs
         </div>
 
+        <div class="pals-hud-left">
 
-        <div
-          class="pals-hud-left"
-        >
+          <div class="pals-bar-row">
+            <span>HEALTH</span>
 
-          <div
-            class="pals-bar-row"
-          >
-
-            <span>
-              HP
-            </span>
-
-            <div
-              class="pals-bar"
-            >
+            <div class="pals-bar">
               <span
+                id="palsHP"
                 class="pals-health-fill"
-                id="pHP"
               ></span>
             </div>
 
-            <strong
-              id="pHPN"
-            >
+            <strong id="palsHPText">
               100
             </strong>
-
           </div>
 
+          <div class="pals-bar-row">
+            <span>STAMINA</span>
 
-          <div
-            class="pals-bar-row"
-          >
-
-            <span>
-              STAM
-            </span>
-
-            <div
-              class="pals-bar"
-            >
+            <div class="pals-bar">
               <span
+                id="palsStamina"
                 class="pals-stamina-fill"
-                id="pST"
               ></span>
             </div>
 
-            <strong
-              id="pSTN"
-            >
+            <strong id="palsStaminaText">
               100
             </strong>
-
           </div>
 
+          <div class="pals-bar-row">
+            <span>FOOD</span>
 
-          <div
-            class="pals-bar-row"
-          >
-
-            <span>
-              FOOD
-            </span>
-
-            <div
-              class="pals-bar"
-            >
+            <div class="pals-bar">
               <span
+                id="palsFood"
                 class="pals-hunger-fill"
-                id="pHU"
               ></span>
             </div>
 
-            <strong
-              id="pHUN"
-            >
+            <strong id="palsFoodText">
               100
             </strong>
-
           </div>
 
         </div>
 
-
         <div
-          class="pals-hud-right"
-        >
-
-          <div
-            id="pInvText"
-          >
-            ${palsInvText(game)}
-          </div>
-
-        </div>
-
-
-        <div
+          id="palsOrbWheel"
           class="pals-sphere-wheel"
-          id="pOrbs"
-        >
-
-          ${
-            PALS_ORBS
-              .map(
-                (
-                  orb,
-                  index
-                ) => `
-
-                  <div
-
-                    class="
-                      pals-sphere
-                      ${
-                        index ===
-                        game.orb
-                          ? "active"
-                          : ""
-                      }
-                    "
-
-                  >
-
-                    ${orb.emoji}
-                    <br>
-                    ${orb.name}
-                    <br>
-
-                    x${
-                      game.inventory
-                        .orbs[index]
-                      ||
-                      0
-                    }
-
-                  </div>
-
-                `
-              )
-              .join("")
-          }
-
-        </div>
+        ></div>
 
       </div>
 
     </div>
-
   `;
 
-
   try {
-
     const THREE =
       await loadThree();
-
 
     const canvas =
       $("#palsCanvas");
 
+    const worldElement =
+      $("#palsWorld");
 
     const scene =
       new THREE.Scene();
 
+    scene.background =
+      new THREE.Color(
+        0x8bc7e2
+      );
+
+    scene.fog =
+      new THREE
+        .FogExp2(
+          0x9dcfdd,
+          0.0065
+        );
 
     const camera =
       new THREE
         .PerspectiveCamera(
-          70,
+          65,
           1,
           0.1,
-          180
+          300
         );
-
 
     const renderer =
       new THREE
         .WebGLRenderer({
-
           canvas,
-
-          antialias:
-            true
+          antialias: true
         });
-
-
-    Object.assign(
-      THREE_ACTIVE,
-      {
-
-        kind:
-          "pals",
-
-        renderer,
-
-        scene,
-
-        camera,
-
-        canvas
-      }
-    );
-
 
     renderer.shadowMap.enabled =
       true;
 
-
-    scene.background =
-      new THREE.Color(
-        0x86c9ef
-      );
-
-
-    scene.fog =
-      new THREE.Fog(
-        0x9dd0df,
-        45,
-        125
-      );
-
-
-    const hemi =
+    scene.add(
       new THREE
         .HemisphereLight(
-          0xcdefff,
-          0x405329,
-          1.6
-        );
-
-
-    scene.add(
-      hemi
+          0xdff5ff,
+          0x405337,
+          1.7
+        )
     );
-
 
     const sun =
       new THREE
         .DirectionalLight(
-          0xfff0cf,
-          1.7
+          0xfff0c9,
+          2.2
         );
 
-
     sun.position.set(
-      30,
-      50,
-      15
+      40,
+      60,
+      25
     );
 
+    sun.castShadow = true;
 
-    sun.castShadow =
-      true;
+    scene.add(sun);
 
+    const world =
+      new THREE.Group();
 
-    scene.add(
-      sun
-    );
-
+    scene.add(world);
 
     const ground =
       new THREE.Mesh(
-
         new THREE
           .PlaneGeometry(
-            180,
-            180,
-            1,
-            1
+            340,
+            340
           ),
 
-        new THREE
-          .MeshStandardMaterial({
-            color:
-              0x557d49,
-
-            roughness:
-              1
-          })
+        palMaterial(
+          THREE,
+          0x5c874d
+        )
       );
 
-
     ground.rotation.x =
-      -Math.PI /
-      2;
-
+      -Math.PI / 2;
 
     ground.receiveShadow =
       true;
 
+    world.add(ground);
 
-    scene.add(
-      ground
-    );
-
-
-    const zones = [
-
-      {
-        x: -45,
-        z: -35,
-        color: 0x789f5b
-      },
-
-      {
-        x: 45,
-        z: -38,
-        color: 0x6f987a
-      },
-
-      {
-        x: -38,
-        z: 42,
-        color: 0xb0a267
-      },
-
-      {
-        x: 48,
-        z: 44,
-        color: 0x7295a8
-      }
-    ];
-
-
-    for (
-      const zone of
-      zones
-    ) {
-
-      const mesh =
-        new THREE.Mesh(
-
-          new THREE
-            .CircleGeometry(
-              28,
-              32
-            ),
-
-          new THREE
-            .MeshStandardMaterial({
-              color:
-                zone.color,
-
-              roughness:
-                1
-            })
-        );
-
-
-      mesh.rotation.x =
-        -Math.PI /
-        2;
-
-
-      mesh.position.set(
-        zone.x,
-        0.02,
-        zone.z
-      );
-
-
-      scene.add(
-        mesh
-      );
-    }
-
+    /* WORLD TREES AND ROCKS */
 
     for (
       let i = 0;
-      i < 55;
+      i < 120;
       i++
     ) {
-
-      const trunk =
-        new THREE.Mesh(
-
-          new THREE
-            .CylinderGeometry(
-              0.25,
-              0.38,
-              rand(
-                2.3,
-                4.8
-              ),
-              7
-            ),
-
-          new THREE
-            .MeshStandardMaterial({
-              color:
-                0x6d4b31
-            })
+      const x =
+        rand(
+          -155,
+          155
         );
 
-
-      trunk.position.set(
+      const z =
         rand(
-          -80,
-          80
-        ),
-        1.5,
-        rand(
-          -80,
-          80
-        )
-      );
+          -155,
+          155
+        );
 
+      if (
+        Math.hypot(
+          x,
+          z
+        ) < 15
+      ) {
+        continue;
+      }
 
-      scene.add(
-        trunk
-      );
+      if (
+        Math.random() <
+        0.68
+      ) {
+        const tree =
+          new THREE.Group();
 
+        const height =
+          rand(
+            3,
+            6
+          );
 
-      const crown =
-        new THREE.Mesh(
+        tree.add(
+          palCylinder(
+            THREE,
+            0.22,
+            0.42,
+            height,
+            0x67462d,
+            0,
+            height / 2,
+            0
+          )
+        );
 
-          new THREE
-            .SphereGeometry(
+        for (
+          let j = 0;
+          j < 3;
+          j++
+        ) {
+          tree.add(
+            palSphere(
+              THREE,
               rand(
                 1.1,
-                2.3
+                2
               ),
-              8,
-              7
-            ),
 
-          new THREE
-            .MeshStandardMaterial({
-              color:
-                pick([
-                  0x4f7a43,
-                  0x5d8c4b,
-                  0x6a9655
-                ])
-            })
-        );
+              pick([
+                0x3f6f39,
+                0x4d7d43,
+                0x5a8848
+              ]),
 
+              rand(
+                -0.35,
+                0.35
+              ),
 
-      crown.position.set(
-        trunk.position.x,
-        rand(
-          3,
-          5
-        ),
-        trunk.position.z
-      );
-
-
-      scene.add(
-        crown
-      );
-    }
-
-
-    const nodes =
-      [];
-
-
-    function addNode(
-      type,
-      x,
-      z
-    ) {
-
-      const color =
-
-        type === "wood"
-
-          ? 0x7b5434
-
-          : (
-              type ===
-              "stone"
-
-                ? 0x777b80
-
-                : (
-                    type ===
-                    "ore"
-
-                      ? 0x675f58
-
-                      : 0x6ec4d9
-                  )
-            );
-
-
-      const geometry =
-
-        type === "wood"
-
-          ? new THREE
-              .CylinderGeometry(
+              height *
+                0.72 +
+              j *
                 0.5,
-                0.65,
-                2.4,
-                7
+
+              rand(
+                -0.35,
+                0.35
               )
+            )
+          );
+        }
 
-          : new THREE
-              .DodecahedronGeometry(
-                type ===
-                "crystal"
-                  ? 0.85
-                  : 1.1
-              );
-
-
-      const mesh =
-        new THREE.Mesh(
-
-          geometry,
-
-          new THREE
-            .MeshStandardMaterial({
-
-              color,
-
-              roughness:
-                0.75,
-
-              metalness:
-                type ===
-                "ore"
-                  ? 0.25
-                  : 0
-            })
+        tree.position.set(
+          x,
+          0,
+          z
         );
 
-
-      mesh.position.set(
-        x,
-        type ===
-        "wood"
-          ? 1.2
-          : 0.9,
-        z
-      );
-
-
-      scene.add(
-        mesh
-      );
-
-
-      nodes.push({
-
-        type,
-
-        x,
-
-        z,
-
-        amount:
-          type ===
-          "wood"
-
-            ? 5
-
-            : (
-                type ===
-                "stone"
-
-                  ? 4
-
-                  : (
-                      type ===
-                      "ore"
-                        ? 3
-                        : 2
-                    )
+        world.add(tree);
+      } else {
+        const rock =
+          new THREE.Mesh(
+            new THREE
+              .DodecahedronGeometry(
+                rand(
+                  0.6,
+                  1.8
+                )
               ),
 
-        mesh
-      });
+            palMaterial(
+              THREE,
+              0x797b74
+            )
+          );
+
+        rock.position.set(
+          x,
+          0.7,
+          z
+        );
+
+        world.add(rock);
+      }
     }
 
+    /* PLAYER */
 
-    for (
-      let i = 0;
-      i < 24;
-      i++
-    ) {
-
-      addNode(
-
-        i < 9
-
-          ? "wood"
-
-          : (
-              i < 17
-
-                ? "stone"
-
-                : (
-                    i < 22
-                      ? "ore"
-                      : "crystal"
-                  )
-            ),
-
-        rand(
-          -70,
-          70
-        ),
-
-        rand(
-          -70,
-          70
-        )
+    const playerModel =
+      createPlayerModel(
+        THREE
       );
-    }
 
+    world.add(
+      playerModel
+    );
 
     const player = {
-
       x:
-        game.x ||
-        0,
+        game.x || 0,
 
       z:
-        game.z ||
-        8,
+        game.z || 8,
 
-      yaw:
-        0,
+      yaw: 0,
+      pitch: -0.12,
 
-      pitch:
-        -0.12,
+      hp:
+        game.hp ??
+        100,
 
-      attackAt:
-        0
+      stamina:
+        game.stamina ??
+        100,
+
+      hunger:
+        game.hunger ??
+        100
     };
-
 
     const keys =
       new Set();
 
+    const creatures = [];
+    const feed = [];
 
-    const wild =
-      [];
+    let target = null;
+    let companion = null;
 
-
-    let companion =
-      null;
-
-
-    let feed =
-      [];
-
-
-    const playerMesh =
-      new THREE.Group();
-
-
-    const playerBody =
-      new THREE.Mesh(
-
-        new THREE
-          .CapsuleGeometry(
-            0.36,
-            0.7,
-            4,
-            8
-          ),
-
-        new THREE
-          .MeshStandardMaterial({
-            color:
-              0x3e6288
-          })
-      );
-
-
-    const playerHead =
-      new THREE.Mesh(
-
-        new THREE
-          .SphereGeometry(
-            0.24,
-            10,
-            8
-          ),
-
-        new THREE
-          .MeshStandardMaterial({
-            color:
-              0xd2ae92
-          })
-      );
-
-
-    playerBody.position.y =
-      1;
-
-
-    playerHead.position.y =
-      1.75;
-
-
-    playerMesh.add(
-      playerBody,
-      playerHead
-    );
-
-
-    scene.add(
-      playerMesh
-    );
-
-
-    function creatureMesh(
-      species,
-      scale = 1
-    ) {
-
-      const group =
-        new THREE.Group();
-
-
-      const body =
-        new THREE.Mesh(
-
-          new THREE
-            .SphereGeometry(
-              0.55 *
-              scale,
-              10,
-              8
-            ),
-
-          new THREE
-            .MeshStandardMaterial({
-
-              color:
-                species.color,
-
-              roughness:
-                0.75
-            })
-        );
-
-
-      const head =
-        new THREE.Mesh(
-
-          new THREE
-            .SphereGeometry(
-              0.38 *
-              scale,
-              10,
-              8
-            ),
-
-          new THREE
-            .MeshStandardMaterial({
-
-              color:
-                species.color,
-
-              roughness:
-                0.75
-            })
-        );
-
-
-      body.position.y =
-        0.65 *
-        scale;
-
-
-      head.position.set(
-        0,
-        0.95 *
-        scale,
-        -0.35 *
-        scale
-      );
-
-
-      group.add(
-        body,
-        head
-      );
-
-
-      const eyeMaterial =
-        new THREE
-          .MeshBasicMaterial({
-            color:
-              0xffffff
-          });
-
-
-      for (
-        const side of
-        [
-          -0.13,
-          0.13
-        ]
-      ) {
-
-        const eye =
-          new THREE.Mesh(
-
-            new THREE
-              .SphereGeometry(
-                0.045 *
-                scale,
-                6,
-                5
-              ),
-
-            eyeMaterial
-          );
-
-
-        eye.position.set(
-          side,
-          0.99 *
-          scale,
-          -0.68 *
-          scale
-        );
-
-
-        group.add(
-          eye
-        );
-      }
-
-
-      return {
-        group,
-        body,
-        head
-      };
-    }
-
+    /* =====================================================
+       SPAWN ALL SPECIES
+       ===================================================== */
 
     function spawnCreature(
+      species,
       index
     ) {
-
-      const species =
-        pick(
-          PALS_CREATURES
-            .filter(
-              creature =>
-                creature.rarity <=
-                Math.min(
-                  5,
-                  1 +
-                  Math.floor(
-                    game.level /
-                    4
-                  ) +
-                  2
-                )
-            )
-        );
-
-
       const model =
-        creatureMesh(
-          species,
-          1 +
-          species.rarity *
-          0.04
+        buildPal(
+          THREE,
+          species
         );
 
+      const angle =
+        index /
+        PALS.length *
+        Math.PI *
+        2;
 
-      const x =
-        rand(
-          -65,
-          65
-        );
-
-
-      const z =
-        rand(
-          -65,
-          65
-        );
-
+      const radius =
+        28 +
+        (
+          index % 6
+        ) *
+        11;
 
       const creature = {
-
-        id:
-          `wild${index}`,
-
         species,
+        model,
 
-        x,
+        x:
+          Math.sin(angle) *
+            radius +
+          rand(
+            -6,
+            6
+          ),
 
-        z,
-
-        hp:
-          species.hp,
-
-        max:
-          species.hp,
-
-        alive:
-          true,
+        z:
+          Math.cos(angle) *
+            radius +
+          rand(
+            -6,
+            6
+          ),
 
         direction:
           rand(
@@ -9018,101 +6176,416 @@ async function startPals() {
             2
           ),
 
-        next:
+        changeDirectionAt:
           performance.now() +
           rand(
-            700,
-            2000
+            1000,
+            3000
           ),
 
-        group:
-          model.group,
+        hp:
+          species.hp,
 
-        body:
-          model.body,
+        maxHp:
+          species.hp,
 
-        head:
-          model.head
+        level:
+          1 +
+          Math.floor(
+            rand(
+              0,
+              8 +
+              game.level
+            )
+          ),
+
+        alive: true
       };
 
-
-      creature.body.userData = {
-        creature
-      };
-
-
-      creature.head.userData = {
-        creature
-      };
-
-
-      creature.group.position.set(
-        x,
+      model.position.set(
+        creature.x,
         0,
-        z
+        creature.z
       );
 
-
-      scene.add(
-        creature.group
+      model.traverse(
+        object => {
+          if (
+            object.isMesh
+          ) {
+            object.userData.creature =
+              creature;
+          }
+        }
       );
 
+      world.add(model);
 
-      wild.push(
+      creatures.push(
         creature
       );
     }
 
+    /* EVERY SPECIES IS GUARANTEED TO SPAWN */
+
+    PALS.forEach(
+      (
+        species,
+        index
+      ) =>
+        spawnCreature(
+          species,
+          index
+        )
+    );
+
+    /* PLUS EXTRA RANDOM WILD CREATURES */
 
     for (
       let i = 0;
-      i < 18;
+      i < 12;
       i++
     ) {
-
-      spawnCreature(i);
+      spawnCreature(
+        pick(PALS),
+        PALS.length +
+        i
+      );
     }
 
+    /* TARGETING */
 
-    const ray =
-      new THREE
-        .Raycaster();
+    const raycaster =
+      new THREE.Raycaster();
 
+    function findTarget() {
+      raycaster.setFromCamera(
+        new THREE.Vector2(
+          0,
+          0
+        ),
+        camera
+      );
 
-    function feedMsg(message) {
+      const meshes = [];
 
+      creatures.forEach(
+        creature => {
+          if (
+            !creature.alive
+          ) {
+            return;
+          }
+
+          creature.model
+            .traverse(
+              object => {
+                if (
+                  object.isMesh
+                ) {
+                  meshes.push(
+                    object
+                  );
+                }
+              }
+            );
+        }
+      );
+
+      const hit =
+        raycaster
+          .intersectObjects(
+            meshes,
+            false
+          )[0];
+
+      target =
+        hit &&
+        hit.distance < 22
+          ? hit.object
+              .userData
+              .creature
+          : null;
+    }
+
+    function captureChance(
+      creature
+    ) {
+      const hpFactor =
+        1 -
+        creature.hp /
+        creature.maxHp;
+
+      return clamp(
+        (
+          0.18 +
+          hpFactor *
+          0.72
+        ) *
+
+        (
+          PALS_ORBS[
+            game.orb
+          ]?.bonus ||
+          1
+        ) /
+
+        (
+          1 +
+          creature.species
+            .rarity *
+          0.2 +
+
+          creature.level *
+          0.018
+        ),
+
+        0.03,
+        0.94
+      );
+    }
+
+    function attackTarget() {
+      if (
+        !target?.alive
+      ) {
+        return;
+      }
+
+      target.hp -=
+        14 +
+        game.level *
+        1.5;
+
+      if (
+        target.hp <= 0
+      ) {
+        target.hp = 0;
+
+        target.alive =
+          false;
+
+        target.model.visible =
+          false;
+
+        addFeed(
+          target.species.name +
+          " defeated"
+        );
+      } else {
+        addFeed(
+          `${target.species.name} HP ${Math.ceil(
+            target.hp
+          )}`
+        );
+      }
+    }
+
+    function captureTarget() {
+      if (
+        !target?.alive
+      ) {
+        return;
+      }
+
+      const orbIndex =
+        game.orb || 0;
+
+      if (
+        (
+          game.inventory
+            .orbs[
+              orbIndex
+            ] ||
+          0
+        ) <= 0
+      ) {
+        addFeed(
+          "No Orbs"
+        );
+
+        return;
+      }
+
+      game.inventory
+        .orbs[
+          orbIndex
+        ]--;
+
+      const creature =
+        target;
+
+      const probability =
+        captureChance(
+          creature
+        );
+
+      if (
+        Math.random() <
+        probability
+      ) {
+        creature.alive =
+          false;
+
+        creature.model.visible =
+          false;
+
+        game.box.push(
+          creature.species.id
+        );
+
+        if (
+          game.party.length <
+          5
+        ) {
+          game.party.push(
+            creature.species.id
+          );
+        }
+
+        game.xp +=
+          35 *
+          creature.species
+            .rarity;
+
+        addFeed(
+          "Captured " +
+          creature.species.name
+        );
+
+        palsSave(game);
+      } else {
+        addFeed(
+          creature.species.name +
+          " escaped"
+        );
+      }
+    }
+
+    function summonPal() {
+      if (companion) {
+        world.remove(
+          companion.model
+        );
+
+        companion = null;
+
+        addFeed(
+          "Companion recalled"
+        );
+
+        return;
+      }
+
+      const id =
+        game.party[0];
+
+      const species =
+        PALS.find(
+          pal =>
+            pal.id === id
+        );
+
+      if (!species) {
+        addFeed(
+          "Capture a Pal first"
+        );
+
+        return;
+      }
+
+      const model =
+        buildPal(
+          THREE,
+          species
+        );
+
+      world.add(model);
+
+      companion = {
+        model,
+        species
+      };
+
+      addFeed(
+        species.name +
+        " summoned"
+      );
+    }
+
+    function addFeed(text) {
       feed.unshift({
-
-        message,
-
+        text,
         time:
           performance.now()
       });
 
-
-      feed =
-        feed.slice(
-          0,
-          5
-        );
-
-
-      renderFeed();
+      feed.splice(5);
     }
 
+    function updateHUD() {
+      const setBar = (
+        selector,
+        value
+      ) =>
+        $(selector)
+          ?.style
+          .setProperty(
+            "width",
+            clamp(
+              value,
+              0,
+              100
+            ) +
+            "%"
+          );
 
-    function renderFeed() {
+      setBar(
+        "#palsHP",
+        player.hp
+      );
 
-      const element =
-        $("#pFeed");
+      setBar(
+        "#palsStamina",
+        player.stamina
+      );
 
+      setBar(
+        "#palsFood",
+        player.hunger
+      );
 
-      if (!element) {
-        return;
+      if (
+        $("#palsHPText")
+      ) {
+        $("#palsHPText")
+          .textContent =
+          Math.round(
+            player.hp
+          );
       }
 
+      if (
+        $("#palsStaminaText")
+      ) {
+        $("#palsStaminaText")
+          .textContent =
+          Math.round(
+            player.stamina
+          );
+      }
 
-      element.innerHTML =
+      if (
+        $("#palsFoodText")
+      ) {
+        $("#palsFoodText")
+          .textContent =
+          Math.round(
+            player.hunger
+          );
+      }
+
+      $("#palsFeed").innerHTML =
         feed
           .filter(
             item =>
@@ -9122,1135 +6595,169 @@ async function startPals() {
           )
           .map(
             item => `
-
-              <div
-                class="pals-feed-row"
-              >
-                ${escapeHTML(
-                  item.message
-                )}
+              <div class="pals-feed-row">
+                ${esc(item.text)}
               </div>
-
             `
           )
           .join("");
-    }
 
-
-    function renderParty() {
-
-      const element =
-        $("#pParty");
-
-
-      if (!element) {
-        return;
-      }
-
-
-      element.innerHTML =
-
-        game.party
-          .slice(
-            0,
-            5
-          )
+      $("#palsOrbWheel").innerHTML =
+        PALS_ORBS
           .map(
-            id => {
+            (
+              orb,
+              index
+            ) => `
+              <div
+                class="
+                  pals-sphere
+                  ${
+                    index ===
+                    game.orb
+                      ? "active"
+                      : ""
+                  }
+                "
+              >
 
+                <b>
+                  ${index + 1}
+                </b>
+
+                <span>
+                  ${orb.name}
+                </span>
+
+                <small>
+                  x${
+                    game.inventory
+                      .orbs[
+                        index
+                      ] ||
+                    0
+                  }
+                </small>
+
+              </div>
+            `
+          )
+          .join("");
+
+      $("#pParty").innerHTML =
+        game.party
+          .slice(0, 5)
+          .map(
+            (
+              id,
+              index
+            ) => {
               const species =
-                palsSpecies(id);
+                PALS.find(
+                  pal =>
+                    pal.id === id
+                );
 
+              if (!species) {
+                return "";
+              }
 
               return `
+                <div class="pals-party-row">
 
-                <div
-                  class="pals-party-row"
-                >
-
-                  <div
-                    class="pals-party-icon"
-                  >
-                    ${
-                      species?.emoji ||
-                      "✦"
-                    }
+                  <div class="pals-party-icon">
+                    ${species.emoji}
                   </div>
 
-
-                  <div
-                    class="pals-party-copy"
-                  >
+                  <div class="pals-party-copy">
 
                     <strong>
-                      ${
-                        species?.name ||
-                        id
-                      }
+                      ${species.name}
                     </strong>
 
                     <span>
-                      Lv ${game.level}
+                      ${species.form}
                       •
-                      ${
-                        species?.element ||
-                        ""
-                      }
+                      ${species.element}
                     </span>
 
-                    <div
-                      class="pals-party-hp"
-                    >
-                      <span
-                        style="width:100%"
-                      ></span>
+                    <div class="pals-party-hp">
+                      <span></span>
                     </div>
 
                   </div>
 
                 </div>
-
               `;
             }
           )
-          .join("")
+          .join("");
 
-        ||
-
-        `
-
-          <div
-            class="pals-party-row"
-          >
-            No Pals in party
-          </div>
-
-        `;
-    }
-
-
-    function hud() {
-
-      game.hp =
-        clamp(
-          game.hp,
-          0,
-          100
-        );
-
-
-      game.stamina =
-        clamp(
-          game.stamina,
-          0,
-          100
-        );
-
-
-      game.hunger =
-        clamp(
-          game.hunger,
-          0,
-          100
-        );
-
-
-      for (
-        const [
-          id,
-          value
-        ] of
-        [
-          ["pHP", game.hp],
-          ["pST", game.stamina],
-          ["pHU", game.hunger]
-        ]
-      ) {
-
-        if (
-          $("#" + id)
-        ) {
-
-          $("#" + id)
-            .style.width =
-            value +
-            "%";
-        }
-      }
-
+      const targetPanel =
+        $("#palsTarget");
 
       if (
-        $("#pHPN")
+        target?.alive
       ) {
-
-        $("#pHPN")
-          .textContent =
-          Math.round(
-            game.hp
-          );
-      }
-
-
-      if (
-        $("#pSTN")
-      ) {
-
-        $("#pSTN")
-          .textContent =
-          Math.round(
-            game.stamina
-          );
-      }
-
-
-      if (
-        $("#pHUN")
-      ) {
-
-        $("#pHUN")
-          .textContent =
-          Math.round(
-            game.hunger
-          );
-      }
-
-
-      if (
-        $("#pInvText")
-      ) {
-
-        $("#pInvText")
-          .textContent =
-          palsInvText(game);
-      }
-
-
-      if (
-        $("#pLevel")
-      ) {
-
-        $("#pLevel")
-          .textContent =
-          game.level;
-      }
-
-
-      const orbHUD =
-        $("#pOrbs");
-
-
-      if (orbHUD) {
-
-        orbHUD.innerHTML =
-          PALS_ORBS
-            .map(
-              (
-                orb,
-                index
-              ) => `
-
-                <div
-                  class="
-                    pals-sphere
-                    ${
-                      index ===
-                      game.orb
-                        ? "active"
-                        : ""
-                    }
-                  "
-                >
-
-                  ${orb.emoji}
-
-                  <br>
-
-                  ${orb.name}
-
-                  <br>
-
-                  x${
-                    game.inventory
-                      .orbs[index]
-                    ||
-                    0
-                  }
-
-                </div>
-
-              `
-            )
-            .join("");
-      }
-
-
-      renderParty();
-    }
-
-
-    function nearestNode() {
-
-      return nodes
-        .filter(
-          node =>
-            node.amount >
-            0
-        )
-        .sort(
-          (
-            a,
-            b
-          ) =>
-
-            Math.hypot(
-              a.x -
-              player.x,
-              a.z -
-              player.z
-            )
-
-            -
-
-            Math.hypot(
-              b.x -
-              player.x,
-              b.z -
-              player.z
-            )
-        )[0];
-    }
-
-
-    function nearestCreature() {
-
-      return wild
-        .filter(
-          creature =>
-            creature.alive
-        )
-        .sort(
-          (
-            a,
-            b
-          ) =>
-
-            Math.hypot(
-              a.x -
-              player.x,
-              a.z -
-              player.z
-            )
-
-            -
-
-            Math.hypot(
-              b.x -
-              player.x,
-              b.z -
-              player.z
-            )
-        )[0];
-    }
-
-
-    function gather() {
-
-      const node =
-        nearestNode();
-
-
-      if (
-        !node ||
-        Math.hypot(
-          node.x -
-          player.x,
-          node.z -
-          player.z
-        ) >
-        3.2
-      ) {
-
-        feedMsg(
-          "Move closer to a resource"
-        );
-
-        return;
-      }
-
-
-      node.amount--;
-
-
-      game.inventory[
-        node.type
-      ] =
-        (
-          game.inventory[
-            node.type
-          ] ||
-          0
-        ) +
-        1;
-
-
-      game.quests.gather++;
-
-
-      feedMsg(
-        `+1 ${node.type}`
-      );
-
-
-      if (
-        node.amount <= 0
-      ) {
-
-        node.mesh.visible =
+        targetPanel.hidden =
           false;
-      }
 
-
-      hud();
-
-      palsSave(game);
-    }
-
-
-    function attack() {
-
-      const now =
-        performance.now();
-
-
-      if (
-        now -
-        player.attackAt <
-        420
-      ) {
-
-        return;
-      }
-
-
-      player.attackAt =
-        now;
-
-
-      ray.setFromCamera(
-        new THREE.Vector2(
-          0,
-          0
-        ),
-        camera
-      );
-
-
-      const targets =
-        wild
-          .filter(
-            creature =>
-              creature.alive
-          )
-          .flatMap(
-            creature => [
-              creature.body,
-              creature.head
-            ]
-          );
-
-
-      const hit =
-        ray.intersectObjects(
-          targets,
-          false
-        )[0];
-
-
-      const creature =
-        hit
-          ?.object
-          ?.userData
-          ?.creature;
-
-
-      if (
-        creature &&
-        hit.distance <
-        24
-      ) {
-
-        creature.hp -=
-          18 +
-          game.level *
-          1.2;
-
-
-        feedMsg(
-          `${creature.species.name} ${Math.max(
-            0,
-            Math.round(
-              creature.hp
-            )
-          )}/${creature.max} HP`
-        );
-
-
-        if (
-          creature.hp <= 0
-        ) {
-
-          creature.alive =
-            false;
-
-          creature.group.visible =
-            false;
-
-
-          game.xp +=
-            25 *
-            creature.species
-              .rarity;
-
-
-          feedMsg(
-            `${creature.species.name} defeated`
-          );
-
-
-          levelUp();
-        }
-      }
-    }
-
-
-    function capture() {
-
-      const creature =
-        nearestCreature();
-
-
-      if (
-        !creature ||
-        Math.hypot(
-          creature.x -
-          player.x,
-          creature.z -
-          player.z
-        ) >
-        14
-      ) {
-
-        feedMsg(
-          "No creature in capture range"
-        );
-
-        return;
-      }
-
-
-      const tier =
-        game.orb;
-
-
-      if (
-        (
-          game.inventory
-            .orbs[tier]
-          ||
-          0
-        ) <= 0
-      ) {
-
-        feedMsg(
-          `No ${PALS_ORBS[tier].name}s`
-        );
-
-        return;
-      }
-
-
-      game.inventory
-        .orbs[tier]--;
-
-
-      const orb =
-        PALS_ORBS[tier];
-
-
-      const hpFactor =
-        1 -
-        (
-          creature.hp /
-          creature.max
-        ) *
-        0.72;
-
-
-      const rarePenalty =
-        1 /
-        (
-          1 +
-          creature.species
-            .rarity *
-          0.3
-        );
-
-
-      const chance =
-        clamp(
-
-          (
-            0.28 +
-            hpFactor
-          )
-
-          *
-
-          orb.bonus
-
-          *
-
-          rarePenalty,
-
-          0.05,
-          0.95
-        );
-
-
-      feedMsg(
-        `${orb.name} thrown — ${Math.round(
-          chance *
-          100
-        )}% chance`
-      );
-
-
-      setTimeout(
-        () => {
-
-          if (
-            THREE_ACTIVE.kind !==
-            "pals"
-          ) {
-            return;
-          }
-
-
-          if (
-            Math.random() <
-            chance
-          ) {
-
-            creature.alive =
-              false;
-
-            creature.group.visible =
-              false;
-
-
-            game.box.push(
-              creature.species.id
-            );
-
-
-            if (
-              game.party.length <
-              5
-            ) {
-
-              game.party.push(
-                creature.species.id
-              );
-            }
-
-
-            game.xp +=
-              40 *
-              creature.species
-                .rarity;
-
-
-            game.quests.capture++;
-
-
-            feedMsg(
-              `Captured ${creature.species.name}!`
-            );
-
-
-            levelUp();
-
-          } else {
-
-            creature.hp =
-              Math.max(
-                1,
-                creature.hp -
-                4
-              );
-
-
-            feedMsg(
-              `${creature.species.name} escaped!`
-            );
-          }
-
-
-          hud();
-
-          palsSave(game);
-
-        },
-        700
-      );
-
-
-      hud();
-    }
-
-
-    function levelUp() {
-
-      while (
-        game.xp >=
-        game.level *
-        120
-      ) {
-
-        game.xp -=
-          game.level *
-          120;
-
-        game.level++;
-
-        game.hp =
-          100;
-
-
-        feedMsg(
-          `Level ${game.level}!`
-        );
-      }
-    }
-
-
-    function craft() {
-
-      const orb =
-        PALS_ORBS[
-          game.orb
-        ];
-
-
-      const cost =
-        orb.cost;
-
-
-      for (
-        const [
-          resource,
-          amount
-        ] of
-        Object.entries(
-          cost
-        )
-      ) {
-
-        if (
-          (
-            game.inventory[
-              resource
-            ] ||
-            0
-          ) <
-          amount
-        ) {
-
-          feedMsg(
-            `Need ${amount} ${resource}`
-          );
-
-          return;
-        }
-      }
-
-
-      for (
-        const [
-          resource,
-          amount
-        ] of
-        Object.entries(
-          cost
-        )
-      ) {
-
-        game.inventory[
-          resource
-        ] -=
-          amount;
-      }
-
-
-      game.inventory.orbs[
-        game.orb
-      ] =
-        (
-          game.inventory.orbs[
-            game.orb
-          ] ||
-          0
-        ) +
-        1;
-
-
-      feedMsg(
-        `Crafted ${orb.name}`
-      );
-
-
-      hud();
-
-      palsSave(game);
-    }
-
-
-    function build() {
-
-      if (
-        game.inventory.wood <
-        10 ||
-        game.inventory.stone <
-        6
-      ) {
-
-        feedMsg(
-          "Need 10 wood + 6 stone"
-        );
-
-        return;
-      }
-
-
-      game.inventory.wood -=
-        10;
-
-      game.inventory.stone -=
-        6;
-
-
-      const hut =
-        new THREE.Group();
-
-
-      const base =
-        new THREE.Mesh(
-
-          new THREE
-            .BoxGeometry(
-              3.2,
-              0.3,
-              3.2
-            ),
-
-          new THREE
-            .MeshStandardMaterial({
-              color:
-                0x806044
-            })
-        );
-
-
-      const roof =
-        new THREE.Mesh(
-
-          new THREE
-            .ConeGeometry(
-              2.4,
-              1.7,
-              4
-            ),
-
-          new THREE
-            .MeshStandardMaterial({
-              color:
-                0x5d4031
-            })
-        );
-
-
-      roof.position.y =
-        1.25;
-
-
-      roof.rotation.y =
-        Math.PI /
-        4;
-
-
-      hut.add(
-        base,
-        roof
-      );
-
-
-      const x =
-        player.x -
-        Math.sin(
-          player.yaw
-        ) *
-        4;
-
-
-      const z =
-        player.z -
-        Math.cos(
-          player.yaw
-        ) *
-        4;
-
-
-      hut.position.set(
-        x,
-        0.15,
-        z
-      );
-
-
-      scene.add(
-        hut
-      );
-
-
-      game.bases.push({
-        x,
-        z
-      });
-
-
-      feedMsg(
-        "Base shelter built"
-      );
-
-
-      hud();
-
-      palsSave(game);
-    }
-
-
-    function summon() {
-
-      if (
-        !game.party.length
-      ) {
-
-        feedMsg(
-          "Capture a creature first"
-        );
-
-        return;
-      }
-
-
-      if (companion) {
-
-        scene.remove(
-          companion.mesh
-        );
-
-        companion =
-          null;
-
-        feedMsg(
-          "Companion recalled"
-        );
-
-        return;
-      }
-
-
-      const species =
-        palsSpecies(
-          game.party[0]
-        );
-
-
-      const model =
-        creatureMesh(
-          species,
-          1.1
-        );
-
-
-      companion = {
-        species,
-        mesh:
-          model.group
-      };
-
-
-      scene.add(
-        companion.mesh
-      );
-
-
-      feedMsg(
-        `${species.name} summoned`
-      );
-    }
-
-
-    function inventoryOverlay() {
-
-      let overlay =
-        $("#palsOverlay");
-
-
-      if (overlay) {
-
-        overlay.remove();
-
-        return;
-      }
-
-
-      const world =
-        $("#palsWorld");
-
-
-      world.insertAdjacentHTML(
-        "beforeend",
-        `
-
-          <div
-
-            class="pals-inventory-overlay"
-
-            id="palsOverlay"
-
-          >
-
-            <div
-              class="pals-panel"
-            >
-
-              <div
-                class="pals-panel-head"
-              >
-
-                <h3>
-                  Inventory & Pal Box
-                </h3>
-
-                <button
-                  class="pals-secondary"
-                  data-pals-close
-                >
-                  Close
-                </button>
-
-              </div>
-
-
-              <div
-                class="pals-panel-body"
-              >
-
-                <div
-                  class="pals-toolbar"
-                >
-                  <button>
-                    Resources:
-                    ${escapeHTML(
-                      palsInvText(
-                        game
-                      )
-                    )}
-                  </button>
-                </div>
-
-
-                <h3>
-                  Captured Pals
-                  (${game.box.length})
-                </h3>
-
-
-                <div
-                  class="pals-grid"
-                >
-
-                  ${
-                    game.box.length
-
-                      ? game.box
-                          .map(
-                            id => {
-
-                              const species =
-                                palsSpecies(
-                                  id
-                                );
-
-
-                              return `
-
-                                <div
-                                  class="pals-creature-card"
-                                >
-
-                                  <div
-                                    class="pals-creature-icon"
-                                  >
-                                    ${
-                                      species?.emoji ||
-                                      "✦"
-                                    }
-                                  </div>
-
-                                  <strong>
-                                    ${
-                                      species?.name ||
-                                      id
-                                    }
-                                  </strong>
-
-                                  <small>
-                                    ${
-                                      species?.element ||
-                                      ""
-                                    }
-                                    •
-                                    Rarity
-                                    ${
-                                      species?.rarity ||
-                                      1
-                                    }
-                                  </small>
-
-                                </div>
-
-                              `;
-                            }
-                          )
-                          .join("")
-
-                      : "No captured creatures yet."
-                  }
-
-                </div>
-
-              </div>
-
-            </div>
+        targetPanel.innerHTML = `
+          <div class="pals-target-title">
+
+            <strong>
+              ${target.species.name}
+            </strong>
+
+            <span>
+              LV ${target.level}
+              •
+              ${target.species.form.toUpperCase()}
+            </span>
 
           </div>
 
-        `
-      );
+          <div class="pals-target-hp">
+
+            <span
+              style="
+                width:
+                ${
+                  target.hp /
+                  target.maxHp *
+                  100
+                }%
+              "
+            ></span>
+
+          </div>
+
+          <div class="pals-capture-chance">
+
+            <span>
+              Capture chance
+            </span>
+
+            <strong>
+              ${
+                Math.round(
+                  captureChance(
+                    target
+                  ) *
+                  100
+                )
+              }%
+            </strong>
+
+          </div>
+        `;
+      } else {
+        targetPanel.hidden =
+          true;
+      }
     }
 
+    /* INPUT */
 
     on3D(
       canvas,
@@ -10261,12 +6768,10 @@ async function startPals() {
           ?.()
     );
 
-
     on3D(
       document,
       "mousemove",
       event => {
-
         if (
           document.pointerLockElement !==
           canvas
@@ -10274,43 +6779,29 @@ async function startPals() {
           return;
         }
 
-
         player.yaw -=
           event.movementX *
-          0.0024;
-
+          0.0025;
 
         player.pitch =
           clamp(
-
             player.pitch -
             event.movementY *
-            0.0016,
+            0.0018,
 
-            -0.55,
-            0.35
+            -0.5,
+            0.3
           );
       }
     );
-
 
     on3D(
       document,
       "keydown",
       event => {
-
-        if (
-          THREE_ACTIVE.kind !==
-          "pals"
-        ) {
-          return;
-        }
-
-
         keys.add(
           event.code
         );
-
 
         if (
           /^Digit[1-5]$/
@@ -10318,78 +6809,29 @@ async function startPals() {
               event.code
             )
         ) {
-
           game.orb =
             Number(
               event.code
                 .slice(-1)
             ) -
             1;
-
-          hud();
         }
-
-
-        if (
-          event.code ===
-          "KeyE"
-        ) {
-          gather();
-        }
-
 
         if (
           event.code ===
           "KeyQ"
         ) {
-          capture();
+          captureTarget();
         }
-
-
-        if (
-          event.code ===
-          "KeyC"
-        ) {
-          craft();
-        }
-
-
-        if (
-          event.code ===
-          "KeyB"
-        ) {
-          build();
-        }
-
 
         if (
           event.code ===
           "KeyF"
         ) {
-          summon();
-        }
-
-
-        if (
-          event.code ===
-          "KeyI"
-        ) {
-
-          inventoryOverlay();
-
-
-          if (
-            document.pointerLockElement
-          ) {
-
-            document
-              .exitPointerLock
-              ?.();
-          }
+          summonPal();
         }
       }
     );
-
 
     on3D(
       document,
@@ -10400,25 +6842,34 @@ async function startPals() {
         )
     );
 
-
     on3D(
       document,
       "mousedown",
       event => {
-
         if (
-          THREE_ACTIVE.kind ===
-          "pals" &&
           event.button === 0 &&
           document.pointerLockElement ===
           canvas
         ) {
-
-          attack();
+          attackTarget();
         }
       }
     );
 
+    function resize() {
+      renderer.setSize(
+        worldElement.clientWidth,
+        worldElement.clientHeight,
+        false
+      );
+
+      camera.aspect =
+        worldElement.clientWidth /
+        worldElement.clientHeight;
+
+      camera
+        .updateProjectionMatrix();
+    }
 
     on3D(
       window,
@@ -10426,62 +6877,21 @@ async function startPals() {
       resize
     );
 
-
-    function resize() {
-
-      const width =
-        canvas
-          .parentElement
-          .clientWidth ||
-        900;
-
-
-      const height =
-        canvas
-          .parentElement
-          .clientHeight ||
-        650;
-
-
-      renderer.setSize(
-        width,
-        height,
-        false
-      );
-
-
-      camera.aspect =
-        width /
-        height;
-
-
-      camera
-        .updateProjectionMatrix();
-    }
-
-
     resize();
-
-    hud();
-
 
     let last =
       performance.now();
 
-
-    let saveAt =
+    let saveTime =
       last;
 
-
     function loop(now) {
-
       if (
-        THREE_ACTIVE.kind !==
+        GameCenter.current !==
         "pals"
       ) {
         return;
       }
-
 
       const dt =
         clamp(
@@ -10490,14 +6900,12 @@ async function startPals() {
             last
           ) /
           1000,
+
           0,
           0.05
         );
 
-
-      last =
-        now;
-
+      last = now;
 
       const forward =
         (
@@ -10506,8 +6914,7 @@ async function startPals() {
           )
             ? 1
             : 0
-        )
-        -
+        ) -
         (
           keys.has(
             "KeyS"
@@ -10516,7 +6923,6 @@ async function startPals() {
             : 0
         );
 
-
       const right =
         (
           keys.has(
@@ -10524,8 +6930,7 @@ async function startPals() {
           )
             ? 1
             : 0
-        )
-        -
+        ) -
         (
           keys.has(
             "KeyA"
@@ -10534,1109 +6939,576 @@ async function startPals() {
             : 0
         );
 
-
-      const sprinting =
-        (
-          keys.has(
-            "ShiftLeft"
-          )
-          ||
-          keys.has(
-            "ShiftRight"
-          )
-        )
-        &&
-        game.stamina >
+      const sprint =
+        keys.has(
+          "ShiftLeft"
+        ) &&
+        player.stamina >
         1;
 
-
       const speed =
-        sprinting
-          ? 6.4
-          : 3.8;
-
+        sprint
+          ? 7.4
+          : 4.2;
 
       const sin =
         Math.sin(
           player.yaw
         );
 
-
       const cos =
         Math.cos(
           player.yaw
         );
 
+      player.x +=
+        (
+          -sin *
+            forward +
+          cos *
+            right
+        ) *
+        speed *
+        dt;
+
+      player.z +=
+        (
+          -cos *
+            forward -
+          sin *
+            right
+        ) *
+        speed *
+        dt;
 
       player.x =
         clamp(
-
-          player.x +
-
-          (
-            -sin *
-            forward
-
-            +
-
-            cos *
-            right
-          )
-
-          *
-
-          speed
-
-          *
-
-          dt,
-
-          -84,
-          84
+          player.x,
+          -160,
+          160
         );
-
 
       player.z =
         clamp(
+          player.z,
+          -160,
+          160
+        );
 
-          player.z +
-
+      player.stamina =
+        clamp(
+          player.stamina +
           (
-            -cos *
-            forward
-
-            -
-
-            sin *
-            right
-          )
-
-          *
-
-          speed
-
-          *
-
+            sprint &&
+            (
+              forward ||
+              right
+            )
+              ? -18
+              : 13
+          ) *
           dt,
 
-          -84,
-          84
-        );
-
-
-      if (
-        sprinting &&
-        (
-          forward ||
-          right
-        )
-      ) {
-
-        game.stamina -=
-          16 *
-          dt;
-
-      } else {
-
-        game.stamina +=
-          10 *
-          dt;
-      }
-
-
-      game.hunger -=
-        0.45 *
-        dt;
-
-
-      if (
-        game.hunger <
-        20
-      ) {
-
-        game.hp -=
-          1.2 *
-          dt;
-      }
-
-
-      game.time +=
-        dt *
-        0.003;
-
-
-      if (
-        game.time >=
-        1
-      ) {
-
-        game.time -=
-          1;
-
-        game.day++;
-      }
-
-
-      const daylight =
-        0.25 +
-        0.75 *
-        Math.max(
           0,
-          Math.sin(
-            game.time *
-            Math.PI
-          )
+          100
         );
 
+      player.hunger =
+        clamp(
+          player.hunger -
+          0.18 *
+          dt,
 
-      sun.intensity =
-        0.35 +
-        daylight *
-        1.45;
-
-
-      scene.background
-        .setHSL(
-          0.56,
-          0.45,
-          0.16 +
-          daylight *
-          0.48
+          0,
+          100
         );
 
-
-      scene.fog.color
-        .copy(
-          scene.background
-        );
-
-
-      playerMesh.position.set(
+      playerModel.position.set(
         player.x,
         0,
         player.z
       );
 
-
-      playerMesh.rotation.y =
+      playerModel.rotation.y =
         player.yaw;
 
+      const playerData =
+        playerModel.userData;
 
-      const cameraDistance =
-        5.6;
+      playerData.time +=
+        dt;
 
+      playerData.legs
+        .forEach(
+          (
+            leg,
+            index
+          ) => {
+            leg.rotation.x =
+              (
+                forward ||
+                right
+              )
 
-      const cameraHeight =
-        2.8;
+                ? Math.sin(
+                    playerData.time *
+                    (
+                      sprint
+                        ? 12
+                        : 8
+                    ) +
+                    index *
+                    Math.PI
+                  ) *
+                  0.55
 
+                : 0;
+          }
+        );
+
+      /* THIRD PERSON CAMERA */
 
       camera.position.set(
-
         player.x +
-
         Math.sin(
           player.yaw
         ) *
-        cameraDistance,
+        7,
 
-        cameraHeight +
+        3.5 +
         player.pitch *
-        2.5,
+        3,
 
         player.z +
-
         Math.cos(
           player.yaw
         ) *
-        cameraDistance
+        7
       );
-
 
       camera.lookAt(
         player.x,
-        1.35,
+        1.5,
         player.z
       );
 
+      /* CREATURE AI */
+
+      creatures.forEach(
+        creature => {
+          if (
+            !creature.alive
+          ) {
+            return;
+          }
+
+          if (
+            now >
+            creature
+              .changeDirectionAt
+          ) {
+            creature.direction +=
+              rand(
+                -1.4,
+                1.4
+              );
+
+            creature
+              .changeDirectionAt =
+              now +
+              rand(
+                1200,
+                3200
+              );
+          }
+
+          creature.x +=
+            Math.sin(
+              creature.direction
+            ) *
+            creature.species
+              .speed *
+            0.14 *
+            dt;
+
+          creature.z +=
+            Math.cos(
+              creature.direction
+            ) *
+            creature.species
+              .speed *
+            0.14 *
+            dt;
+
+          creature.model
+            .position.x =
+            creature.x;
+
+          creature.model
+            .position.z =
+            creature.z;
+
+          creature.model
+            .rotation.y =
+            creature.direction;
+
+          animatePal(
+            creature,
+            dt,
+            true
+          );
+        }
+      );
+
+      /* FOLLOWING PAL */
 
       if (companion) {
-
         const targetX =
           player.x +
           Math.cos(
             player.yaw
           ) *
-          2.2;
-
+          2;
 
         const targetZ =
           player.z -
           Math.sin(
             player.yaw
           ) *
-          2.2;
+          2;
 
-
-        companion.mesh
+        companion.model
           .position.x +=
-
           (
             targetX -
-            companion.mesh
+            companion.model
               .position.x
-          )
-
-          *
-
+          ) *
           Math.min(
             1,
             dt *
-            3
+            4
           );
 
-
-        companion.mesh
+        companion.model
           .position.z +=
-
           (
             targetZ -
-            companion.mesh
+            companion.model
               .position.z
-          )
-
-          *
-
+          ) *
           Math.min(
             1,
             dt *
-            3
+            4
           );
 
-
-        companion.mesh
-          .rotation.y =
-          player.yaw;
+        animatePal(
+          {
+            model:
+              companion.model
+          },
+          dt,
+          true
+        );
       }
 
+      findTarget();
 
-      for (
-        const creature of
-        wild
-      ) {
-
-        if (
-          !creature.alive
-        ) {
-
-          continue;
-        }
-
-
-        if (
-          now >
-          creature.next
-        ) {
-
-          creature.direction +=
-            rand(
-              -1.2,
-              1.2
-            );
-
-
-          creature.next =
-            now +
-            rand(
-              900,
-              2200
-            );
-        }
-
-
-        creature.x =
-          clamp(
-
-            creature.x +
-
-            Math.sin(
-              creature.direction
-            )
-
-            *
-
-            creature.species
-              .speed
-
-            *
-
-            0.28
-
-            *
-
-            dt,
-
-            -80,
-            80
-          );
-
-
-        creature.z =
-          clamp(
-
-            creature.z +
-
-            Math.cos(
-              creature.direction
-            )
-
-            *
-
-            creature.species
-              .speed
-
-            *
-
-            0.28
-
-            *
-
-            dt,
-
-            -80,
-            80
-          );
-
-
-        creature.group
-          .position
-          .set(
-            creature.x,
-            0,
-            creature.z
-          );
-
-
-        creature.group
-          .rotation.y =
-          creature.direction;
-      }
-
-
-      const node =
-        nearestNode();
-
-
-      const creature =
-        nearestCreature();
-
-
-      const message =
-        $("#pInteract");
-
-
-      if (message) {
-
-        const nodeDistance =
-          node
-            ? Math.hypot(
-                node.x -
-                player.x,
-                node.z -
-                player.z
-              )
-            : 99;
-
-
-        const creatureDistance =
-          creature
-            ? Math.hypot(
-                creature.x -
-                player.x,
-                creature.z -
-                player.z
-              )
-            : 99;
-
-
-        message.textContent =
-
-          nodeDistance <
-          3.2
-
-            ? `E Gather ${node.type}`
-
-            : (
-                creatureDistance <
-                14
-
-                  ? `${creature.species.name} • ${Math.max(
-                      0,
-                      Math.round(
-                        creature.hp
-                      )
-                    )}/${creature.max} HP • Q Throw ${PALS_ORBS[game.orb].name}`
-
-                  : "Explore • E gather • Q capture • C craft • B build • F summon"
-              );
-      }
-
-
-      if (
-        $("#pTime")
-      ) {
-
-        $("#pTime")
-          .textContent =
-
-          `DAY ${game.day} • `
-
-          +
-
-          (
-            game.time <
-            0.25 ||
-            game.time >
-            0.75
-
-              ? "NIGHT"
-
-              : "DAYLIGHT"
-          );
-      }
-
-
-      hud();
-
-      renderFeed();
-
+      updateHUD();
 
       if (
         now -
-        saveAt >
+        saveTime >
         5000
       ) {
+        Object.assign(
+          game,
+          {
+            x:
+              player.x,
 
-        game.x =
-          player.x;
+            z:
+              player.z,
 
-        game.z =
-          player.z;
+            hp:
+              player.hp,
 
+            stamina:
+              player.stamina,
 
-        palsSave(
-          game
+            hunger:
+              player.hunger
+          }
         );
 
+        palsSave(game);
 
-        saveAt =
-          now;
+        saveTime = now;
       }
-
 
       renderer.render(
         scene,
         camera
       );
 
-
-      THREE_ACTIVE.raf =
+      GameCenter.raf =
         requestAnimationFrame(
           loop
         );
     }
 
-
-    THREE_ACTIVE.raf =
+    GameCenter.raf =
       requestAnimationFrame(
         loop
       );
 
-  } catch (error) {
-
-    console.error(
-      error
+    addFeed(
+      "32 original creature species loaded"
     );
 
+    addFeed(
+      "Different creature body constructions are active"
+    );
 
-    body.innerHTML = `
+    addFeed(
+      "Weaken a creature then press Q to capture"
+    );
 
-      <div
-        class="pals-card"
-      >
+  } catch (error) {
+    console.error(error);
+
+    $("#contentBody").innerHTML = `
+      <div class="pals-card">
 
         <h3>
-          GALAXY PALS could not start
+          GALAXY PALS failed to start
         </h3>
 
         <p>
-          ${escapeHTML(
-            error.message
-          )}
+          ${esc(error.message)}
         </p>
 
-        <button
-          class="pals-primary"
-          data-pals-home
-        >
-          Back
-        </button>
-
       </div>
-
     `;
   }
 }
 
+/* =========================================================
+   OPEN GAME
+   ========================================================= */
 
-/* ============================================================
-   GLOBAL EVENTS
-   ============================================================ */
+function openGame(id) {
+  cleanup3D();
+
+  const games = {
+    chess:
+      openChess,
+
+    tictactoe:
+      openTTT,
+
+    connect4:
+      openConnect4,
+
+    memory:
+      openMemory,
+
+    arena:
+      openArena,
+
+    snake:
+      openSnake,
+
+    chicken:
+      openChicken,
+
+    pals:
+      openPals
+  };
+
+  (
+    games[id] ||
+    renderGames
+  )();
+}
+
+/* =========================================================
+   GLOBAL CLICK HANDLER
+   ========================================================= */
 
 document.addEventListener(
   "click",
   event => {
-
     const target =
-      event.target instanceof
-      Element
-        ? event.target
-        : null;
-
+      event.target.closest(
+        "button,[data-game-open],[data-view]"
+      );
 
     if (!target) {
       return;
     }
 
-
-    const action =
-      target.closest(
-        "[data-action]"
-      );
-
-
-    if (action) {
-
-      const type =
-        action.dataset.action;
-
-
-      if (
-        type === "send"
-      ) {
-
-        sendMessage();
-
-        return;
-      }
-
-
-      if (
-        type ===
-        "new-chat"
-      ) {
-
-        newChat();
-
-        return;
-      }
-
-
-      if (
-        type ===
-        "work-send"
-      ) {
-
-        sendWork();
-
-        return;
-      }
+    if (
+      target.dataset.action ===
+      "new-chat"
+    ) {
+      newChat();
     }
-
-
-    const view =
-      target.closest(
-        "[data-view]"
-      );
-
-
-    if (view) {
-
-      setView(
-        view.dataset.view
-      );
-
-      return;
-    }
-
 
     if (
-      target.closest(
-        "[data-game-back]"
+      target.dataset.action ===
+      "send"
+    ) {
+      sendMessage();
+    }
+
+    if (
+      target.dataset.action ===
+      "work-send"
+    ) {
+      sendWork();
+    }
+
+    if (
+      target.dataset.view
+    ) {
+      setView(
+        target.dataset.view
+      );
+    }
+
+    if (
+      target.dataset.gameOpen
+    ) {
+      openGame(
+        target.dataset
+          .gameOpen
+      );
+    }
+
+    if (
+      target.hasAttribute(
+        "data-game-back"
       )
     ) {
-
       renderGames();
-
-      return;
     }
 
-
-    const open =
-      target.closest(
-        "[data-game-open]"
+    if (
+      target.dataset.ttt !=
+      null
+    ) {
+      tttMove(
+        Number(
+          target.dataset.ttt
+        )
       );
-
-
-    if (open) {
-
-      const id =
-        open.dataset.gameOpen;
-
-
-      if (
-        id === "chess"
-      ) {
-        resetChess();
-        return;
-      }
-
-
-      if (
-        id === "tictactoe"
-      ) {
-        resetTTT();
-        return;
-      }
-
-
-      if (
-        id === "connect4"
-      ) {
-        resetConnect();
-        return;
-      }
-
-
-      if (
-        id === "memory"
-      ) {
-        resetMemory();
-        return;
-      }
-
-
-      if (
-        id === "snake"
-      ) {
-        resetSnake();
-        return;
-      }
-
-
-      if (
-        id === "chicken"
-      ) {
-        resetChicken();
-        return;
-      }
-
-
-      if (
-        id === "arena"
-      ) {
-        openArena();
-        return;
-      }
-
-
-      if (
-        id === "pals"
-      ) {
-        openPals();
-        return;
-      }
     }
 
+    if (
+      target.hasAttribute(
+        "data-ttt-reset"
+      )
+    ) {
+      openTTT();
+    }
 
-    const chess =
-      target.closest(
-        "[data-chess]"
+    if (
+      target.dataset.c4 !=
+      null
+    ) {
+      connectMove(
+        Number(
+          target.dataset.c4
+        )
       );
+    }
 
+    if (
+      target.hasAttribute(
+        "data-c4-reset"
+      )
+    ) {
+      openConnect4();
+    }
 
-    if (chess) {
+    if (
+      target.dataset.memory !=
+      null
+    ) {
+      memoryFlip(
+        Number(
+          target.dataset
+            .memory
+        )
+      );
+    }
 
+    if (
+      target.hasAttribute(
+        "data-memory-reset"
+      )
+    ) {
+      openMemory();
+    }
+
+    if (
+      target.hasAttribute(
+        "data-snake-reset"
+      )
+    ) {
+      openSnake();
+    }
+
+    if (
+      target.hasAttribute(
+        "data-chicken-reset"
+      )
+    ) {
+      openChicken();
+    }
+
+    if (
+      target.dataset.chess
+    ) {
       const [
-        r,
-        c
+        row,
+        col
       ] =
-        chess.dataset
+        target.dataset
           .chess
           .split(",")
           .map(Number);
 
-
-      clickChess(
-        r,
-        c
+      chessClick(
+        row,
+        col
       );
-
-      return;
     }
-
 
     if (
-      target.closest(
-        "[data-chess-reset]"
+      target.hasAttribute(
+        "data-chess-reset"
       )
     ) {
-
-      resetChess();
-
-      return;
+      openChess();
     }
-
 
     if (
-      target.closest(
-        "[data-chess-undo]"
+      target.hasAttribute(
+        "data-pals-start"
       )
     ) {
-
-      const game =
-        GameCenter.chess;
-
-
-      if (
-        game
-          ?.snapshots
-          .length
-      ) {
-
-        Object.assign(
-          game,
-          game.snapshots.pop(),
-          {
-            selected: null,
-            legal: []
-          }
-        );
-
-
-        renderChess();
-      }
-
-
-      return;
-    }
-
-
-    const ttt =
-      target.closest(
-        "[data-ttt]"
-      );
-
-
-    if (ttt) {
-
-      tMove(
-        Number(
-          ttt.dataset.ttt
-        )
-      );
-
-      return;
-    }
-
-
-    if (
-      target.closest(
-        "[data-ttt-reset]"
-      )
-    ) {
-
-      resetTTT();
-
-      return;
-    }
-
-
-    const connect =
-      target.closest(
-        "[data-c4]"
-      );
-
-
-    if (connect) {
-
-      cMove(
-        Number(
-          connect.dataset.c4
-        )
-      );
-
-      return;
-    }
-
-
-    if (
-      target.closest(
-        "[data-c4-reset]"
-      )
-    ) {
-
-      resetConnect();
-
-      return;
-    }
-
-
-    const memory =
-      target.closest(
-        "[data-mem]"
-      );
-
-
-    if (memory) {
-
-      memClick(
-        Number(
-          memory.dataset.mem
-        )
-      );
-
-      return;
-    }
-
-
-    if (
-      target.closest(
-        "[data-mem-reset]"
-      )
-    ) {
-
-      resetMemory();
-
-      return;
-    }
-
-
-    if (
-      target.closest(
-        "[data-snake-start]"
-      )
-    ) {
-
-      snakeStart();
-
-      return;
-    }
-
-
-    if (
-      target.closest(
-        "[data-snake-new]"
-      )
-    ) {
-
-      resetSnake();
-
-      return;
-    }
-
-
-    const snakeDirection =
-      target.closest(
-        "[data-snake-dir]"
-      );
-
-
-    if (snakeDirection) {
-
-      const direction = {
-
-        up: [
-          0,
-          -1
-        ],
-
-        down: [
-          0,
-          1
-        ],
-
-        left: [
-          -1,
-          0
-        ],
-
-        right: [
-          1,
-          0
-        ]
-
-      }[
-        snakeDirection
-          .dataset
-          .snakeDir
-      ];
-
-
-      snakeDir(
-        ...direction
-      );
-
-      return;
-    }
-
-
-    if (
-      target.closest(
-        "[data-chick-start]"
-      )
-    ) {
-
-      chickenStart();
-
-      return;
-    }
-
-
-    if (
-      target.closest(
-        "[data-chick-new]"
-      )
-    ) {
-
-      resetChicken();
-
-      return;
-    }
-
-
-    const chickenDirection =
-      target.closest(
-        "[data-chick-dir]"
-      );
-
-
-    if (
-      chickenDirection
-    ) {
-
-      const direction = {
-
-        up: [
-          0,
-          -1
-        ],
-
-        down: [
-          0,
-          1
-        ],
-
-        left: [
-          -8,
-          0
-        ],
-
-        right: [
-          8,
-          0
-        ]
-
-      }[
-        chickenDirection
-          .dataset
-          .chickDir
-      ];
-
-
-      chickenMove(
-        ...direction
-      );
-
-      return;
-    }
-
-
-    const arenaMode =
-      target.closest(
-        "[data-arena-mode]"
-      );
-
-
-    if (arenaMode) {
-
-      GameCenter.arena.mode =
-        arenaMode
-          .dataset
-          .arenaMode;
-
-
-      $$(
-        "[data-arena-mode]"
-      )
-        .forEach(
-          button => {
-
-            button.classList.toggle(
-              "active",
-              button ===
-              arenaMode
-            );
-          }
-        );
-
-
-      return;
-    }
-
-
-    if (
-      target.closest(
-        "[data-arena-start]"
-      )
-    ) {
-
-      startArena();
-
-      return;
-    }
-
-
-    if (
-      target.closest(
-        "[data-arena-home]"
-      )
-    ) {
-
-      openArena();
-
-      return;
-    }
-
-
-    if (
-      target.closest(
-        "[data-pals-play]"
-      )
-    ) {
-
       startPals();
-
-      return;
     }
 
-
     if (
-      target.closest(
-        "[data-pals-new]"
+      target.hasAttribute(
+        "data-pals-reset"
       )
     ) {
-
-      storage.del(
+      localStorage.removeItem(
         PALS_SAVE
       );
 
@@ -11644,185 +7516,13 @@ document.addEventListener(
         palsDefault();
 
       openPals();
-
-      return;
-    }
-
-
-    if (
-      target.closest(
-        "[data-pals-home]"
-      )
-    ) {
-
-      openPals();
-
-      return;
-    }
-
-
-    if (
-      target.closest(
-        "[data-pals-close]"
-      )
-    ) {
-
-      target
-        .closest(
-          "#palsOverlay"
-        )
-        ?.remove();
-
-      return;
     }
   }
 );
 
-
-/* ============================================================
-   SELECT CHANGES
-   ============================================================ */
-
-document.addEventListener(
-  "change",
-  event => {
-
-    const target =
-      event.target;
-
-
-    if (
-      !(
-        target instanceof
-        HTMLSelectElement
-      )
-    ) {
-      return;
-    }
-
-
-    if (
-      target.matches(
-        "[data-mode]"
-      )
-    ) {
-
-      const game = {
-
-        chess:
-          GameCenter.chess,
-
-        tictactoe:
-          GameCenter.ttt,
-
-        connect4:
-          GameCenter.connect
-
-      }[
-        GameCenter.current
-      ];
-
-
-      if (game) {
-
-        game.mode =
-          target.value;
-
-
-        if (
-          GameCenter.current ===
-          "chess"
-        ) {
-
-          resetChess();
-        }
-
-
-        if (
-          GameCenter.current ===
-          "tictactoe"
-        ) {
-
-          resetTTT();
-        }
-
-
-        if (
-          GameCenter.current ===
-          "connect4"
-        ) {
-
-          resetConnect();
-        }
-      }
-    }
-
-
-    if (
-      target.matches(
-        "[data-level]"
-      )
-    ) {
-
-      const game = {
-
-        chess:
-          GameCenter.chess,
-
-        tictactoe:
-          GameCenter.ttt,
-
-        connect4:
-          GameCenter.connect
-
-      }[
-        GameCenter.current
-      ];
-
-
-      if (game) {
-
-        game.elo =
-          Number(
-            target.value
-          );
-      }
-    }
-
-
-    if (
-      target.matches(
-        "[data-snake-level]"
-      )
-    ) {
-
-      resetSnake(
-        Number(
-          target.value
-        )
-      );
-    }
-
-
-    if (
-      target.matches(
-        "[data-chick-level]"
-      )
-    ) {
-
-      resetChicken(
-        Number(
-          target.value
-        )
-      );
-    }
-  }
-);
-
-
-/* ============================================================
-   KEYBOARD FOR SNAKE + CHICKEN
-   ============================================================ */
+/* =========================================================
+   KEYBOARD
+   ========================================================= */
 
 document.addEventListener(
   "keydown",
@@ -11832,4478 +7532,137 @@ document.addEventListener(
       GameCenter.current ===
       "snake"
     ) {
+      const game =
+        GameCenter.snake;
 
-      const direction = {
+      const move =
+        {
+          ArrowUp:
+            [0, -1],
 
-        ArrowUp: [
-          0,
-          -1
-        ],
+          KeyW:
+            [0, -1],
 
-        KeyW: [
-          0,
-          -1
-        ],
+          ArrowDown:
+            [0, 1],
 
-        ArrowDown: [
-          0,
-          1
-        ],
+          KeyS:
+            [0, 1],
 
-        KeyS: [
-          0,
-          1
-        ],
+          ArrowLeft:
+            [-1, 0],
 
-        ArrowLeft: [
-          -1,
-          0
-        ],
+          KeyA:
+            [-1, 0],
 
-        KeyA: [
-          -1,
-          0
-        ],
+          ArrowRight:
+            [1, 0],
 
-        ArrowRight: [
-          1,
-          0
-        ],
+          KeyD:
+            [1, 0]
+        }[
+          event.code
+        ];
 
-        KeyD: [
-          1,
-          0
-        ]
-
-      }[
-        event.code
-      ];
-
-
-      if (direction) {
-
-        event.preventDefault();
-
-        snakeDir(
-          ...direction
-        );
+      if (
+        move &&
+        !(
+          move[0] ===
+            -game.direction[0] &&
+          move[1] ===
+            -game.direction[1]
+        )
+      ) {
+        game.nextDirection =
+          move;
       }
     }
-
 
     if (
       GameCenter.current ===
       "chicken"
     ) {
+      const move =
+        {
+          ArrowUp:
+            [0, -1],
 
-      const direction = {
+          KeyW:
+            [0, -1],
 
-        ArrowUp: [
-          0,
-          -1
-        ],
+          ArrowDown:
+            [0, 1],
 
-        KeyW: [
-          0,
-          -1
-        ],
+          KeyS:
+            [0, 1],
 
-        ArrowDown: [
-          0,
-          1
-        ],
+          ArrowLeft:
+            [-1, 0],
 
-        KeyS: [
-          0,
-          1
-        ],
+          KeyA:
+            [-1, 0],
 
-        ArrowLeft: [
-          -8,
-          0
-        ],
+          ArrowRight:
+            [1, 0],
 
-        KeyA: [
-          -8,
-          0
-        ],
+          KeyD:
+            [1, 0]
+        }[
+          event.code
+        ];
 
-        ArrowRight: [
-          8,
-          0
-        ],
-
-        KeyD: [
-          8,
-          0
-        ]
-
-      }[
-        event.code
-      ];
-
-
-      if (direction) {
-
-        event.preventDefault();
-
+      if (move) {
         chickenMove(
-          ...direction
+          ...move
         );
       }
+    }
+
+    if (
+      event.code ===
+        "Enter" &&
+      !event.shiftKey &&
+      document.activeElement ===
+        $("#promptInput")
+    ) {
+      event.preventDefault();
+
+      sendMessage();
+    }
+
+    if (
+      event.code ===
+        "Enter" &&
+      !event.shiftKey &&
+      document.activeElement ===
+        $("#workPrompt")
+    ) {
+      event.preventDefault();
+
+      sendWork();
     }
   }
 );
 
-
-/* ============================================================
-   INITIALIZE
-   ============================================================ */
-
-function initializeGalaxy() {
-
-  const input =
-    $("#promptInput");
-
-
-  if (input) {
-
-    input.addEventListener(
-      "input",
-      () =>
-        autoResize(
-          input
-        )
-    );
-
-
-    input.addEventListener(
-      "keydown",
-      event => {
-
-        if (
-          event.key ===
-          "Enter" &&
-          !event.shiftKey
-        ) {
-
-          event.preventDefault();
-
-          sendMessage();
-        }
-      }
-    );
-
-
-    autoResize(
-      input
-    );
-  }
-
-
-  $("#sendButton")
-    ?.addEventListener(
-      "click",
-      event => {
-
-        event.preventDefault();
-
-        sendMessage();
-      }
-    );
-
-
-  $("#workPrompt")
-    ?.addEventListener(
-      "keydown",
-      event => {
-
-        if (
-          event.key ===
-          "Enter" &&
-          (
-            event.ctrlKey ||
-            event.metaKey
-          )
-        ) {
-
-          event.preventDefault();
-
-          sendWork();
-        }
-      }
-    );
-
-
-  const provider =
-    $("#aiProvider");
-
-
-  if (provider) {
-
-    provider.value =
-      "gemini";
-
-    provider.disabled =
-      true;
-  }
-
-
-  updateSendButtonState();
-
-
-  console.log(
-    "GALAXY AI initialized — Games + Arena + GALAXY PALS"
+$("#promptInput")
+  ?.addEventListener(
+    "input",
+    event =>
+      autoResize(
+        event.target
+      )
   );
-}
-
-
-if (
-  document.readyState ===
-  "loading"
-) {
-
-  document.addEventListener(
-    "DOMContentLoaded",
-    initializeGalaxy
-  );
-
-} else {
-
-  initializeGalaxy();
-}
-
-
-/* ============================================================
-   GLOBAL API
-   ============================================================ */
 
 window.GALAXY = {
-
   state,
-
-  games:
-    GameCenter,
-
+  GameCenter,
+  setView,
   newChat,
-
   sendMessage,
-
   sendWork,
-
-  openGames:
-    renderGames,
-
-  openArena,
-
-  openPals
+  renderGames,
+  openPals,
+  startPals
 };
-/* ============================================================
-   GALAXY PALS — ADVANCED CREATURE UPGRADE
-   Paste at END of script.js
-   ============================================================ */
 
-(() => {
-
-  "use strict";
-
-
-  const GP = {
-
-    active:
-      false,
-
-    creatures:
-      [],
-
-    resources:
-      [],
-
-    buildings:
-      [],
-
-    projectiles:
-      [],
-
-    companion:
-      null,
-
-    target:
-      null,
-
-    keys:
-      new Set(),
-
-    mouseDown:
-      false
-  };
-
-
-  /* ============================================================
-     ORIGINAL DETAILED CREATURE DATABASE
-     ============================================================ */
-
-  const GALAXY_CREATURES = [
-
-    {
-      id: "emberfox",
-      name: "Emberfox",
-      type: "fox",
-      element: "Fire",
-      rarity: 1,
-      hp: 90,
-      attack: 22,
-      speed: 3.2,
-      body: 0xe1633f,
-      accent: 0xffc55b
-    },
-
-    {
-      id: "mossbun",
-      name: "Mossbun",
-      type: "rabbit",
-      element: "Grass",
-      rarity: 1,
-      hp: 100,
-      attack: 17,
-      speed: 3.1,
-      body: 0x62a95f,
-      accent: 0xc3e883
-    },
-
-    {
-      id: "voltcat",
-      name: "Voltcat",
-      type: "cat",
-      element: "Electric",
-      rarity: 2,
-      hp: 85,
-      attack: 27,
-      speed: 3.8,
-      body: 0xe5c943,
-      accent: 0x3c3831
-    },
-
-    {
-      id: "aquafin",
-      name: "Aquafin",
-      type: "dragon",
-      element: "Water",
-      rarity: 2,
-      hp: 115,
-      attack: 24,
-      speed: 2.8,
-      body: 0x4f9ed0,
-      accent: 0xa1eaff
-    },
-
-    {
-      id: "stonehorn",
-      name: "Stonehorn",
-      type: "deer",
-      element: "Ground",
-      rarity: 2,
-      hp: 145,
-      attack: 29,
-      speed: 2.4,
-      body: 0x8a7762,
-      accent: 0xd0b893
-    },
-
-    {
-      id: "frostwolf",
-      name: "Frostwolf",
-      type: "wolf",
-      element: "Ice",
-      rarity: 3,
-      hp: 125,
-      attack: 34,
-      speed: 3.9,
-      body: 0x9cd4e5,
-      accent: 0xf0fbff
-    },
-
-    {
-      id: "shadebat",
-      name: "Shadebat",
-      type: "bat",
-      element: "Dark",
-      rarity: 2,
-      hp: 83,
-      attack: 31,
-      speed: 4.2,
-      body: 0x55466e,
-      accent: 0xb394dd
-    },
-
-    {
-      id: "ironape",
-      name: "Ironape",
-      type: "ape",
-      element: "Ground",
-      rarity: 3,
-      hp: 165,
-      attack: 39,
-      speed: 2.3,
-      body: 0x6c7780,
-      accent: 0x273038
-    },
-
-    {
-      id: "stormgryph",
-      name: "Stormgryph",
-      type: "bird",
-      element: "Electric",
-      rarity: 4,
-      hp: 170,
-      attack: 43,
-      speed: 4.7,
-      body: 0xc6aa37,
-      accent: 0x5e4f27
-    },
-
-    {
-      id: "cinderdrake",
-      name: "Cinderdrake",
-      type: "dragon",
-      element: "Fire",
-      rarity: 4,
-      hp: 190,
-      attack: 48,
-      speed: 3.3,
-      body: 0xa94131,
-      accent: 0xff8a43
-    },
-
-    {
-      id: "glacierox",
-      name: "Glacierox",
-      type: "bull",
-      element: "Ice",
-      rarity: 4,
-      hp: 230,
-      attack: 41,
-      speed: 2.1,
-      body: 0x88bed3,
-      accent: 0xe4f7ff
-    },
-
-    {
-      id: "voidlion",
-      name: "Voidlion",
-      type: "lion",
-      element: "Dark",
-      rarity: 5,
-      hp: 220,
-      attack: 55,
-      speed: 3.6,
-      body: 0x46355e,
-      accent: 0xbd6eff
-    },
-
-    {
-      id: "solara",
-      name: "Solara",
-      type: "bird",
-      element: "Dragon",
-      rarity: 5,
-      hp: 205,
-      attack: 57,
-      speed: 5,
-      body: 0xe0b957,
-      accent: 0xfff2b2
-    }
-
-  ];
-
-
-  if (
-    typeof PALS_CREATURES !==
-    "undefined"
-  ) {
-
-    PALS_CREATURES.splice(
-      0,
-      PALS_CREATURES.length,
-      ...GALAXY_CREATURES
-    );
-  }
-
-
-  /* ============================================================
-     CREATURE BODY BUILDERS
-     ============================================================ */
-
-  function material(
-    THREE,
-    color
-  ) {
-
-    return new THREE
-      .MeshStandardMaterial({
-
-        color,
-
-        roughness:
-          0.72
-      });
-  }
-
-
-  function sphere(
-    THREE,
-    radius,
-    color,
-    x,
-    y,
-    z,
-    sx = 1,
-    sy = 1,
-    sz = 1
-  ) {
-
-    const mesh =
-      new THREE.Mesh(
-
-        new THREE
-          .SphereGeometry(
-            radius,
-            14,
-            11
-          ),
-
-        material(
-          THREE,
-          color
-        )
-      );
-
-
-    mesh.position.set(
-      x,
-      y,
-      z
-    );
-
-
-    mesh.scale.set(
-      sx,
-      sy,
-      sz
-    );
-
-
-    mesh.castShadow =
-      true;
-
-
-    return mesh;
-  }
-
-
-  function box(
-    THREE,
-    w,
-    h,
-    d,
-    color
-  ) {
-
-    const mesh =
-      new THREE.Mesh(
-
-        new THREE
-          .BoxGeometry(
-            w,
-            h,
-            d
-          ),
-
-        material(
-          THREE,
-          color
-        )
-      );
-
-
-    mesh.castShadow =
-      true;
-
-
-    return mesh;
-  }
-
-
-  function cone(
-    THREE,
-    radius,
-    height,
-    color
-  ) {
-
-    const mesh =
-      new THREE.Mesh(
-
-        new THREE
-          .ConeGeometry(
-            radius,
-            height,
-            6
-          ),
-
-        material(
-          THREE,
-          color
-        )
-      );
-
-
-    mesh.castShadow =
-      true;
-
-
-    return mesh;
-  }
-
-
-  function createDetailedCreature(
-    THREE,
-    species
-  ) {
-
-    const root =
-      new THREE.Group();
-
-
-    const bodyColor =
-      species.body;
-
-
-    const accent =
-      species.accent;
-
-
-    const body =
-      sphere(
-        THREE,
-        .75,
-        bodyColor,
-        0,
-        1.05,
-        0,
-        1.25,
-        .9,
-        1.5
-      );
-
-
-    root.add(
-      body
-    );
-
-
-    const chest =
-      sphere(
-        THREE,
-        .58,
-        bodyColor,
-        0,
-        1.25,
-        -.55,
-        1,
-        1.05,
-        1
-      );
-
-
-    root.add(
-      chest
-    );
-
-
-    const neck =
-      sphere(
-        THREE,
-        .35,
-        bodyColor,
-        0,
-        1.5,
-        -.82,
-        .8,
-        1.2,
-        .8
-      );
-
-
-    root.add(
-      neck
-    );
-
-
-    const head =
-      sphere(
-        THREE,
-        .52,
-        bodyColor,
-        0,
-        1.85,
-        -1.05,
-        1,
-        .95,
-        1
-      );
-
-
-    root.add(
-      head
-    );
-
-
-    const muzzle =
-      sphere(
-        THREE,
-        .25,
-        accent,
-        0,
-        1.72,
-        -1.48,
-        1.15,
-        .75,
-        .9
-      );
-
-
-    root.add(
-      muzzle
-    );
-
-
-    const eyes = [];
-
-
-    [
-      -.19,
-      .19
-    ]
-      .forEach(
-        x => {
-
-          const eye =
-            sphere(
-              THREE,
-              .075,
-              0xffffff,
-              x,
-              1.98,
-              -1.49
-            );
-
-
-          const pupil =
-            sphere(
-              THREE,
-              .035,
-              0x101010,
-              x,
-              1.98,
-              -1.56
-            );
-
-
-          root.add(
-            eye,
-            pupil
-          );
-
-
-          eyes.push(
-            eye,
-            pupil
-          );
-        }
-      );
-
-
-    const ears = [];
-
-
-    [
-      -.32,
-      .32
-    ]
-      .forEach(
-        x => {
-
-          const ear =
-            cone(
-              THREE,
-              .17,
-              .65,
-              accent
-            );
-
-
-          ear.position.set(
-            x,
-            2.38,
-            -1.04
-          );
-
-
-          ear.rotation.z =
-            x < 0
-              ? .16
-              : -.16;
-
-
-          root.add(
-            ear
-          );
-
-
-          ears.push(
-            ear
-          );
-        }
-      );
-
-
-    const legs = [];
-
-
-    [
-      [-.43, -.55],
-      [.43, -.55],
-      [-.48, .62],
-      [.48, .62]
-    ]
-      .forEach(
-        (
-          [
-            x,
-            z
-          ]
-        ) => {
-
-          const pivot =
-            new THREE.Group();
-
-
-          pivot.position.set(
-            x,
-            .8,
-            z
-          );
-
-
-          const upper =
-            box(
-              THREE,
-              .25,
-              .75,
-              .27,
-              bodyColor
-            );
-
-
-          upper.position.y =
-            -.34;
-
-
-          pivot.add(
-            upper
-          );
-
-
-          const foot =
-            sphere(
-              THREE,
-              .19,
-              accent,
-              0,
-              -.72,
-              -.06,
-              1.15,
-              .55,
-              1.4
-            );
-
-
-          pivot.add(
-            foot
-          );
-
-
-          root.add(
-            pivot
-          );
-
-
-          legs.push(
-            pivot
-          );
-        }
-      );
-
-
-    const tailPivot =
-      new THREE.Group();
-
-
-    tailPivot.position.set(
-      0,
-      1.25,
-      .95
-    );
-
-
-    const tail =
-      sphere(
-        THREE,
-        .22,
-        accent,
-        0,
-        .15,
-        .6,
-        .75,
-        .75,
-        3
-      );
-
-
-    tail.rotation.x =
-      -.45;
-
-
-    tailPivot.add(
-      tail
-    );
-
-
-    root.add(
-      tailPivot
-    );
-
-
-    const wings = [];
-
-
-    if (
-      species.type ===
-      "bird" ||
-      species.type ===
-      "bat" ||
-      species.type ===
-      "dragon"
-    ) {
-
-      [
-        -1,
-        1
-      ]
-        .forEach(
-          side => {
-
-            const wingPivot =
-              new THREE.Group();
-
-
-            wingPivot.position.set(
-              side *
-              .65,
-              1.45,
-              0
-            );
-
-
-            const wing =
-              new THREE.Mesh(
-
-                new THREE
-                  .ConeGeometry(
-                    .55,
-                    1.8,
-                    3
-                  ),
-
-                material(
-                  THREE,
-                  accent
-                )
-              );
-
-
-            wing.rotation.z =
-              side *
-              Math.PI /
-              2;
-
-
-            wing.rotation.y =
-              .2;
-
-
-            wingPivot.add(
-              wing
-            );
-
-
-            root.add(
-              wingPivot
-            );
-
-
-            wings.push(
-              wingPivot
-            );
-          }
-        );
-    }
-
-
-    const horns = [];
-
-
-    if (
-      species.type ===
-      "deer" ||
-      species.type ===
-      "bull" ||
-      species.type ===
-      "dragon"
-    ) {
-
-      [
-        -.28,
-        .28
-      ]
-        .forEach(
-          x => {
-
-            const horn =
-              cone(
-                THREE,
-                .09,
-                .55,
-                0xd9d0ba
-              );
-
-
-            horn.position.set(
-              x,
-              2.28,
-              -1.08
-            );
-
-
-            horn.rotation.z =
-              x < 0
-                ? -.3
-                : .3;
-
-
-            root.add(
-              horn
-            );
-
-
-            horns.push(
-              horn
-            );
-        }
-      );
-    }
-
-
-    root.userData = {
-
-      species,
-
-      body,
-
-      head,
-
-      legs,
-
-      wings,
-
-      tailPivot,
-
-      eyes,
-
-      horns,
-
-      animTime:
-        Math.random() *
-        10
-    };
-
-
-    return root;
-  }
-
-
-  /* ============================================================
-     CREATURE ANIMATION
-     ============================================================ */
-
-  function animateCreature(
-    creature,
-    dt,
-    moving
-  ) {
-
-    const model =
-      creature.model;
-
-
-    const data =
-      model.userData;
-
-
-    data.animTime +=
-      dt;
-
-
-    const t =
-      data.animTime;
-
-
-    data.body.position.y =
-      1.05 +
-      Math.sin(
-        t *
-        2
-      ) *
-      .025;
-
-
-    data.head.rotation.y =
-      Math.sin(
-        t *
-        .8
-      ) *
-      .09;
-
-
-    data.tailPivot.rotation.x =
-      Math.sin(
-        t *
-        3
-      ) *
-      .3;
-
-
-    if (
-      moving
-    ) {
-
-      data.legs
-        .forEach(
-          (
-            leg,
-            index
-          ) => {
-
-            leg.rotation.x =
-              Math.sin(
-                t *
-                7 +
-                index *
-                Math.PI
-              ) *
-              .55;
-          }
-        );
-
-    } else {
-
-      data.legs
-        .forEach(
-          leg => {
-
-            leg.rotation.x *=
-              .85;
-          }
-        );
-    }
-
-
-    data.wings
-      .forEach(
-        (
-          wing,
-          index
-        ) => {
-
-          wing.rotation.z =
-            Math.sin(
-              t *
-              4
-            ) *
-            .28 *
-            (
-              index
-                ? -1
-                : 1
-            );
-        }
-      );
-
-
-    model.rotation.z =
-      Math.sin(
-        t *
-        1.5
-      ) *
-      .01;
-  }
-
-
-  /* ============================================================
-     ADVANCED ORB
-     ============================================================ */
-
-  function createOrbMesh(
-    THREE,
-    tier = 0
-  ) {
-
-    const colors = [
-
-      0x4fa8ff,
-      0x55d474,
-      0xe4c748,
-      0x9f66e7,
-      0xf2d8ff,
-      0xffb338
-    ];
-
-
-    const group =
-      new THREE.Group();
-
-
-    const top =
-      new THREE.Mesh(
-
-        new THREE
-          .SphereGeometry(
-            .19,
-            16,
-            12
-          ),
-
-        new THREE
-          .MeshStandardMaterial({
-
-            color:
-              colors[
-                tier %
-                colors.length
-              ],
-
-            metalness:
-              .35,
-
-            roughness:
-              .25,
-
-            emissive:
-              colors[
-                tier %
-                colors.length
-              ],
-
-            emissiveIntensity:
-              .15
-          })
-      );
-
-
-    const band =
-      new THREE.Mesh(
-
-        new THREE
-          .TorusGeometry(
-            .19,
-            .025,
-            8,
-            24
-          ),
-
-        new THREE
-          .MeshStandardMaterial({
-
-            color:
-              0xffffff,
-
-            metalness:
-              .5
-          })
-      );
-
-
-    band.rotation.x =
-      Math.PI /
-      2;
-
-
-    const button =
-      sphere(
-        THREE,
-        .045,
-        0xffffff,
-        0,
-        0,
-        -.19
-      );
-
-
-    group.add(
-      top,
-      band,
-      button
-    );
-
-
-    return group;
-  }
-
-
-  /* ============================================================
-     THIRD PERSON PLAYER
-     ============================================================ */
-
-  function createPlayerModel(
-    THREE
-  ) {
-
-    const root =
-      new THREE.Group();
-
-
-    const torso =
-      box(
-        THREE,
-        .58,
-        .85,
-        .33,
-        0x354c68
-      );
-
-
-    torso.position.y =
-      1.15;
-
-
-    root.add(
-      torso
-    );
-
-
-    const head =
-      sphere(
-        THREE,
-        .24,
-        0xd0aa8c,
-        0,
-        1.86,
-        0
-      );
-
-
-    root.add(
-      head
-    );
-
-
-    const arms =
-      [];
-
-
-    [
-      -.4,
-      .4
-    ]
-      .forEach(
-        x => {
-
-          const pivot =
-            new THREE.Group();
-
-
-          pivot.position.set(
-            x,
-            1.45,
-            0
-          );
-
-
-          const arm =
-            box(
-              THREE,
-              .17,
-              .72,
-              .18,
-              0x354c68
-            );
-
-
-          arm.position.y =
-            -.32;
-
-
-          pivot.add(
-            arm
-          );
-
-
-          root.add(
-            pivot
-          );
-
-
-          arms.push(
-            pivot
-          );
-        }
-      );
-
-
-    const legs =
-      [];
-
-
-    [
-      -.18,
-      .18
-    ]
-      .forEach(
-        x => {
-
-          const pivot =
-            new THREE.Group();
-
-
-          pivot.position.set(
-            x,
-            .77,
-            0
-          );
-
-
-          const leg =
-            box(
-              THREE,
-              .2,
-              .75,
-              .22,
-              0x263141
-            );
-
-
-          leg.position.y =
-            -.36;
-
-
-          pivot.add(
-            leg
-          );
-
-
-          root.add(
-            pivot
-          );
-
-
-          legs.push(
-            pivot
-          );
-        }
-      );
-
-
-    root.userData = {
-
-      arms,
-
-      legs,
-
-      anim:
-        0
-    };
-
-
-    return root;
-  }
-
-
-  /* ============================================================
-     REPLACE START PALS
-     ============================================================ */
-
-  const oldStartPals =
-    typeof startPals ===
-    "function"
-      ? startPals
-      : null;
-
-
-  startPals =
-    async function () {
-
-      cleanup3D();
-
-
-      GP.active =
-        true;
-
-
-      const game =
-        GameCenter.pals ||
-        palsDefault();
-
-
-      GameCenter.pals =
-        game;
-
-
-      const body =
-        $("#contentBody");
-
-
-      body.innerHTML = `
-
-        <div
-          class="pals-shell"
-        >
-
-          <div
-            class="pals-world"
-            id="palsWorld"
-          >
-
-            <canvas
-              id="palsCanvas"
-            ></canvas>
-
-
-            <div
-              class="pals-vignette"
-            ></div>
-
-
-            <div
-              class="pals-hud-top"
-            >
-
-              <div
-                class="pals-zone"
-              >
-                Verdant Wilds
-              </div>
-
-
-              <div
-                id="palsTime"
-                class="pals-clock"
-              >
-                DAY ${game.day || 1}
-              </div>
-
-
-              <div
-                class="pals-level"
-              >
-                LEVEL
-                <strong
-                  id="palsLevel"
-                >
-                  ${game.level || 1}
-                </strong>
-              </div>
-
-            </div>
-
-
-            <div
-              id="palsTarget"
-              class="pals-target-card"
-              hidden
-            ></div>
-
-
-            <div
-              id="pParty"
-              class="pals-party"
-            ></div>
-
-
-            <div
-              class="pals-minimap"
-            >
-              <span
-                class="pals-minimap-player"
-              ></span>
-            </div>
-
-
-            <div
-              id="palsFeed"
-              class="pals-feed"
-            ></div>
-
-
-            <div
-              class="pals-crosshair"
-            ></div>
-
-
-            <div
-              id="palsInteract"
-              class="pals-interact"
-            >
-              Click world to control camera
-            </div>
-
-
-            <div
-              class="pals-hud-left"
-            >
-
-              <div
-                class="pals-bar-row"
-              >
-                <span>HEALTH</span>
-
-                <div
-                  class="pals-bar"
-                >
-                  <span
-                    id="palsHP"
-                    class="pals-health-fill"
-                  ></span>
-                </div>
-
-                <strong
-                  id="palsHPText"
-                >
-                  100
-                </strong>
-              </div>
-
-
-              <div
-                class="pals-bar-row"
-              >
-                <span>STAMINA</span>
-
-                <div
-                  class="pals-bar"
-                >
-                  <span
-                    id="palsStamina"
-                    class="pals-stamina-fill"
-                  ></span>
-                </div>
-
-                <strong
-                  id="palsStaminaText"
-                >
-                  100
-                </strong>
-              </div>
-
-
-              <div
-                class="pals-bar-row"
-              >
-                <span>FOOD</span>
-
-                <div
-                  class="pals-bar"
-                >
-                  <span
-                    id="palsFood"
-                    class="pals-hunger-fill"
-                  ></span>
-                </div>
-
-                <strong
-                  id="palsFoodText"
-                >
-                  100
-                </strong>
-              </div>
-
-            </div>
-
-
-            <div
-              id="palsOrbWheel"
-              class="pals-sphere-wheel"
-            ></div>
-
-          </div>
-
-        </div>
-
-      `;
-
-
-      try {
-
-        const THREE =
-          await loadThree();
-
-
-        const canvas =
-          $("#palsCanvas");
-
-
-        const scene =
-          new THREE.Scene();
-
-
-        const camera =
-          new THREE
-            .PerspectiveCamera(
-              67,
-              1,
-              .1,
-              260
-            );
-
-
-        const renderer =
-          new THREE
-            .WebGLRenderer({
-
-              canvas,
-
-              antialias:
-                true
-            });
-
-
-        renderer.shadowMap.enabled =
-          true;
-
-
-        renderer.shadowMap.type =
-          THREE.PCFSoftShadowMap;
-
-
-        Object.assign(
-          THREE_ACTIVE,
-          {
-
-            kind:
-              "pals",
-
-            renderer,
-
-            scene,
-
-            camera,
-
-            canvas
-          }
-        );
-
-
-        scene.background =
-          new THREE.Color(
-            0x85c5e6
-          );
-
-
-        scene.fog =
-          new THREE.FogExp2(
-            0x9bcada,
-            .008
-          );
-
-
-        const hemisphere =
-          new THREE
-            .HemisphereLight(
-              0xcceeff,
-              0x40502d,
-              1.5
-            );
-
-
-        scene.add(
-          hemisphere
-        );
-
-
-        const sun =
-          new THREE
-            .DirectionalLight(
-              0xfff3ce,
-              2
-            );
-
-
-        sun.position.set(
-          35,
-          55,
-          28
-        );
-
-
-        sun.castShadow =
-          true;
-
-
-        scene.add(
-          sun
-        );
-
-
-        /* ====================================================
-           WORLD
-           ==================================================== */
-
-        const world =
-          new THREE.Group();
-
-
-        scene.add(
-          world
-        );
-
-
-        const ground =
-          new THREE.Mesh(
-
-            new THREE
-              .PlaneGeometry(
-                300,
-                300,
-                1,
-                1
-              ),
-
-            new THREE
-              .MeshStandardMaterial({
-                color:
-                  0x587d45,
-
-                roughness:
-                  1
-              })
-          );
-
-
-        ground.rotation.x =
-          -Math.PI /
-          2;
-
-
-        ground.receiveShadow =
-          true;
-
-
-        world.add(
-          ground
-        );
-
-
-        /* water */
-
-        const water =
-          new THREE.Mesh(
-
-            new THREE
-              .PlaneGeometry(
-                55,
-                40
-              ),
-
-            new THREE
-              .MeshStandardMaterial({
-
-                color:
-                  0x4388b6,
-
-                transparent:
-                  true,
-
-                opacity:
-                  .78,
-
-                roughness:
-                  .2
-              })
-          );
-
-
-        water.rotation.x =
-          -Math.PI /
-          2;
-
-
-        water.position.set(
-          45,
-          .05,
-          -45
-        );
-
-
-        world.add(
-          water
-        );
-
-
-        /* rocks + trees */
-
-        for (
-          let i = 0;
-          i < 100;
-          i++
-        ) {
-
-          const x =
-            rand(
-              -135,
-              135
-            );
-
-
-          const z =
-            rand(
-              -135,
-              135
-            );
-
-
-          if (
-            Math.hypot(
-              x,
-              z
-            ) <
-            12
-          ) {
-            continue;
-          }
-
-
-          if (
-            Math.random() <
-            .65
-          ) {
-
-            const tree =
-              new THREE.Group();
-
-
-            const trunk =
-              new THREE.Mesh(
-
-                new THREE
-                  .CylinderGeometry(
-                    .25,
-                    .42,
-                    rand(
-                      3,
-                      6
-                    ),
-                    7
-                  ),
-
-                material(
-                  THREE,
-                  0x6b4a2f
-                )
-              );
-
-
-            trunk.position.y =
-              2;
-
-
-            tree.add(
-              trunk
-            );
-
-
-            for (
-              let c = 0;
-              c < 3;
-              c++
-            ) {
-
-              const crown =
-                sphere(
-                  THREE,
-                  rand(
-                    1.2,
-                    2.1
-                  ),
-                  pick([
-                    0x416d3a,
-                    0x4b7c41,
-                    0x558744
-                  ]),
-                  rand(
-                    -.4,
-                    .4
-                  ),
-                  4 +
-                  c *
-                  .6,
-                  rand(
-                    -.4,
-                    .4
-                  )
-                );
-
-
-              tree.add(
-                crown
-              );
-            }
-
-
-            tree.position.set(
-              x,
-              0,
-              z
-            );
-
-
-            world.add(
-              tree
-            );
-
-          } else {
-
-            const rock =
-              new THREE.Mesh(
-
-                new THREE
-                  .DodecahedronGeometry(
-                    rand(
-                      .7,
-                      1.8
-                    )
-                  ),
-
-                material(
-                  THREE,
-                  0x7a7c75
-                )
-              );
-
-
-            rock.position.set(
-              x,
-              .7,
-              z
-            );
-
-
-            rock.rotation.set(
-              rand(
-                0,
-                2
-              ),
-              rand(
-                0,
-                2
-              ),
-              rand(
-                0,
-                2
-              )
-            );
-
-
-            world.add(
-              rock
-            );
-          }
-        }
-
-
-        /* ====================================================
-           PLAYER
-           ==================================================== */
-
-        const playerModel =
-          createPlayerModel(
-            THREE
-          );
-
-
-        world.add(
-          playerModel
-        );
-
-
-        const player = {
-
-          x:
-            game.x || 0,
-
-          z:
-            game.z || 8,
-
-          y:
-            0,
-
-          yaw:
-            0,
-
-          pitch:
-            -.12,
-
-          velocityY:
-            0,
-
-          ground:
-            true,
-
-          hp:
-            game.hp || 100,
-
-          stamina:
-            game.stamina || 100,
-
-          hunger:
-            game.hunger || 100
-        };
-
-
-        /* ====================================================
-           CREATURES
-           ==================================================== */
-
-        const creatures =
-          [];
-
-
-        function spawnWild() {
-
-          const species =
-            pick(
-              GALAXY_CREATURES
-            );
-
-
-          const model =
-            createDetailedCreature(
-              THREE,
-              species
-            );
-
-
-          const creature = {
-
-            species,
-
-            model,
-
-            x:
-              rand(
-                -100,
-                100
-              ),
-
-            z:
-              rand(
-                -100,
-                100
-              ),
-
-            hp:
-              species.hp,
-
-            maxHp:
-              species.hp,
-
-            level:
-              Math.max(
-                1,
-                Math.floor(
-                  rand(
-                    1,
-                    5 +
-                    game.level *
-                    .8
-                  )
-                )
-              ),
-
-            direction:
-              rand(
-                0,
-                Math.PI *
-                2
-              ),
-
-            nextDirection:
-              performance.now() +
-              rand(
-                800,
-                2500
-              ),
-
-            alive:
-              true,
-
-            captured:
-              false
-          };
-
-
-          model.position.set(
-            creature.x,
-            0,
-            creature.z
-          );
-
-
-          model.traverse(
-            child => {
-
-              if (
-                child.isMesh
-              ) {
-
-                child.userData.creature =
-                  creature;
-              }
-            }
-          );
-
-
-          world.add(
-            model
-          );
-
-
-          creatures.push(
-            creature
-          );
-        }
-
-
-        for (
-          let i = 0;
-          i < 26;
-          i++
-        ) {
-
-          spawnWild();
-        }
-
-
-        GP.creatures =
-          creatures;
-
-
-        /* ====================================================
-           INPUT
-           ==================================================== */
-
-        const keys =
-          GP.keys;
-
-
-        keys.clear();
-
-
-        on3D(
-          canvas,
-          "click",
-          () => {
-
-            canvas
-              .requestPointerLock
-              ?.();
-          }
-        );
-
-
-        on3D(
-          document,
-          "mousemove",
-          event => {
-
-            if (
-              document.pointerLockElement !==
-              canvas
-            ) {
-              return;
-            }
-
-
-            player.yaw -=
-              event.movementX *
-              .0025;
-
-
-            player.pitch =
-              clamp(
-
-                player.pitch -
-                event.movementY *
-                .0018,
-
-                -.48,
-                .3
-              );
-          }
-        );
-
-
-        on3D(
-          document,
-          "keydown",
-          event => {
-
-            if (
-              THREE_ACTIVE.kind !==
-              "pals"
-            ) {
-              return;
-            }
-
-
-            keys.add(
-              event.code
-            );
-
-
-            if (
-              /^Digit[1-5]$/
-                .test(
-                  event.code
-                )
-            ) {
-
-              game.orb =
-                Number(
-                  event.code
-                    .slice(-1)
-                ) -
-                1;
-            }
-
-
-            if (
-              event.code ===
-              "KeyQ"
-            ) {
-
-              throwOrb();
-            }
-
-
-            if (
-              event.code ===
-              "KeyF"
-            ) {
-
-              summonCreature();
-            }
-
-
-            if (
-              event.code ===
-              "KeyI"
-            ) {
-
-              showAdvancedPalBox();
-
-              document
-                .exitPointerLock
-                ?.();
-            }
-          }
-        );
-
-
-        on3D(
-          document,
-          "keyup",
-          event => {
-
-            keys.delete(
-              event.code
-            );
-          }
-        );
-
-
-        on3D(
-          document,
-          "mousedown",
-          event => {
-
-            if (
-              THREE_ACTIVE.kind !==
-              "pals"
-            ) {
-              return;
-            }
-
-
-            if (
-              event.button === 0 &&
-              document.pointerLockElement ===
-              canvas
-            ) {
-
-              damageTarget();
-            }
-          }
-        );
-
-
-        /* ====================================================
-           RAY TARGET
-           ==================================================== */
-
-        const raycaster =
-          new THREE
-            .Raycaster();
-
-
-        function findTarget() {
-
-          raycaster.setFromCamera(
-            new THREE.Vector2(
-              0,
-              0
-            ),
-            camera
-          );
-
-
-          const meshes =
-            [];
-
-
-          creatures.forEach(
-            creature => {
-
-              if (
-                !creature.alive
-              ) {
-                return;
-              }
-
-
-              creature.model.traverse(
-                child => {
-
-                  if (
-                    child.isMesh
-                  ) {
-
-                    meshes.push(
-                      child
-                    );
-                  }
-                }
-              );
-            }
-          );
-
-
-          const hit =
-            raycaster.intersectObjects(
-              meshes,
-              false
-            )[0];
-
-
-          const creature =
-            hit
-              ?.object
-              ?.userData
-              ?.creature;
-
-
-          if (
-            creature &&
-            hit.distance <
-            20
-          ) {
-
-            GP.target =
-              creature;
-
-          } else {
-
-            GP.target =
-              null;
-          }
-        }
-
-
-        /* ====================================================
-           DAMAGE
-           ==================================================== */
-
-        function damageTarget() {
-
-          const creature =
-            GP.target;
-
-
-          if (
-            !creature ||
-            !creature.alive
-          ) {
-            return;
-          }
-
-
-          creature.hp -=
-            13 +
-            game.level *
-            1.3;
-
-
-          creature.model
-            .rotation.z =
-            .15;
-
-
-          setTimeout(
-            () => {
-
-              if (
-                creature.model
-              ) {
-
-                creature.model
-                  .rotation.z =
-                  0;
-              }
-            },
-            100
-          );
-
-
-          addFeed(
-            `${creature.species.name} HP ${Math.ceil(
-              Math.max(
-                0,
-                creature.hp
-              )
-            )}`
-          );
-
-
-          if (
-            creature.hp <= 0
-          ) {
-
-            creature.alive =
-              false;
-
-            creature.model.visible =
-              false;
-
-
-            game.xp =
-              (
-                game.xp ||
-                0
-              )
-              +
-              25 *
-              creature.species
-                .rarity;
-
-
-            addFeed(
-              `${creature.species.name} defeated`
-            );
-          }
-        }
-
-
-        /* ====================================================
-           CAPTURE CHANCE
-           ==================================================== */
-
-        function captureChance(
-          creature
-        ) {
-
-          const orb =
-            PALS_ORBS[
-              game.orb ||
-              0
-            ];
-
-
-          const hp =
-            creature.hp /
-            creature.maxHp;
-
-
-          const hpBonus =
-            1 -
-            hp *
-            .72;
-
-
-          const rarityPenalty =
-            1 /
-            (
-              1 +
-              creature.species
-                .rarity *
-              .28
-            );
-
-
-          const levelPenalty =
-            1 /
-            (
-              1 +
-              creature.level *
-              .025
-            );
-
-
-          return clamp(
-
-            (
-              .26 +
-              hpBonus
-            )
-
-            *
-
-            (
-              orb?.bonus ||
-              1
-            )
-
-            *
-
-            rarityPenalty
-
-            *
-
-            levelPenalty,
-
-            .03,
-            .96
-          );
-        }
-
-
-        /* ====================================================
-           THROW PHYSICAL ORB
-           ==================================================== */
-
-        function throwOrb() {
-
-          const tier =
-            game.orb ||
-            0;
-
-
-          game.inventory.orbs =
-            game.inventory.orbs ||
-            [
-              10,
-              2,
-              0,
-              0,
-              0
-            ];
-
-
-          if (
-            (
-              game.inventory.orbs[
-                tier
-              ] ||
-              0
-            ) <= 0
-          ) {
-
-            addFeed(
-              "No capture Orbs"
-            );
-
-            return;
-          }
-
-
-          game.inventory.orbs[
-            tier
-          ]--;
-
-
-          const orb =
-            createOrbMesh(
-              THREE,
-              tier
-            );
-
-
-          const direction =
-            new THREE.Vector3();
-
-
-          camera.getWorldDirection(
-            direction
-          );
-
-
-          orb.position.copy(
-            playerModel.position
-          );
-
-
-          orb.position.y =
-            1.6;
-
-
-          orb.position.add(
-            direction
-              .clone()
-              .multiplyScalar(
-                1
-              )
-          );
-
-
-          world.add(
-            orb
-          );
-
-
-          GP.projectiles.push({
-
-            mesh:
-              orb,
-
-            velocity:
-              direction
-                .multiplyScalar(
-                  13
-                )
-                .add(
-                  new THREE.Vector3(
-                    0,
-                    3.8,
-                    0
-                  )
-                ),
-
-            life:
-              4,
-
-            tier,
-
-            active:
-              true
-          });
-
-
-          addFeed(
-            `${PALS_ORBS[tier]?.name || "Orb"} thrown`
-          );
-        }
-
-
-        function updateProjectiles(
-          dt
-        ) {
-
-          for (
-            const projectile of
-            GP.projectiles
-          ) {
-
-            if (
-              !projectile.active
-            ) {
-              continue;
-            }
-
-
-            projectile.velocity.y -=
-              9.8 *
-              dt;
-
-
-            projectile.mesh.position
-              .addScaledVector(
-                projectile.velocity,
-                dt
-              );
-
-
-            projectile.mesh.rotation.x +=
-              dt *
-              8;
-
-
-            projectile.mesh.rotation.z +=
-              dt *
-              5;
-
-
-            projectile.life -=
-              dt;
-
-
-            let hitCreature =
-              null;
-
-
-            for (
-              const creature of
-              creatures
-            ) {
-
-              if (
-                !creature.alive
-              ) {
-                continue;
-              }
-
-
-              const distance =
-                projectile.mesh
-                  .position
-                  .distanceTo(
-                    creature.model
-                      .position
-                  );
-
-
-              if (
-                distance <
-                1.25
-              ) {
-
-                hitCreature =
-                  creature;
-
-                break;
-              }
-            }
-
-
-            if (
-              hitCreature
-            ) {
-
-              projectile.active =
-                false;
-
-
-              world.remove(
-                projectile.mesh
-              );
-
-
-              beginCapture(
-                hitCreature,
-                projectile.tier
-              );
-
-
-              continue;
-            }
-
-
-            if (
-              projectile.mesh
-                .position.y <
-              .15 ||
-              projectile.life <
-              0
-            ) {
-
-              projectile.active =
-                false;
-
-
-              world.remove(
-                projectile.mesh
-              );
-            }
-          }
-
-
-          GP.projectiles =
-            GP.projectiles
-              .filter(
-                projectile =>
-                  projectile.active
-              );
-        }
-
-
-        /* ====================================================
-           CAPTURE SEQUENCE
-           ==================================================== */
-
-        async function beginCapture(
-          creature,
-          tier
-        ) {
-
-          const chance =
-            captureChance(
-              creature
-            );
-
-
-          creature.model.visible =
-            false;
-
-
-          showCaptureStatus(
-            "CAPTURE STARTED",
-            `${Math.round(
-              chance *
-              100
-            )}% chance`
-          );
-
-
-          await wait(
-            500
-          );
-
-
-          showCaptureStatus(
-            "SHAKE 1",
-            creature.species.name
-          );
-
-
-          await wait(
-            550
-          );
-
-
-          showCaptureStatus(
-            "SHAKE 2",
-            creature.species.name
-          );
-
-
-          await wait(
-            550
-          );
-
-
-          if (
-            Math.random() <
-            chance
-          ) {
-
-            creature.alive =
-              false;
-
-            creature.captured =
-              true;
-
-
-            game.box =
-              game.box ||
-              [];
-
-
-            game.party =
-              game.party ||
-              [];
-
-
-            game.box.push(
-              creature.species.id
-            );
-
-
-            if (
-              game.party.length <
-              5
-            ) {
-
-              game.party.push(
-                creature.species.id
-              );
-            }
-
-
-            game.xp =
-              (
-                game.xp ||
-                0
-              )
-              +
-              40 *
-              creature.species
-                .rarity;
-
-
-            showCaptureStatus(
-              "CAPTURED!",
-              creature.species.name
-            );
-
-
-            addFeed(
-              `${creature.species.name} captured!`
-            );
-
-
-            palsSave(
-              game
-            );
-
-
-            setTimeout(
-              hideCaptureStatus,
-              1200
-            );
-
-          } else {
-
-            creature.model.visible =
-              true;
-
-
-            creature.hp =
-              Math.max(
-                1,
-                creature.hp
-              );
-
-
-            showCaptureStatus(
-              "ESCAPED!",
-              creature.species.name
-            );
-
-
-            addFeed(
-              `${creature.species.name} escaped`
-            );
-
-
-            setTimeout(
-              hideCaptureStatus,
-              900
-            );
-          }
-        }
-
-
-        function wait(ms) {
-
-          return new Promise(
-            resolve =>
-              setTimeout(
-                resolve,
-                ms
-              )
-          );
-        }
-
-
-        function showCaptureStatus(
-          title,
-          text
-        ) {
-
-          let box =
-            $("#palsCaptureStatus");
-
-
-          if (!box) {
-
-            box =
-              document.createElement(
-                "div"
-              );
-
-
-            box.id =
-              "palsCaptureStatus";
-
-
-            box.className =
-              "pals-capture-status";
-
-
-            $("#palsWorld")
-              ?.appendChild(
-                box
-              );
-          }
-
-
-          box.innerHTML = `
-
-            <strong>
-              ${escapeHTML(title)}
-            </strong>
-
-            <span>
-              ${escapeHTML(text)}
-            </span>
-
-          `;
-        }
-
-
-        function hideCaptureStatus() {
-
-          $("#palsCaptureStatus")
-            ?.remove();
-        }
-
-
-        /* ====================================================
-           COMPANION
-           ==================================================== */
-
-        function summonCreature() {
-
-          if (
-            GP.companion
-          ) {
-
-            world.remove(
-              GP.companion.model
-            );
-
-
-            GP.companion =
-              null;
-
-
-            addFeed(
-              "Companion recalled"
-            );
-
-
-            return;
-          }
-
-
-          if (
-            !game.party?.length
-          ) {
-
-            addFeed(
-              "Capture a creature first"
-            );
-
-            return;
-          }
-
-
-          const species =
-            GALAXY_CREATURES
-              .find(
-                creature =>
-                  creature.id ===
-                  game.party[0]
-              );
-
-
-          if (!species) {
-            return;
-          }
-
-
-          const model =
-            createDetailedCreature(
-              THREE,
-              species
-            );
-
-
-          model.scale.setScalar(
-            1.1
-          );
-
-
-          world.add(
-            model
-          );
-
-
-          GP.companion = {
-
-            species,
-
-            model,
-
-            hp:
-              species.hp
-          };
-
-
-          addFeed(
-            `${species.name} summoned`
-          );
-        }
-
-
-        /* ====================================================
-           PAL BOX
-           ==================================================== */
-
-        function showAdvancedPalBox() {
-
-          const old =
-            $("#palsOverlay");
-
-
-          if (old) {
-
-            old.remove();
-
-            return;
-          }
-
-
-          const overlay =
-            document.createElement(
-              "div"
-            );
-
-
-          overlay.id =
-            "palsOverlay";
-
-
-          overlay.className =
-            "pals-inventory-overlay";
-
-
-          overlay.innerHTML = `
-
-            <div
-              class="pals-panel"
-            >
-
-              <div
-                class="pals-panel-head"
-              >
-
-                <h3>
-                  PAL BOX
-                </h3>
-
-                <button
-                  class="pals-secondary"
-                  onclick="
-                    document
-                    .getElementById('palsOverlay')
-                    ?.remove()
-                  "
-                >
-                  Close
-                </button>
-
-              </div>
-
-
-              <div
-                class="pals-panel-body"
-              >
-
-                <h3>
-                  Captured
-                  ${
-                    game.box?.length ||
-                    0
-                  }
-                </h3>
-
-
-                <div
-                  class="pals-grid"
-                >
-
-                  ${
-                    (
-                      game.box ||
-                      []
-                    )
-                      .map(
-                        id => {
-
-                          const species =
-                            GALAXY_CREATURES
-                              .find(
-                                creature =>
-                                  creature.id === id
-                              );
-
-
-                          if (
-                            !species
-                          ) {
-                            return "";
-                          }
-
-
-                          return `
-
-                            <div
-                              class="pals-creature-card"
-                            >
-
-                              <div
-                                class="pals-creature-icon"
-                              >
-                                ✦
-                              </div>
-
-                              <strong>
-                                ${species.name}
-                              </strong>
-
-                              <small>
-                                ${species.element}
-                                •
-                                Rarity
-                                ${species.rarity}
-                              </small>
-
-                            </div>
-
-                          `;
-                        }
-                      )
-                      .join("")
-
-                    ||
-
-                    "<p>No creatures captured yet.</p>"
-                  }
-
-                </div>
-
-              </div>
-
-            </div>
-
-          `;
-
-
-          $("#palsWorld")
-            ?.appendChild(
-              overlay
-            );
-        }
-
-
-        /* ====================================================
-           FEED
-           ==================================================== */
-
-        const feed =
-          [];
-
-
-        function addFeed(text) {
-
-          feed.unshift({
-
-            text,
-
-            time:
-              performance.now()
-          });
-
-
-          feed.splice(
-            5
-          );
-
-
-          renderFeed();
-        }
-
-
-        function renderFeed() {
-
-          const root =
-            $("#palsFeed");
-
-
-          if (!root) {
-            return;
-          }
-
-
-          root.innerHTML =
-            feed
-              .filter(
-                item =>
-                  performance.now() -
-                  item.time <
-                  5500
-              )
-              .map(
-                item => `
-
-                  <div
-                    class="pals-feed-row"
-                  >
-                    ${escapeHTML(
-                      item.text
-                    )}
-                  </div>
-
-                `
-              )
-              .join("");
-        }
-
-
-        /* ====================================================
-           HUD
-           ==================================================== */
-
-        function updateHUD() {
-
-          $("#palsHP")
-            ?.style
-            .setProperty(
-              "width",
-              `${
-                clamp(
-                  player.hp,
-                  0,
-                  100
-                )
-              }%`
-            );
-
-
-          $("#palsStamina")
-            ?.style
-            .setProperty(
-              "width",
-              `${
-                clamp(
-                  player.stamina,
-                  0,
-                  100
-                )
-              }%`
-            );
-
-
-          $("#palsFood")
-            ?.style
-            .setProperty(
-              "width",
-              `${
-                clamp(
-                  player.hunger,
-                  0,
-                  100
-                )
-              }%`
-            );
-
-
-          if (
-            $("#palsHPText")
-          ) {
-
-            $("#palsHPText")
-              .textContent =
-              Math.round(
-                player.hp
-              );
-          }
-
-
-          if (
-            $("#palsStaminaText")
-          ) {
-
-            $("#palsStaminaText")
-              .textContent =
-              Math.round(
-                player.stamina
-              );
-          }
-
-
-          if (
-            $("#palsFoodText")
-          ) {
-
-            $("#palsFoodText")
-              .textContent =
-              Math.round(
-                player.hunger
-              );
-          }
-
-
-          const wheel =
-            $("#palsOrbWheel");
-
-
-          if (wheel) {
-
-            wheel.innerHTML =
-              PALS_ORBS
-                .map(
-                  (
-                    orb,
-                    index
-                  ) => `
-
-                    <div
-
-                      class="
-                        pals-sphere
-
-                        ${
-                          index ===
-                          (
-                            game.orb ||
-                            0
-                          )
-                            ? "active"
-                            : ""
-                        }
-                      "
-
-                    >
-
-                      ${index + 1}
-
-                      <br>
-
-                      ${escapeHTML(
-                        orb.name
-                      )}
-
-                      <br>
-
-                      x${
-                        game.inventory
-                          ?.orbs
-                          ? game.inventory
-                              .orbs[index]
-                              ||
-                              0
-                          : 0
-                      }
-
-                    </div>
-
-                  `
-                )
-                .join("");
-          }
-
-
-          const targetBox =
-            $("#palsTarget");
-
-
-          if (
-            GP.target &&
-            GP.target.alive
-          ) {
-
-            targetBox.hidden =
-              false;
-
-
-            targetBox.innerHTML = `
-
-              <div
-                class="pals-target-title"
-              >
-
-                <strong>
-                  ${GP.target.species.name}
-                </strong>
-
-                <span>
-                  LV ${GP.target.level}
-                  •
-                  ${GP.target.species.element}
-                </span>
-
-              </div>
-
-
-              <div
-                class="pals-target-hp"
-              >
-
-                <span
-                  style="
-                    width:
-                    ${
-                      clamp(
-                        GP.target.hp /
-                        GP.target.maxHp *
-                        100,
-                        0,
-                        100
-                      )
-                    }%
-                  "
-                ></span>
-
-              </div>
-
-
-              <div
-                class="pals-capture-chance"
-              >
-
-                <span>
-                  Capture probability
-                </span>
-
-                <strong>
-                  ${
-                    Math.round(
-                      captureChance(
-                        GP.target
-                      ) *
-                      100
-                    )
-                  }%
-                </strong>
-
-              </div>
-
-            `;
-
-          } else {
-
-            targetBox.hidden =
-              true;
-          }
-
-
-          const party =
-            $("#pParty");
-
-
-          if (party) {
-
-            party.innerHTML =
-              (
-                game.party ||
-                []
-              )
-                .map(
-                  id => {
-
-                    const species =
-                      GALAXY_CREATURES
-                        .find(
-                          creature =>
-                            creature.id ===
-                            id
-                        );
-
-
-                    return `
-
-                      <div
-                        class="pals-party-row"
-                      >
-
-                        <div
-                          class="pals-party-icon"
-                        >
-                          ✦
-                        </div>
-
-                        <div
-                          class="pals-party-copy"
-                        >
-
-                          <strong>
-                            ${species?.name || id}
-                          </strong>
-
-                          <span>
-                            ${species?.element || ""}
-                          </span>
-
-                          <div
-                            class="pals-party-hp"
-                          >
-                            <span></span>
-                          </div>
-
-                        </div>
-
-                      </div>
-
-                    `;
-                  }
-                )
-                .join("");
-          }
-        }
-
-
-        /* ====================================================
-           PLAYER MOVEMENT
-           ==================================================== */
-
-        function movePlayer(
-          dt
-        ) {
-
-          const forward =
-            (
-              keys.has(
-                "KeyW"
-              )
-                ? 1
-                : 0
-            )
-            -
-            (
-              keys.has(
-                "KeyS"
-              )
-                ? 1
-                : 0
-            );
-
-
-          const right =
-            (
-              keys.has(
-                "KeyD"
-              )
-                ? 1
-                : 0
-            )
-            -
-            (
-              keys.has(
-                "KeyA"
-              )
-                ? 1
-                : 0
-            );
-
-
-          const sprint =
-            keys.has(
-              "ShiftLeft"
-            ) &&
-            player.stamina >
-            1;
-
-
-          const speed =
-            sprint
-              ? 7.1
-              : 4.1;
-
-
-          const sin =
-            Math.sin(
-              player.yaw
-            );
-
-
-          const cos =
-            Math.cos(
-              player.yaw
-            );
-
-
-          player.x +=
-
-            (
-              -sin *
-              forward
-
-              +
-
-              cos *
-              right
-            )
-
-            *
-
-            speed
-
-            *
-
-            dt;
-
-
-          player.z +=
-
-            (
-              -cos *
-              forward
-
-              -
-
-              sin *
-              right
-            )
-
-            *
-
-            speed
-
-            *
-
-            dt;
-
-
-          player.x =
-            clamp(
-              player.x,
-              -140,
-              140
-            );
-
-
-          player.z =
-            clamp(
-              player.z,
-              -140,
-              140
-            );
-
-
-          if (
-            sprint &&
-            (
-              forward ||
-              right
-            )
-          ) {
-
-            player.stamina -=
-              18 *
-              dt;
-
-          } else {
-
-            player.stamina +=
-              13 *
-              dt;
-          }
-
-
-          player.stamina =
-            clamp(
-              player.stamina,
-              0,
-              100
-            );
-
-
-          playerModel.position.set(
-            player.x,
-            0,
-            player.z
-          );
-
-
-          playerModel.rotation.y =
-            player.yaw;
-
-
-          const moving =
-            Math.abs(
-              forward
-            )
-            +
-            Math.abs(
-              right
-            )
-            >
-            0;
-
-
-          const data =
-            playerModel.userData;
-
-
-          data.anim +=
-            dt;
-
-
-          data.legs
-            .forEach(
-              (
-                leg,
-                index
-              ) => {
-
-                leg.rotation.x =
-                  moving
-
-                    ? Math.sin(
-                        data.anim *
-                        (
-                          sprint
-                            ? 12
-                            : 8
-                        )
-
-                        +
-
-                        index *
-                        Math.PI
-                      ) *
-                      .65
-
-                    : 0;
-              }
-            );
-
-
-          data.arms
-            .forEach(
-              (
-                arm,
-                index
-              ) => {
-
-                arm.rotation.x =
-                  moving
-
-                    ? Math.sin(
-                        data.anim *
-                        8
-
-                        +
-
-                        (
-                          index +
-                          1
-                        ) *
-                        Math.PI
-                      ) *
-                      .4
-
-                    : 0;
-              }
-            );
-        }
-
-
-        /* ====================================================
-           CAMERA
-           ==================================================== */
-
-        function updateCamera() {
-
-          const distance =
-            6.4;
-
-
-          const height =
-            3.2;
-
-
-          camera.position.set(
-
-            player.x +
-
-            Math.sin(
-              player.yaw
-            ) *
-            distance,
-
-            height +
-
-            player.pitch *
-            3,
-
-            player.z +
-
-            Math.cos(
-              player.yaw
-            ) *
-            distance
-          );
-
-
-          camera.lookAt(
-            player.x,
-            1.45,
-            player.z
-          );
-        }
-
-
-        /* ====================================================
-           CREATURE AI
-           ==================================================== */
-
-        function updateCreatures(
-          dt,
-          now
-        ) {
-
-          creatures.forEach(
-            creature => {
-
-              if (
-                !creature.alive
-              ) {
-                return;
-              }
-
-
-              if (
-                now >
-                creature.nextDirection
-              ) {
-
-                creature.direction +=
-                  rand(
-                    -1.4,
-                    1.4
-                  );
-
-
-                creature.nextDirection =
-                  now +
-                  rand(
-                    1200,
-                    3000
-                  );
-              }
-
-
-              const distance =
-                Math.hypot(
-
-                  player.x -
-                  creature.x,
-
-                  player.z -
-                  creature.z
-                );
-
-
-              const moving =
-                distance >
-                2;
-
-
-              if (moving) {
-
-                creature.x +=
-
-                  Math.sin(
-                    creature.direction
-                  )
-
-                  *
-
-                  creature.species
-                    .speed
-
-                  *
-
-                  .2
-
-                  *
-
-                  dt;
-
-
-                creature.z +=
-
-                  Math.cos(
-                    creature.direction
-                  )
-
-                  *
-
-                  creature.species
-                    .speed
-
-                  *
-
-                  .2
-
-                  *
-
-                  dt;
-              }
-
-
-              creature.model.position.set(
-                creature.x,
-                0,
-                creature.z
-              );
-
-
-              creature.model.rotation.y =
-                creature.direction;
-
-
-              animateCreature(
-                creature,
-                dt,
-                moving
-              );
-            }
-          );
-
-
-          if (
-            GP.companion
-          ) {
-
-            const model =
-              GP.companion.model;
-
-
-            const targetX =
-              player.x +
-              Math.cos(
-                player.yaw
-              ) *
-              2;
-
-
-            const targetZ =
-              player.z -
-              Math.sin(
-                player.yaw
-              ) *
-              2;
-
-
-            model.position.x +=
-
-              (
-                targetX -
-                model.position.x
-              )
-
-              *
-
-              Math.min(
-                1,
-                dt *
-                4
-              );
-
-
-            model.position.z +=
-
-              (
-                targetZ -
-                model.position.z
-              )
-
-              *
-
-              Math.min(
-                1,
-                dt *
-                4
-              );
-
-
-            animateCreature(
-              {
-                model
-              },
-              dt,
-              true
-            );
-          }
-        }
-
-
-        /* ====================================================
-           RESIZE
-           ==================================================== */
-
-        function resize() {
-
-          const width =
-            canvas
-              .parentElement
-              .clientWidth;
-
-
-          const height =
-            canvas
-              .parentElement
-              .clientHeight;
-
-
-          renderer.setSize(
-            width,
-            height,
-            false
-          );
-
-
-          camera.aspect =
-            width /
-            height;
-
-
-          camera
-            .updateProjectionMatrix();
-        }
-
-
-        on3D(
-          window,
-          "resize",
-          resize
-        );
-
-
-        resize();
-
-
-        /* ====================================================
-           MAIN LOOP
-           ==================================================== */
-
-        let last =
-          performance.now();
-
-
-        let lastSave =
-          last;
-
-
-        function loop(now) {
-
-          if (
-            THREE_ACTIVE.kind !==
-            "pals"
-          ) {
-            return;
-          }
-
-
-          const dt =
-            clamp(
-              (
-                now -
-                last
-              ) /
-              1000,
-              0,
-              .05
-            );
-
-
-          last =
-            now;
-
-
-          movePlayer(
-            dt
-          );
-
-
-          updateCamera();
-
-
-          updateCreatures(
-            dt,
-            now
-          );
-
-
-          updateProjectiles(
-            dt
-          );
-
-
-          findTarget();
-
-
-          player.hunger -=
-            .25 *
-            dt;
-
-
-          if (
-            player.hunger <
-            15
-          ) {
-
-            player.hp -=
-              .6 *
-              dt;
-          }
-
-
-          player.hp =
-            clamp(
-              player.hp,
-              0,
-              100
-            );
-
-
-          player.hunger =
-            clamp(
-              player.hunger,
-              0,
-              100
-            );
-
-
-          updateHUD();
-
-
-          renderFeed();
-
-
-          if (
-            now -
-            lastSave >
-            5000
-          ) {
-
-            game.x =
-              player.x;
-
-            game.z =
-              player.z;
-
-            game.hp =
-              player.hp;
-
-            game.stamina =
-              player.stamina;
-
-            game.hunger =
-              player.hunger;
-
-
-            palsSave(
-              game
-            );
-
-
-            lastSave =
-              now;
-          }
-
-
-          renderer.render(
-            scene,
-            camera
-          );
-
-
-          THREE_ACTIVE.raf =
-            requestAnimationFrame(
-              loop
-            );
-        }
-
-
-        THREE_ACTIVE.raf =
-          requestAnimationFrame(
-            loop
-          );
-
-
-        addFeed(
-          "Welcome to GALAXY PALS"
-        );
-
-
-        addFeed(
-          "Attack creatures to weaken them"
-        );
-
-
-        addFeed(
-          "Press Q to throw a capture Orb"
-        );
-
-      } catch (error) {
-
-        console.error(
-          error
-        );
-
-
-        if (
-          oldStartPals
-        ) {
-
-          toast(
-            "Advanced world failed — loading basic world",
-            "error"
-          );
-
-
-          return oldStartPals();
-        }
-
-
-        $("#contentBody")
-          .innerHTML = `
-
-            <div
-              class="pals-card"
-            >
-
-              <h3>
-                GALAXY PALS failed to start
-              </h3>
-
-              <p>
-                ${escapeHTML(
-                  error.message
-                )}
-              </p>
-
-            </div>
-
-          `;
-      }
-    };
-
-
-  console.log(
-    "GALAXY PALS Advanced Creature Upgrade loaded"
-  );
-
-})();
+setView("chat");
