@@ -5066,16 +5066,18 @@ function initializePromptInput() {
    ========================================================= */
 
 function initializeSendButton() {
-  const button =
-    $("#sendButton");
+  const button = $("#sendButton");
 
   if (!button) return;
 
-  button.type =
-    "button";
+  button.type = "button";
+
+  button.onclick = event => {
+    event.preventDefault();
+    event.stopPropagation();
+    sendMessage();
+  };
 }
-
-
 /* =========================================================
    WORK MODE INITIALIZATION
    ========================================================= */
