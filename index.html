@@ -175,12 +175,6 @@
 
         <!-- PROJECTS -->
 
-        <button class="nav-row" data-view="studio" aria-label="Create Studio">
-          <span class="nav-icon" aria-hidden="true">✦</span>
-          <span class="nav-label">Create Studio</span>
-          <span class="nav-arrow" aria-hidden="true">›</span>
-        </button>
-
         <button
           class="nav-row"
           data-view="projects"
@@ -282,63 +276,6 @@
 
           <span class="nav-label">
             Plugins
-          </span>
-
-          <span
-            class="nav-arrow"
-            aria-hidden="true"
-          >
-            ›
-          </span>
-
-        </button>
-
-
-
-        <!-- PACKS -->
-
-        <button
-          class="nav-row"
-          data-view="packs"
-        >
-
-          <span
-            class="nav-icon"
-            aria-hidden="true"
-          >
-            ▦
-          </span>
-
-          <span class="nav-label">
-            Packs
-          </span>
-
-          <span
-            class="nav-arrow"
-            aria-hidden="true"
-          >
-            ›
-          </span>
-
-        </button>
-
-
-        <!-- GAMING CENTER -->
-
-        <button
-          class="nav-row"
-          data-view="games"
-        >
-
-          <span
-            class="nav-icon"
-            aria-hidden="true"
-          >
-            ♟
-          </span>
-
-          <span class="nav-label">
-            Gaming Center
           </span>
 
           <span
@@ -1076,7 +1013,7 @@
 
               <button
                 class="send-arrow"
-                data-action="work-send"
+                data-action="send-work"
                 aria-label="Send work request"
               >
                 ↑
@@ -1295,192 +1232,6 @@
             class="content-body"
           ></div>
 
-
-          <!-- ==================================================
-               PACK DETAILS TEMPLATE
-
-               This template is hidden by default.
-               script.js can clone and populate it when a Pack
-               is opened.
-          =================================================== -->
-
-          <template id="packDetailTemplate">
-
-            <section
-              class="pack-detail"
-              data-pack-detail
-            >
-
-              <!-- PACK HERO -->
-
-              <header class="pack-detail-hero">
-
-                <div
-                  class="pack-detail-icon"
-                  data-pack-detail-icon
-                  aria-hidden="true"
-                >
-                  ✦
-                </div>
-
-                <div class="pack-detail-copy">
-
-                  <span class="pack-detail-label">
-                    GALAXY Pack
-                  </span>
-
-                  <h1 data-pack-detail-name>
-                    Pack Name
-                  </h1>
-
-                  <p data-pack-detail-description>
-                    Pack description
-                  </p>
-
-                  <div class="pack-detail-meta">
-
-                    <span data-pack-detail-count>
-                      0 workflows
-                    </span>
-
-                    <span data-pack-detail-status>
-                      Installed
-                    </span>
-
-                    <span
-                      data-pack-detail-featured
-                      hidden
-                    >
-                      Featured
-                    </span>
-
-                  </div>
-
-                </div>
-
-              </header>
-
-
-              <!-- ABOUT -->
-
-              <section class="pack-detail-section">
-
-                <div class="pack-detail-section-head">
-
-                  <h2>
-                    About this Pack
-                  </h2>
-
-                </div>
-
-                <p data-pack-detail-about>
-                  Learn what this Pack is designed to help you do.
-                </p>
-
-              </section>
-
-
-              <!-- INCLUDED WORKFLOWS -->
-
-              <section class="pack-detail-section">
-
-                <div class="pack-detail-section-head">
-
-                  <h2>
-                    Included workflows
-                  </h2>
-
-                  <span data-pack-detail-workflow-count>
-                    0 included
-                  </span>
-
-                </div>
-
-                <div
-                  class="pack-workflow-list"
-                  data-pack-detail-workflows
-                ></div>
-
-              </section>
-
-
-              <!-- BEST FOR -->
-
-              <section class="pack-detail-section">
-
-                <div class="pack-detail-section-head">
-
-                  <h2>
-                    Best for
-                  </h2>
-
-                </div>
-
-                <div
-                  class="pack-use-grid"
-                  data-pack-detail-use-cases
-                ></div>
-
-              </section>
-
-
-              <!-- EXAMPLE PROMPT -->
-
-              <section class="pack-detail-section">
-
-                <div class="pack-detail-section-head">
-
-                  <h2>
-                    Example prompt
-                  </h2>
-
-                </div>
-
-                <div class="pack-example">
-
-                  <p data-pack-detail-example>
-                    Try a workflow from this Pack.
-                  </p>
-
-                  <button
-                    class="text-action"
-                    type="button"
-                    data-pack-detail-use-example
-                  >
-                    Use prompt
-                  </button>
-
-                </div>
-
-              </section>
-
-
-              <!-- PACK ACTIONS -->
-
-              <footer class="pack-detail-actions">
-
-                <button
-                  class="text-action"
-                  type="button"
-                  data-pack-detail-back
-                >
-                  ← Back to Packs
-                </button>
-
-                <button
-                  class="text-action primary"
-                  type="button"
-                  data-pack-detail-install
-                >
-                  Install Pack
-                </button>
-
-              </footer>
-
-            </section>
-
-          </template>
-
         </div>
 
       </section>
@@ -1620,3 +1371,4 @@
 
 </body>
 
+</html>
