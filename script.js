@@ -223,6 +223,7 @@ async function fetchAIResponse(message, includeHistory = true) {
   const payload = {
     message,
     prompt: message,
+     mode: includeHistory ? "chat" : "work",
     system: creatorContext,
 
     messages: [
