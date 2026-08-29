@@ -1398,7 +1398,13 @@ function renderChess() {
                         "
                         data-chess-square="${r},${c}"
                       >
-                        ${CHESS.pieces[piece] || ""}
+                       ${
+  piece
+    ? `<span class="chess-piece ${
+        isWhitePiece(piece) ? "silver-piece" : "gold-piece"
+      }">${CHESS.pieces[piece]}</span>`
+    : ""
+}
                       </button>
                     `;
                   }).join("")
