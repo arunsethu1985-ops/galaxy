@@ -5241,7 +5241,3379 @@ window.GALAXY = {
 };
 
 
+
 /* =========================================================
-   END OF GALAXY AI SCRIPT.JS
-   PART 1 + PART 2 = COMPLETE SCRIPT
+   GALAXY AI
+   SNAKE + CHICKEN CROSSING
+   SINGLE PLAYER ARCADE
+   COMPLETE JS — ONE PART
+   ========================================================= */
+
+
+/* =========================================================
+   GAME CENTER STORAGE
+   ========================================================= */
+
+GameCenter.snake = GameCenter.snake || null;
+GameCenter.snakeTimer = GameCenter.snakeTimer || null;
+
+GameCenter.chicken = GameCenter.chicken || null;
+GameCenter.chickenTimer = GameCenter.chickenTimer || null;
+
+
+/* =========================================================
+   LOCAL STORAGE KEYS
+   ========================================================= */
+
+const RETRO_ARCADE_KEYS = {
+  snakeSave: "galaxy.snake.save.v1",
+  snakeHigh: "galaxy.snake.high.v1",
+
+  chickenSave: "galaxy.chicken.save.v1",
+  chickenHigh: "galaxy.chicken.high.v1"
+};
+
+
+/* =========================================================
+   GAME SPEEDS
+   ========================================================= */
+
+const GALAXY_SNAKE_SPEED = {
+  1: 260,
+  2: 210,
+  3: 165,
+  4: 125,
+  5: 90
+};
+
+const GALAXY_CHICKEN_SPEED = {
+  1: 80,
+  2: 65,
+  3: 50,
+  4: 38,
+  5: 28
+};
+
+
+/* =========================================================
+   LOCAL STORAGE HELPERS
+   ========================================================= */
+
+function retroLoad(key) {
+  try {
+    const value = localStorage.getItem(key);
+
+    if (!value) {
+      return null;
+    }
+
+    return JSON.parse(value);
+
+  } catch (error) {
+    return null;
+  }
+}
+
+
+function retroSave(key, value) {
+  try {
+    localStorage.setItem(
+      key,
+      JSON.stringify(value)
+    );
+  } catch (error) {}
+}
+
+
+function retroDelete(key) {
+  try {
+    localStorage.removeItem(key);
+  } catch (error) {}
+}
+
+
+function retroHighScore(key) {
+  try {
+    return Number(
+      localStorage.getItem(key) || 0
+    ) || 0;
+
+  } catch (error) {
+    return 0;
+  }
+}
+
+
+function retroSetHighScore(
+  key,
+  score
+) {
+  const oldScore =
+    retroHighScore(key);
+
+  const newScore =
+    Math.max(
+      oldScore,
+      Number(score) || 0
+    );
+
+  try {
+    localStorage.setItem(
+      key,
+      String(newScore)
+    );
+  } catch (error) {}
+
+  return newScore;
+}
+
+
+/* =========================================================
+   RETRO SOUND
+   ========================================================= */
+
+let galaxyRetroAudio = null;
+
+
+function retroSoundEnabled() {
+  if (
+    GameCenter.current === "snake"
+  ) {
+    return (
+      GameCenter.snake?.sound !== false
+    );
+  }
+
+  if (
+    GameCenter.current === "chicken"
+  ) {
+    return (
+      GameCenter.chicken?.sound !== false
+    );
+  }
+
+  return false;
+}
+
+
+function retroTone(
+  frequency = 440,
+  duration = 0.05,
+  volume = 0.035,
+  type = "square"
+) {
+  if (!retroSoundEnabled()) {
+    return;
+  }
+
+  try {
+    if (!galaxyRetroAudio) {
+      galaxyRetroAudio =
+        new (
+          window.AudioContext ||
+          window.webkitAudioContext
+        )();
+    }
+
+    const context =
+      galaxyRetroAudio;
+
+    if (
+      context.state === "suspended"
+    ) {
+      context.resume();
+    }
+
+    const oscillator =
+      context.createOscillator();
+
+    const gain =
+      context.createGain();
+
+    oscillator.type =
+      type;
+
+    oscillator.frequency.value =
+      frequency;
+
+    gain.gain.setValueAtTime(
+      volume,
+      context.currentTime
+    );
+
+    gain.gain.exponentialRampToValueAtTime(
+      0.0001,
+      context.currentTime + duration
+    );
+
+    oscillator.connect(gain);
+
+    gain.connect(
+      context.destination
+    );
+
+    oscillator.start();
+
+    oscillator.stop(
+      context.currentTime + duration
+    );
+
+  } catch (error) {}
+}
+
+
+function retroStartSound() {
+  retroTone(
+    330,
+    0.05
+  );
+
+  setTimeout(
+    () =>
+      retroTone(
+        520,
+        0.07
+      ),
+    55
+  );
+}
+
+
+function retroMoveSound() {
+  retroTone(
+    235,
+    0.025,
+    0.018
+  );
+}
+
+
+function retroScoreSound() {
+  retroTone(
+    560,
+    0.04
+  );
+
+  setTimeout(
+    () =>
+      retroTone(
+        760,
+        0.05
+      ),
+    45
+  );
+}
+
+
+function retroCrashSound() {
+  retroTone(
+    140,
+    0.13,
+    0.045,
+    "sawtooth"
+  );
+}
+
+
+/* =========================================================
+   ADD SNAKE + CHICKEN CARDS TO GAMING CENTER
+   ========================================================= */
+
+const originalGalaxyRenderGames =
+  renderGames;
+
+
+renderGames = function () {
+  originalGalaxyRenderGames();
+
+  const grid =
+    document.querySelector(
+      ".games-grid"
+    );
+
+  if (!grid) {
+    return;
+  }
+
+
+  if (
+    !grid.querySelector(
+      '[data-game-open="snake"]'
+    )
+  ) {
+    grid.insertAdjacentHTML(
+      "beforeend",
+
+      gameCard(
+        "snake",
+        "▰",
+        "Snake",
+        "Classic retro • Single player • Continue game"
+      )
+    );
+  }
+
+
+  if (
+    !grid.querySelector(
+      '[data-game-open="chicken"]'
+    )
+  ) {
+    grid.insertAdjacentHTML(
+      "beforeend",
+
+      gameCard(
+        "chicken",
+        "🐔",
+        "Chicken Crossing",
+        "Retro crossing • Single player • Continue game"
+      )
+    );
+  }
+
+
+  const heroText =
+    document.querySelector(
+      ".games-hero p"
+    );
+
+  if (heroText) {
+    heroText.textContent =
+      "Play against GALAXY, with a friend, or choose a single-player arcade game.";
+  }
+};
+
+
+/* update global Gaming Center shortcut */
+
+if (window.GALAXY) {
+  window.GALAXY.openGames =
+    renderGames;
+}
+
+
+/* =========================================================
+   SNAKE DEFAULT GAME
+   ========================================================= */
+
+function galaxySnakeDefault(
+  overrides = {}
+) {
+  return {
+    type: "classic",
+
+    level: 3,
+
+    sound: true,
+
+    score: 0,
+
+    high:
+      retroHighScore(
+        RETRO_ARCADE_KEYS.snakeHigh
+      ),
+
+    snake: [
+      {
+        x: 10,
+        y: 10
+      },
+      {
+        x: 9,
+        y: 10
+      },
+      {
+        x: 8,
+        y: 10
+      }
+    ],
+
+    food: {
+      x: 14,
+      y: 10
+    },
+
+    dir: {
+      x: 1,
+      y: 0
+    },
+
+    nextDir: {
+      x: 1,
+      y: 0
+    },
+
+    running: false,
+
+    paused: true,
+
+    finished: false,
+
+    message: "Ready",
+
+    ...overrides
+  };
+}
+
+
+/* =========================================================
+   SNAKE SAVE
+   ========================================================= */
+
+function saveGalaxySnake() {
+  const game =
+    GameCenter.snake;
+
+  if (
+    !game ||
+    game.finished
+  ) {
+    return;
+  }
+
+  retroSave(
+    RETRO_ARCADE_KEYS.snakeSave,
+    {
+      ...game,
+
+      running: false,
+
+      paused: true
+    }
+  );
+}
+
+
+/* =========================================================
+   SNAKE FOOD
+   ========================================================= */
+
+function galaxySnakeNewFood(
+  game
+) {
+  const free = [];
+
+  for (
+    let y = 0;
+    y < 20;
+    y++
+  ) {
+    for (
+      let x = 0;
+      x < 20;
+      x++
+    ) {
+      const occupied =
+        game.snake.some(
+          part =>
+            part.x === x &&
+            part.y === y
+        );
+
+      if (!occupied) {
+        free.push({
+          x,
+          y
+        });
+      }
+    }
+  }
+
+
+  if (!free.length) {
+    game.food = null;
+    return;
+  }
+
+
+  game.food =
+    free[
+      Math.floor(
+        Math.random() *
+        free.length
+      )
+    ];
+}
+
+
+/* =========================================================
+   SNAKE TIMER
+   ========================================================= */
+
+function runGalaxySnakeTimer() {
+  if (
+    GameCenter.snakeTimer
+  ) {
+    clearInterval(
+      GameCenter.snakeTimer
+    );
+  }
+
+
+  GameCenter.snakeTimer =
+    null;
+
+
+  const game =
+    GameCenter.snake;
+
+
+  if (
+    !game ||
+    !game.running ||
+    game.paused ||
+    game.finished
+  ) {
+    return;
+  }
+
+
+  const speed =
+    GALAXY_SNAKE_SPEED[
+      game.level
+    ] || 165;
+
+
+  GameCenter.snakeTimer =
+    setInterval(
+      galaxySnakeTick,
+      speed
+    );
+}
+
+
+/* =========================================================
+   SNAKE GAME LOOP
+   ========================================================= */
+
+function galaxySnakeTick() {
+  const game =
+    GameCenter.snake;
+
+
+  if (
+    !game ||
+    !game.running ||
+    game.paused ||
+    game.finished
+  ) {
+    return;
+  }
+
+
+  game.dir = {
+    ...game.nextDir
+  };
+
+
+  let head = {
+    x:
+      game.snake[0].x +
+      game.dir.x,
+
+    y:
+      game.snake[0].y +
+      game.dir.y
+  };
+
+
+  /* WRAP GAME TYPE */
+
+  if (
+    game.type === "wrap"
+  ) {
+    head.x =
+      (
+        head.x + 20
+      ) % 20;
+
+    head.y =
+      (
+        head.y + 20
+      ) % 20;
+  }
+
+
+  /* CLASSIC WALL COLLISION */
+
+  else if (
+    head.x < 0 ||
+    head.x >= 20 ||
+    head.y < 0 ||
+    head.y >= 20
+  ) {
+    finishGalaxySnake();
+    return;
+  }
+
+
+  /* SELF COLLISION */
+
+  const hitBody =
+    game.snake.some(
+      part =>
+        part.x === head.x &&
+        part.y === head.y
+    );
+
+
+  if (hitBody) {
+    finishGalaxySnake();
+    return;
+  }
+
+
+  game.snake.unshift(
+    head
+  );
+
+
+  /* FOOD */
+
+  if (
+    game.food &&
+    head.x === game.food.x &&
+    head.y === game.food.y
+  ) {
+    game.score +=
+      10 * game.level;
+
+
+    game.high =
+      retroSetHighScore(
+        RETRO_ARCADE_KEYS.snakeHigh,
+        game.score
+      );
+
+
+    galaxySnakeNewFood(
+      game
+    );
+
+
+    retroScoreSound();
+  }
+
+
+  else {
+    game.snake.pop();
+  }
+
+
+  saveGalaxySnake();
+
+  renderGalaxySnakeBoard();
+}
+
+
+/* =========================================================
+   SNAKE GAME OVER
+   ========================================================= */
+
+function finishGalaxySnake() {
+  const game =
+    GameCenter.snake;
+
+
+  if (!game) {
+    return;
+  }
+
+
+  if (
+    GameCenter.snakeTimer
+  ) {
+    clearInterval(
+      GameCenter.snakeTimer
+    );
+  }
+
+
+  GameCenter.snakeTimer =
+    null;
+
+
+  game.running =
+    false;
+
+  game.paused =
+    false;
+
+  game.finished =
+    true;
+
+  game.message =
+    "Game Over";
+
+
+  game.high =
+    retroSetHighScore(
+      RETRO_ARCADE_KEYS.snakeHigh,
+      game.score
+    );
+
+
+  retroDelete(
+    RETRO_ARCADE_KEYS.snakeSave
+  );
+
+
+  retroCrashSound();
+
+  renderGalaxySnake();
+}
+
+
+/* =========================================================
+   NEW SNAKE GAME
+   ========================================================= */
+
+function newGalaxySnake() {
+  const previous =
+    GameCenter.snake ||
+    retroLoad(
+      RETRO_ARCADE_KEYS.snakeSave
+    ) ||
+    {};
+
+
+  const level =
+    Number(
+      previous.level
+    ) || 3;
+
+
+  GameCenter.snake =
+    galaxySnakeDefault({
+      type:
+        previous.type ||
+        "classic",
+
+      level,
+
+      sound:
+        previous.sound !== false
+    });
+
+
+  retroDelete(
+    RETRO_ARCADE_KEYS.snakeSave
+  );
+
+
+  GameCenter.current =
+    "snake";
+
+
+  renderGalaxySnake();
+}
+
+
+/* =========================================================
+   CONTINUE SNAKE
+   ========================================================= */
+
+function continueGalaxySnake() {
+  const saved =
+    retroLoad(
+      RETRO_ARCADE_KEYS.snakeSave
+    );
+
+
+  if (!saved) {
+    newGalaxySnake();
+    return;
+  }
+
+
+  GameCenter.snake =
+    galaxySnakeDefault({
+      ...saved,
+
+      high:
+        retroHighScore(
+          RETRO_ARCADE_KEYS.snakeHigh
+        ),
+
+      running: true,
+
+      paused: false,
+
+      finished: false,
+
+      message: "Playing"
+    });
+
+
+  GameCenter.current =
+    "snake";
+
+
+  retroStartSound();
+
+  renderGalaxySnake();
+
+  runGalaxySnakeTimer();
+}
+
+
+/* =========================================================
+   OPEN SNAKE
+   ========================================================= */
+
+function openGalaxySnake() {
+  if (
+    GameCenter.chickenTimer
+  ) {
+    clearInterval(
+      GameCenter.chickenTimer
+    );
+  }
+
+
+  GameCenter.current =
+    "snake";
+
+
+  const saved =
+    retroLoad(
+      RETRO_ARCADE_KEYS.snakeSave
+    );
+
+
+  if (
+    saved &&
+    !GameCenter.snake
+  ) {
+    GameCenter.snake =
+      galaxySnakeDefault(
+        saved
+      );
+  }
+
+
+  if (!GameCenter.snake) {
+    GameCenter.snake =
+      galaxySnakeDefault();
+  }
+
+
+  GameCenter.snake.running =
+    false;
+
+  GameCenter.snake.paused =
+    true;
+
+
+  GameCenter.snake.message =
+    saved
+      ? "Previous game available"
+      : "Ready";
+
+
+  renderGalaxySnake();
+}
+
+
+/* =========================================================
+   START SNAKE
+   ========================================================= */
+
+function startGalaxySnake() {
+  const game =
+    GameCenter.snake;
+
+
+  if (
+    !game ||
+    game.finished
+  ) {
+    return;
+  }
+
+
+  game.running =
+    true;
+
+  game.paused =
+    false;
+
+  game.message =
+    "Playing";
+
+
+  retroStartSound();
+
+  saveGalaxySnake();
+
+  renderGalaxySnake();
+
+  runGalaxySnakeTimer();
+}
+
+
+/* =========================================================
+   PAUSE SNAKE
+   ========================================================= */
+
+function pauseGalaxySnake(
+  silent = false
+) {
+  const game =
+    GameCenter.snake;
+
+
+  if (
+    !game ||
+    game.finished
+  ) {
+    return;
+  }
+
+
+  if (
+    GameCenter.snakeTimer
+  ) {
+    clearInterval(
+      GameCenter.snakeTimer
+    );
+  }
+
+
+  GameCenter.snakeTimer =
+    null;
+
+
+  if (
+    game.running
+  ) {
+    game.running =
+      false;
+
+    game.paused =
+      true;
+
+    game.message =
+      "Paused";
+
+
+    saveGalaxySnake();
+  }
+
+
+  if (!silent) {
+    renderGalaxySnake();
+  }
+}
+
+
+/* =========================================================
+   TOGGLE SNAKE PAUSE
+   ========================================================= */
+
+function toggleGalaxySnakePause() {
+  const game =
+    GameCenter.snake;
+
+
+  if (
+    !game ||
+    game.finished
+  ) {
+    return;
+  }
+
+
+  if (game.running) {
+    pauseGalaxySnake();
+
+  } else {
+    startGalaxySnake();
+  }
+}
+
+
+/* =========================================================
+   SNAKE DIRECTION
+   ========================================================= */
+
+function galaxySnakeDirection(
+  dx,
+  dy
+) {
+  const game =
+    GameCenter.snake;
+
+
+  if (
+    !game ||
+    game.finished
+  ) {
+    return;
+  }
+
+
+  /* stop reverse direction */
+
+  if (
+    dx === -game.dir.x &&
+    dy === -game.dir.y
+  ) {
+    return;
+  }
+
+
+  game.nextDir = {
+    x: dx,
+    y: dy
+  };
+
+
+  retroMoveSound();
+
+
+  if (!game.running) {
+    startGalaxySnake();
+  }
+}
+
+
+/* =========================================================
+   SNAKE CELLS
+   ========================================================= */
+
+function galaxySnakeCells(
+  game
+) {
+  let html = "";
+
+
+  for (
+    let y = 0;
+    y < 20;
+    y++
+  ) {
+    for (
+      let x = 0;
+      x < 20;
+      x++
+    ) {
+      const snakeIndex =
+        game.snake.findIndex(
+          part =>
+            part.x === x &&
+            part.y === y
+        );
+
+
+      const food =
+        game.food &&
+        game.food.x === x &&
+        game.food.y === y;
+
+
+      let className =
+        "snake-cell";
+
+
+      if (
+        snakeIndex === 0
+      ) {
+        className +=
+          " snake-body snake-head";
+      }
+
+
+      else if (
+        snakeIndex > 0
+      ) {
+        className +=
+          " snake-body";
+      }
+
+
+      else if (food) {
+        className +=
+          " snake-food";
+      }
+
+
+      html += `
+        <div
+          class="${className}"
+        ></div>
+      `;
+    }
+  }
+
+
+  return html;
+}
+
+
+/* =========================================================
+   UPDATE SNAKE BOARD ONLY
+   ========================================================= */
+
+function renderGalaxySnakeBoard() {
+  const game =
+    GameCenter.snake;
+
+
+  if (
+    !game ||
+    GameCenter.current !==
+      "snake"
+  ) {
+    return;
+  }
+
+
+  const grid =
+    document.querySelector(
+      "#snakeGrid"
+    );
+
+
+  if (grid) {
+    grid.innerHTML =
+      galaxySnakeCells(
+        game
+      );
+  }
+
+
+  const score =
+    document.querySelector(
+      "#snakeScore"
+    );
+
+
+  if (score) {
+    score.textContent =
+      game.score;
+  }
+
+
+  const high =
+    document.querySelector(
+      "#snakeHigh"
+    );
+
+
+  if (high) {
+    high.textContent =
+      game.high;
+  }
+}
+
+
+/* =========================================================
+   RENDER SNAKE
+   ========================================================= */
+
+function renderGalaxySnake() {
+  const body =
+    document.querySelector(
+      "#contentBody"
+    );
+
+
+  if (!body) {
+    return;
+  }
+
+
+  if (!GameCenter.snake) {
+    GameCenter.snake =
+      galaxySnakeDefault();
+  }
+
+
+  const game =
+    GameCenter.snake;
+
+
+  GameCenter.current =
+    "snake";
+
+
+  const hasSave =
+    !!retroLoad(
+      RETRO_ARCADE_KEYS.snakeSave
+    );
+
+
+  body.innerHTML = `
+    <div class="game-shell snake-game">
+
+      <div class="game-topline">
+
+        <button
+          class="secondary-btn"
+          data-game-back
+        >
+          ← Games
+        </button>
+
+
+        <div class="game-status">
+          ${escapeHTML(
+            game.message
+          )}
+        </div>
+
+
+        <div class="game-toolbar">
+
+          <button
+            class="secondary-btn"
+            data-snake-continue
+            ${
+              hasSave
+                ? ""
+                : "disabled"
+            }
+          >
+            Continue
+          </button>
+
+
+          <button
+            class="secondary-btn"
+            data-snake-new
+          >
+            New Game
+          </button>
+
+
+          <button
+            class="secondary-btn"
+            data-snake-pause
+          >
+            ${
+              game.running
+                ? "Pause"
+                : "Start / Resume"
+            }
+          </button>
+
+        </div>
+
+      </div>
+
+
+      <div class="snake-hud">
+
+        <span>
+          Score
+          <strong id="snakeScore">
+            ${game.score}
+          </strong>
+        </span>
+
+
+        <span>
+          High
+          <strong id="snakeHigh">
+            ${game.high}
+          </strong>
+        </span>
+
+
+        <label>
+          Game Type
+
+          <select
+            data-snake-type
+          >
+
+            <option
+              value="classic"
+              ${
+                game.type ===
+                "classic"
+                  ? "selected"
+                  : ""
+              }
+            >
+              Classic Walls
+            </option>
+
+
+            <option
+              value="wrap"
+              ${
+                game.type ===
+                "wrap"
+                  ? "selected"
+                  : ""
+              }
+            >
+              Wrap Around
+            </option>
+
+          </select>
+        </label>
+
+
+        <label>
+          Level
+
+          <select
+            data-snake-level
+          >
+
+            ${[
+              1,
+              2,
+              3,
+              4,
+              5
+            ]
+              .map(
+                level => `
+                  <option
+                    value="${level}"
+                    ${
+                      game.level ===
+                      level
+                        ? "selected"
+                        : ""
+                    }
+                  >
+                    Level ${level}
+                  </option>
+                `
+              )
+              .join("")}
+
+          </select>
+        </label>
+
+
+        <label>
+          Sound
+
+          <select
+            data-snake-sound
+          >
+
+            <option
+              value="yes"
+              ${
+                game.sound
+                  ? "selected"
+                  : ""
+              }
+            >
+              Yes
+            </option>
+
+
+            <option
+              value="no"
+              ${
+                !game.sound
+                  ? "selected"
+                  : ""
+              }
+            >
+              No
+            </option>
+
+          </select>
+        </label>
+
+      </div>
+
+
+      <div
+        class="snake-screen retro-game-board"
+      >
+
+        <div
+          id="snakeGrid"
+          class="snake-grid"
+        >
+          ${galaxySnakeCells(
+            game
+          )}
+        </div>
+
+      </div>
+
+
+      <div class="snake-controls">
+
+        <button
+          data-snake-dir="up"
+        >
+          ▲
+        </button>
+
+
+        <button
+          data-snake-dir="left"
+        >
+          ◀
+        </button>
+
+
+        <button
+          data-snake-dir="down"
+        >
+          ▼
+        </button>
+
+
+        <button
+          data-snake-dir="right"
+        >
+          ▶
+        </button>
+
+      </div>
+
+
+      <div class="retro-game-message">
+        Arrow keys or W A S D
+      </div>
+
+    </div>
+  `;
+}
+
+
+/* =========================================================
+   CHICKEN DEFAULT
+   ========================================================= */
+
+function galaxyChickenCars(
+  level = 3
+) {
+  const cars = [];
+
+  const lanes = [
+    18,
+    28,
+    38,
+    48,
+    58,
+    68,
+    78,
+    88
+  ];
+
+
+  lanes.forEach(
+    (y, index) => {
+
+      const count =
+        index % 3 === 0
+          ? 2
+          : 1;
+
+
+      for (
+        let car = 0;
+        car < count;
+        car++
+      ) {
+        cars.push({
+          lane: index,
+
+          y,
+
+          x:
+            (
+              18 +
+              index * 17 +
+              car * 48
+            ) % 100,
+
+          dir:
+            index % 2
+              ? 1
+              : -1,
+
+          speed:
+            0.65 +
+            (
+              index % 4
+            ) * 0.12 +
+            level * 0.08
+        });
+      }
+    }
+  );
+
+
+  return cars;
+}
+
+
+function galaxyChickenDefault(
+  overrides = {}
+) {
+  const level =
+    Number(
+      overrides.level
+    ) || 3;
+
+
+  return {
+    type: "classic",
+
+    level,
+
+    sound: true,
+
+    score: 0,
+
+    high:
+      retroHighScore(
+        RETRO_ARCADE_KEYS.chickenHigh
+      ),
+
+    x: 50,
+
+    y: 94,
+
+    running: false,
+
+    paused: true,
+
+    finished: false,
+
+    message: "Ready",
+
+    tick: 0,
+
+    cars:
+      galaxyChickenCars(
+        level
+      ),
+
+    ...overrides
+  };
+}
+
+
+/* =========================================================
+   SAVE CHICKEN
+   ========================================================= */
+
+function saveGalaxyChicken() {
+  const game =
+    GameCenter.chicken;
+
+
+  if (
+    !game ||
+    game.finished
+  ) {
+    return;
+  }
+
+
+  retroSave(
+    RETRO_ARCADE_KEYS.chickenSave,
+
+    {
+      ...game,
+
+      running: false,
+
+      paused: true
+    }
+  );
+}
+
+
+/* =========================================================
+   CHICKEN TIMER
+   ========================================================= */
+
+function runGalaxyChickenTimer() {
+  if (
+    GameCenter.chickenTimer
+  ) {
+    clearInterval(
+      GameCenter.chickenTimer
+    );
+  }
+
+
+  GameCenter.chickenTimer =
+    null;
+
+
+  const game =
+    GameCenter.chicken;
+
+
+  if (
+    !game ||
+    !game.running ||
+    game.paused ||
+    game.finished
+  ) {
+    return;
+  }
+
+
+  const speed =
+    GALAXY_CHICKEN_SPEED[
+      game.level
+    ] || 50;
+
+
+  GameCenter.chickenTimer =
+    setInterval(
+      galaxyChickenTick,
+      speed
+    );
+}
+
+
+/* =========================================================
+   CHICKEN COLLISION
+   ========================================================= */
+
+function galaxyChickenCollision(
+  game
+) {
+  return game.cars.some(
+    car => {
+
+      const verticalDistance =
+        Math.abs(
+          car.y -
+          game.y
+        );
+
+
+      const horizontalDistance =
+        Math.abs(
+          car.x -
+          game.x
+        );
+
+
+      return (
+        verticalDistance <
+          4.7 &&
+        horizontalDistance <
+          9.5
+      );
+    }
+  );
+}
+
+
+/* =========================================================
+   CHICKEN GAME LOOP
+   ========================================================= */
+
+function galaxyChickenTick() {
+  const game =
+    GameCenter.chicken;
+
+
+  if (
+    !game ||
+    !game.running ||
+    game.paused ||
+    game.finished
+  ) {
+    return;
+  }
+
+
+  game.tick++;
+
+
+  game.cars.forEach(
+    car => {
+
+      car.x +=
+        car.dir *
+        car.speed;
+
+
+      if (
+        car.dir > 0 &&
+        car.x > 108
+      ) {
+        car.x = -12;
+      }
+
+
+      if (
+        car.dir < 0 &&
+        car.x < -12
+      ) {
+        car.x = 108;
+      }
+    }
+  );
+
+
+  if (
+    galaxyChickenCollision(
+      game
+    )
+  ) {
+    finishGalaxyChicken();
+    return;
+  }
+
+
+  saveGalaxyChicken();
+
+  renderGalaxyChickenStage();
+}
+
+
+/* =========================================================
+   CHICKEN GAME OVER
+   ========================================================= */
+
+function finishGalaxyChicken() {
+  const game =
+    GameCenter.chicken;
+
+
+  if (!game) {
+    return;
+  }
+
+
+  if (
+    GameCenter.chickenTimer
+  ) {
+    clearInterval(
+      GameCenter.chickenTimer
+    );
+  }
+
+
+  GameCenter.chickenTimer =
+    null;
+
+
+  game.running =
+    false;
+
+  game.paused =
+    false;
+
+  game.finished =
+    true;
+
+  game.message =
+    "Hit! Game Over";
+
+
+  game.high =
+    retroSetHighScore(
+      RETRO_ARCADE_KEYS.chickenHigh,
+      game.score
+    );
+
+
+  retroDelete(
+    RETRO_ARCADE_KEYS.chickenSave
+  );
+
+
+  retroCrashSound();
+
+  renderGalaxyChicken();
+}
+
+
+/* =========================================================
+   NEW CHICKEN GAME
+   ========================================================= */
+
+function newGalaxyChicken() {
+  const previous =
+    GameCenter.chicken ||
+    retroLoad(
+      RETRO_ARCADE_KEYS.chickenSave
+    ) ||
+    {};
+
+
+  const level =
+    Number(
+      previous.level
+    ) || 3;
+
+
+  GameCenter.chicken =
+    galaxyChickenDefault({
+      type:
+        previous.type ||
+        "classic",
+
+      level,
+
+      sound:
+        previous.sound !== false,
+
+      cars:
+        galaxyChickenCars(
+          level
+        )
+    });
+
+
+  retroDelete(
+    RETRO_ARCADE_KEYS.chickenSave
+  );
+
+
+  GameCenter.current =
+    "chicken";
+
+
+  renderGalaxyChicken();
+}
+
+
+/* =========================================================
+   CONTINUE CHICKEN
+   ========================================================= */
+
+function continueGalaxyChicken() {
+  const saved =
+    retroLoad(
+      RETRO_ARCADE_KEYS.chickenSave
+    );
+
+
+  if (!saved) {
+    newGalaxyChicken();
+    return;
+  }
+
+
+  GameCenter.chicken =
+    galaxyChickenDefault({
+      ...saved,
+
+      high:
+        retroHighScore(
+          RETRO_ARCADE_KEYS.chickenHigh
+        ),
+
+      running: true,
+
+      paused: false,
+
+      finished: false,
+
+      message:
+        "Cross the road"
+    });
+
+
+  GameCenter.current =
+    "chicken";
+
+
+  retroStartSound();
+
+  renderGalaxyChicken();
+
+  runGalaxyChickenTimer();
+}
+
+
+/* =========================================================
+   OPEN CHICKEN
+   ========================================================= */
+
+function openGalaxyChicken() {
+  if (
+    GameCenter.snakeTimer
+  ) {
+    clearInterval(
+      GameCenter.snakeTimer
+    );
+  }
+
+
+  GameCenter.current =
+    "chicken";
+
+
+  const saved =
+    retroLoad(
+      RETRO_ARCADE_KEYS.chickenSave
+    );
+
+
+  if (
+    saved &&
+    !GameCenter.chicken
+  ) {
+    GameCenter.chicken =
+      galaxyChickenDefault(
+        saved
+      );
+  }
+
+
+  if (!GameCenter.chicken) {
+    GameCenter.chicken =
+      galaxyChickenDefault();
+  }
+
+
+  GameCenter.chicken.running =
+    false;
+
+  GameCenter.chicken.paused =
+    true;
+
+
+  GameCenter.chicken.message =
+    saved
+      ? "Previous game available"
+      : "Ready";
+
+
+  renderGalaxyChicken();
+}
+
+
+/* =========================================================
+   START CHICKEN
+   ========================================================= */
+
+function startGalaxyChicken() {
+  const game =
+    GameCenter.chicken;
+
+
+  if (
+    !game ||
+    game.finished
+  ) {
+    return;
+  }
+
+
+  game.running =
+    true;
+
+  game.paused =
+    false;
+
+  game.message =
+    "Cross the road";
+
+
+  retroStartSound();
+
+  saveGalaxyChicken();
+
+  renderGalaxyChicken();
+
+  runGalaxyChickenTimer();
+}
+
+
+/* =========================================================
+   PAUSE CHICKEN
+   ========================================================= */
+
+function pauseGalaxyChicken(
+  silent = false
+) {
+  const game =
+    GameCenter.chicken;
+
+
+  if (
+    !game ||
+    game.finished
+  ) {
+    return;
+  }
+
+
+  if (
+    GameCenter.chickenTimer
+  ) {
+    clearInterval(
+      GameCenter.chickenTimer
+    );
+  }
+
+
+  GameCenter.chickenTimer =
+    null;
+
+
+  if (game.running) {
+    game.running =
+      false;
+
+    game.paused =
+      true;
+
+    game.message =
+      "Paused";
+
+
+    saveGalaxyChicken();
+  }
+
+
+  if (!silent) {
+    renderGalaxyChicken();
+  }
+}
+
+
+/* =========================================================
+   TOGGLE CHICKEN
+   ========================================================= */
+
+function toggleGalaxyChickenPause() {
+  const game =
+    GameCenter.chicken;
+
+
+  if (
+    !game ||
+    game.finished
+  ) {
+    return;
+  }
+
+
+  if (game.running) {
+    pauseGalaxyChicken();
+
+  } else {
+    startGalaxyChicken();
+  }
+}
+
+
+/* =========================================================
+   MOVE CHICKEN
+   ========================================================= */
+
+function moveGalaxyChicken(
+  dx,
+  dy
+) {
+  const game =
+    GameCenter.chicken;
+
+
+  if (
+    !game ||
+    game.finished
+  ) {
+    return;
+  }
+
+
+  if (!game.running) {
+    startGalaxyChicken();
+  }
+
+
+  game.x =
+    Math.max(
+      4,
+      Math.min(
+        96,
+        game.x + dx
+      )
+    );
+
+
+  game.y =
+    Math.max(
+      4,
+      Math.min(
+        96,
+        game.y + dy
+      )
+    );
+
+
+  retroMoveSound();
+
+
+  /* HIT CAR */
+
+  if (
+    galaxyChickenCollision(
+      game
+    )
+  ) {
+    finishGalaxyChicken();
+    return;
+  }
+
+
+  /* SUCCESSFULLY CROSS ROAD */
+
+  if (
+    game.y <= 7
+  ) {
+    game.score +=
+      100 * game.level;
+
+
+    game.high =
+      retroSetHighScore(
+        RETRO_ARCADE_KEYS.chickenHigh,
+        game.score
+      );
+
+
+    retroScoreSound();
+
+
+    /* RETURN CHICKEN TO START */
+
+    game.x = 50;
+
+    game.y = 94;
+
+
+    /* PROGRESSIVE MODE */
+
+    if (
+      game.type ===
+        "progressive" &&
+      game.level < 5
+    ) {
+      game.level++;
+
+
+      game.cars =
+        galaxyChickenCars(
+          game.level
+        );
+
+
+      runGalaxyChickenTimer();
+    }
+  }
+
+
+  saveGalaxyChicken();
+
+  renderGalaxyChickenStage();
+}
+
+
+/* =========================================================
+   CHICKEN CARS HTML
+   ========================================================= */
+
+function galaxyChickenCarsHTML(
+  game
+) {
+  return game.cars
+    .map(
+      (car, index) => `
+        <div
+          class="chicken-car"
+          data-chicken-car="${index}"
+          style="
+            left:${car.x}%;
+            top:${car.y}%;
+          "
+        ></div>
+      `
+    )
+    .join("");
+}
+
+
+/* =========================================================
+   UPDATE CHICKEN STAGE
+   ========================================================= */
+
+function renderGalaxyChickenStage() {
+  const game =
+    GameCenter.chicken;
+
+
+  if (
+    !game ||
+    GameCenter.current !==
+      "chicken"
+  ) {
+    return;
+  }
+
+
+  const player =
+    document.querySelector(
+      "#chickenPlayer"
+    );
+
+
+  if (player) {
+    player.style.left =
+      `${game.x}%`;
+
+    player.style.top =
+      `${game.y}%`;
+  }
+
+
+  game.cars.forEach(
+    (car, index) => {
+
+      const element =
+        document.querySelector(
+          `[data-chicken-car="${index}"]`
+        );
+
+
+      if (element) {
+        element.style.left =
+          `${car.x}%`;
+
+        element.style.top =
+          `${car.y}%`;
+      }
+    }
+  );
+
+
+  const score =
+    document.querySelector(
+      "#chickenScore"
+    );
+
+
+  if (score) {
+    score.textContent =
+      game.score;
+  }
+
+
+  const high =
+    document.querySelector(
+      "#chickenHigh"
+    );
+
+
+  if (high) {
+    high.textContent =
+      game.high;
+  }
+}
+
+
+/* =========================================================
+   RENDER CHICKEN
+   ========================================================= */
+
+function renderGalaxyChicken() {
+  const body =
+    document.querySelector(
+      "#contentBody"
+    );
+
+
+  if (!body) {
+    return;
+  }
+
+
+  if (!GameCenter.chicken) {
+    GameCenter.chicken =
+      galaxyChickenDefault();
+  }
+
+
+  const game =
+    GameCenter.chicken;
+
+
+  GameCenter.current =
+    "chicken";
+
+
+  const hasSave =
+    !!retroLoad(
+      RETRO_ARCADE_KEYS.chickenSave
+    );
+
+
+  body.innerHTML = `
+    <div class="game-shell chicken-game">
+
+      <div class="game-topline">
+
+        <button
+          class="secondary-btn"
+          data-game-back
+        >
+          ← Games
+        </button>
+
+
+        <div class="game-status">
+          ${escapeHTML(
+            game.message
+          )}
+        </div>
+
+
+        <div class="game-toolbar">
+
+          <button
+            class="secondary-btn"
+            data-chicken-continue
+            ${
+              hasSave
+                ? ""
+                : "disabled"
+            }
+          >
+            Continue
+          </button>
+
+
+          <button
+            class="secondary-btn"
+            data-chicken-new
+          >
+            New Game
+          </button>
+
+
+          <button
+            class="secondary-btn"
+            data-chicken-pause
+          >
+            ${
+              game.running
+                ? "Pause"
+                : "Start / Resume"
+            }
+          </button>
+
+        </div>
+
+      </div>
+
+
+      <div class="chicken-hud">
+
+        <span>
+          Score
+          <strong id="chickenScore">
+            ${game.score}
+          </strong>
+        </span>
+
+
+        <span>
+          High
+          <strong id="chickenHigh">
+            ${game.high}
+          </strong>
+        </span>
+
+
+        <label>
+          Game Type
+
+          <select
+            data-chicken-type
+          >
+
+            <option
+              value="classic"
+              ${
+                game.type ===
+                "classic"
+                  ? "selected"
+                  : ""
+              }
+            >
+              Classic
+            </option>
+
+
+            <option
+              value="progressive"
+              ${
+                game.type ===
+                "progressive"
+                  ? "selected"
+                  : ""
+              }
+            >
+              Progressive
+            </option>
+
+          </select>
+        </label>
+
+
+        <label>
+          Level
+
+          <select
+            data-chicken-level
+          >
+
+            ${[
+              1,
+              2,
+              3,
+              4,
+              5
+            ]
+              .map(
+                level => `
+                  <option
+                    value="${level}"
+                    ${
+                      game.level ===
+                      level
+                        ? "selected"
+                        : ""
+                    }
+                  >
+                    Level ${level}
+                  </option>
+                `
+              )
+              .join("")}
+
+          </select>
+        </label>
+
+
+        <label>
+          Sound
+
+          <select
+            data-chicken-sound
+          >
+
+            <option
+              value="yes"
+              ${
+                game.sound
+                  ? "selected"
+                  : ""
+              }
+            >
+              Yes
+            </option>
+
+
+            <option
+              value="no"
+              ${
+                !game.sound
+                  ? "selected"
+                  : ""
+              }
+            >
+              No
+            </option>
+
+          </select>
+        </label>
+
+      </div>
+
+
+      <div
+        class="chicken-stage retro-game-board"
+      >
+
+        <div class="chicken-road">
+
+          ${Array.from(
+            {
+              length: 10
+            },
+            () =>
+              `<div class="chicken-lane"></div>`
+          ).join("")}
+
+        </div>
+
+
+        <div class="chicken-goal">
+          SAFE SIDE
+        </div>
+
+
+        ${galaxyChickenCarsHTML(
+          game
+        )}
+
+
+        <div
+          id="chickenPlayer"
+          class="chicken-player"
+          style="
+            left:${game.x}%;
+            top:${game.y}%;
+          "
+        ></div>
+
+      </div>
+
+
+      <div class="chicken-controls">
+
+        <button
+          data-chicken-dir="up"
+        >
+          ▲
+        </button>
+
+
+        <button
+          data-chicken-dir="left"
+        >
+          ◀
+        </button>
+
+
+        <button
+          data-chicken-dir="down"
+        >
+          ▼
+        </button>
+
+
+        <button
+          data-chicken-dir="right"
+        >
+          ▶
+        </button>
+
+      </div>
+
+
+      <div class="retro-game-message">
+        Arrow keys or W A S D
+      </div>
+
+    </div>
+  `;
+}
+
+
+/* =========================================================
+   OPEN SNAKE / CHICKEN FROM GAME CARDS
+   ========================================================= */
+
+document.addEventListener(
+  "click",
+
+  event => {
+
+    const target =
+      event.target instanceof Element
+        ? event.target
+        : null;
+
+
+    if (!target) {
+      return;
+    }
+
+
+    const snakeCard =
+      target.closest(
+        '[data-game-open="snake"]'
+      );
+
+
+    if (snakeCard) {
+      event.preventDefault();
+
+      openGalaxySnake();
+
+      return;
+    }
+
+
+    const chickenCard =
+      target.closest(
+        '[data-game-open="chicken"]'
+      );
+
+
+    if (chickenCard) {
+      event.preventDefault();
+
+      openGalaxyChicken();
+
+      return;
+    }
+  }
+);
+
+
+/* =========================================================
+   SNAKE + CHICKEN BUTTONS
+   ========================================================= */
+
+document.addEventListener(
+  "click",
+
+  event => {
+
+    const target =
+      event.target instanceof Element
+        ? event.target
+        : null;
+
+
+    if (!target) {
+      return;
+    }
+
+
+    /* SNAKE NEW GAME */
+
+    if (
+      target.closest(
+        "[data-snake-new]"
+      )
+    ) {
+      newGalaxySnake();
+
+      return;
+    }
+
+
+    /* SNAKE CONTINUE */
+
+    if (
+      target.closest(
+        "[data-snake-continue]"
+      )
+    ) {
+      continueGalaxySnake();
+
+      return;
+    }
+
+
+    /* SNAKE PAUSE */
+
+    if (
+      target.closest(
+        "[data-snake-pause]"
+      )
+    ) {
+      toggleGalaxySnakePause();
+
+      return;
+    }
+
+
+    /* SNAKE UP */
+
+    if (
+      target.closest(
+        '[data-snake-dir="up"]'
+      )
+    ) {
+      galaxySnakeDirection(
+        0,
+        -1
+      );
+
+      return;
+    }
+
+
+    /* SNAKE DOWN */
+
+    if (
+      target.closest(
+        '[data-snake-dir="down"]'
+      )
+    ) {
+      galaxySnakeDirection(
+        0,
+        1
+      );
+
+      return;
+    }
+
+
+    /* SNAKE LEFT */
+
+    if (
+      target.closest(
+        '[data-snake-dir="left"]'
+      )
+    ) {
+      galaxySnakeDirection(
+        -1,
+        0
+      );
+
+      return;
+    }
+
+
+    /* SNAKE RIGHT */
+
+    if (
+      target.closest(
+        '[data-snake-dir="right"]'
+      )
+    ) {
+      galaxySnakeDirection(
+        1,
+        0
+      );
+
+      return;
+    }
+
+
+    /* CHICKEN NEW GAME */
+
+    if (
+      target.closest(
+        "[data-chicken-new]"
+      )
+    ) {
+      newGalaxyChicken();
+
+      return;
+    }
+
+
+    /* CHICKEN CONTINUE */
+
+    if (
+      target.closest(
+        "[data-chicken-continue]"
+      )
+    ) {
+      continueGalaxyChicken();
+
+      return;
+    }
+
+
+    /* CHICKEN PAUSE */
+
+    if (
+      target.closest(
+        "[data-chicken-pause]"
+      )
+    ) {
+      toggleGalaxyChickenPause();
+
+      return;
+    }
+
+
+    /* CHICKEN UP */
+
+    if (
+      target.closest(
+        '[data-chicken-dir="up"]'
+      )
+    ) {
+      moveGalaxyChicken(
+        0,
+        -10
+      );
+
+      return;
+    }
+
+
+    /* CHICKEN DOWN */
+
+    if (
+      target.closest(
+        '[data-chicken-dir="down"]'
+      )
+    ) {
+      moveGalaxyChicken(
+        0,
+        10
+      );
+
+      return;
+    }
+
+
+    /* CHICKEN LEFT */
+
+    if (
+      target.closest(
+        '[data-chicken-dir="left"]'
+      )
+    ) {
+      moveGalaxyChicken(
+        -10,
+        0
+      );
+
+      return;
+    }
+
+
+    /* CHICKEN RIGHT */
+
+    if (
+      target.closest(
+        '[data-chicken-dir="right"]'
+      )
+    ) {
+      moveGalaxyChicken(
+        10,
+        0
+      );
+
+      return;
+    }
+  }
+);
+
+
+/* =========================================================
+   GAME SETTINGS
+   ========================================================= */
+
+document.addEventListener(
+  "change",
+
+  event => {
+
+    const target =
+      event.target;
+
+
+    /* SNAKE LEVEL */
+
+    if (
+      target.matches(
+        "[data-snake-level]"
+      )
+    ) {
+      const game =
+        GameCenter.snake;
+
+
+      if (!game) {
+        return;
+      }
+
+
+      game.level =
+        Number(
+          target.value
+        );
+
+
+      saveGalaxySnake();
+
+
+      if (game.running) {
+        runGalaxySnakeTimer();
+      }
+
+
+      return;
+    }
+
+
+    /* SNAKE TYPE */
+
+    if (
+      target.matches(
+        "[data-snake-type]"
+      )
+    ) {
+      const game =
+        GameCenter.snake;
+
+
+      if (!game) {
+        return;
+      }
+
+
+      game.type =
+        target.value;
+
+
+      saveGalaxySnake();
+
+      return;
+    }
+
+
+    /* SNAKE SOUND */
+
+    if (
+      target.matches(
+        "[data-snake-sound]"
+      )
+    ) {
+      const game =
+        GameCenter.snake;
+
+
+      if (!game) {
+        return;
+      }
+
+
+      game.sound =
+        target.value ===
+        "yes";
+
+
+      saveGalaxySnake();
+
+      return;
+    }
+
+
+    /* CHICKEN LEVEL */
+
+    if (
+      target.matches(
+        "[data-chicken-level]"
+      )
+    ) {
+      const game =
+        GameCenter.chicken;
+
+
+      if (!game) {
+        return;
+      }
+
+
+      game.level =
+        Number(
+          target.value
+        );
+
+
+      game.cars =
+        galaxyChickenCars(
+          game.level
+        );
+
+
+      saveGalaxyChicken();
+
+
+      if (game.running) {
+        runGalaxyChickenTimer();
+      }
+
+
+      renderGalaxyChickenStage();
+
+      return;
+    }
+
+
+    /* CHICKEN TYPE */
+
+    if (
+      target.matches(
+        "[data-chicken-type]"
+      )
+    ) {
+      const game =
+        GameCenter.chicken;
+
+
+      if (!game) {
+        return;
+      }
+
+
+      game.type =
+        target.value;
+
+
+      saveGalaxyChicken();
+
+      return;
+    }
+
+
+    /* CHICKEN SOUND */
+
+    if (
+      target.matches(
+        "[data-chicken-sound]"
+      )
+    ) {
+      const game =
+        GameCenter.chicken;
+
+
+      if (!game) {
+        return;
+      }
+
+
+      game.sound =
+        target.value ===
+        "yes";
+
+
+      saveGalaxyChicken();
+
+      return;
+    }
+  }
+);
+
+
+/* =========================================================
+   KEYBOARD CONTROLS
+   ========================================================= */
+
+document.addEventListener(
+  "keydown",
+
+  event => {
+
+    /* ignore keyboard while typing */
+
+    const active =
+      document.activeElement;
+
+
+    if (
+      active &&
+      (
+        active.tagName ===
+          "INPUT" ||
+        active.tagName ===
+          "TEXTAREA" ||
+        active.tagName ===
+          "SELECT"
+      )
+    ) {
+      return;
+    }
+
+
+    const key =
+      event.key.toLowerCase();
+
+
+    /* =====================================================
+       SNAKE
+       ===================================================== */
+
+    if (
+      GameCenter.current ===
+      "snake"
+    ) {
+      const allowed = [
+        "arrowup",
+        "arrowdown",
+        "arrowleft",
+        "arrowright",
+        "w",
+        "a",
+        "s",
+        "d",
+        " "
+      ];
+
+
+      if (
+        !allowed.includes(
+          key
+        )
+      ) {
+        return;
+      }
+
+
+      event.preventDefault();
+
+
+      if (
+        key === "arrowup" ||
+        key === "w"
+      ) {
+        galaxySnakeDirection(
+          0,
+          -1
+        );
+      }
+
+
+      else if (
+        key === "arrowdown" ||
+        key === "s"
+      ) {
+        galaxySnakeDirection(
+          0,
+          1
+        );
+      }
+
+
+      else if (
+        key === "arrowleft" ||
+        key === "a"
+      ) {
+        galaxySnakeDirection(
+          -1,
+          0
+        );
+      }
+
+
+      else if (
+        key === "arrowright" ||
+        key === "d"
+      ) {
+        galaxySnakeDirection(
+          1,
+          0
+        );
+      }
+
+
+      else if (
+        key === " "
+      ) {
+        toggleGalaxySnakePause();
+      }
+
+
+      return;
+    }
+
+
+    /* =====================================================
+       CHICKEN
+       ===================================================== */
+
+    if (
+      GameCenter.current ===
+      "chicken"
+    ) {
+      const allowed = [
+        "arrowup",
+        "arrowdown",
+        "arrowleft",
+        "arrowright",
+        "w",
+        "a",
+        "s",
+        "d",
+        " "
+      ];
+
+
+      if (
+        !allowed.includes(
+          key
+        )
+      ) {
+        return;
+      }
+
+
+      event.preventDefault();
+
+
+      if (
+        key === "arrowup" ||
+        key === "w"
+      ) {
+        moveGalaxyChicken(
+          0,
+          -10
+        );
+      }
+
+
+      else if (
+        key === "arrowdown" ||
+        key === "s"
+      ) {
+        moveGalaxyChicken(
+          0,
+          10
+        );
+      }
+
+
+      else if (
+        key === "arrowleft" ||
+        key === "a"
+      ) {
+        moveGalaxyChicken(
+          -10,
+          0
+        );
+      }
+
+
+      else if (
+        key === "arrowright" ||
+        key === "d"
+      ) {
+        moveGalaxyChicken(
+          10,
+          0
+        );
+      }
+
+
+      else if (
+        key === " "
+      ) {
+        toggleGalaxyChickenPause();
+      }
+    }
+  }
+);
+
+
+/* =========================================================
+   SAVE GAME BEFORE LEAVING GAMING SCREEN
+   CAPTURE MODE MAKES THIS RUN BEFORE OLD BACK HANDLER
+   ========================================================= */
+
+document.addEventListener(
+  "click",
+
+  event => {
+
+    const target =
+      event.target instanceof Element
+        ? event.target
+        : null;
+
+
+    if (!target) {
+      return;
+    }
+
+
+    if (
+      !target.closest(
+        "[data-game-back]"
+      )
+    ) {
+      return;
+    }
+
+
+    if (
+      GameCenter.current ===
+      "snake"
+    ) {
+      pauseGalaxySnake(
+        true
+      );
+    }
+
+
+    if (
+      GameCenter.current ===
+      "chicken"
+    ) {
+      pauseGalaxyChicken(
+        true
+      );
+    }
+
+  },
+
+  true
+);
+
+
+/* =========================================================
+   SAVE IF USER CLOSES OR REFRESHES PAGE
+   ========================================================= */
+
+window.addEventListener(
+  "beforeunload",
+
+  () => {
+
+    if (
+      GameCenter.current ===
+      "snake"
+    ) {
+      saveGalaxySnake();
+    }
+
+
+    if (
+      GameCenter.current ===
+      "chicken"
+    ) {
+      saveGalaxyChicken();
+    }
+  }
+);
+
+
+/* =========================================================
+   OPTIONAL GLOBAL ACCESS
+   ========================================================= */
+
+if (window.GALAXY) {
+
+  window.GALAXY.openSnake =
+    openGalaxySnake;
+
+
+  window.GALAXY.openChicken =
+    openGalaxyChicken;
+
+
+  window.GALAXY.newSnake =
+    newGalaxySnake;
+
+
+  window.GALAXY.newChicken =
+    newGalaxyChicken;
+}
+
+
+/* =========================================================
+   END
+   SNAKE + CHICKEN COMPLETE
    ========================================================= */
