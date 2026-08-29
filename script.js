@@ -2,6 +2,7 @@
 
 /* =========================================================
    GALAXY AI — COMPLETE SCRIPT.JS
+   PART 1 OF 2
    GEMINI ONLY
    ========================================================= */
 
@@ -34,7 +35,6 @@ const GameCenter = {
   shooterTimer: null,
   shooterGalaxyTimer: null
 };
-
 
 /* =========================================================
    BASIC UI
@@ -162,7 +162,6 @@ function autoResize(el) {
   el.style.height = `${Math.min(el.scrollHeight, 180)}px`;
 }
 
-
 /* =========================================================
    CHAT
    ========================================================= */
@@ -208,12 +207,11 @@ function updateSendButtonState() {
   );
 }
 
-
 /* =========================================================
    GEMINI AI
    ========================================================= */
 
-async function fetchAIResponse(message) {
+async function fetchAIResponse(message, includeHistory = true) {
   const creatorContext =
     "You are GALAXY AI. " +
     "GALAXY AI was created and founded by Harshavardhan. " +
@@ -233,12 +231,15 @@ async function fetchAIResponse(message) {
         content: creatorContext
       },
 
-      ...state.messages
-        .slice(-20)
-        .map(item => ({
-          role: item.role,
-          content: item.text
-        })),
+      ...(includeHistory
+        ? state.messages
+            .slice(0, -1)
+            .slice(-20)
+            .map(item => ({
+              role: item.role,
+              content: item.text
+            }))
+        : []),
 
       {
         role: "user",
@@ -250,8 +251,1419 @@ async function fetchAIResponse(message) {
   const response = await fetch("/api/gemini", {
     method: "POST",
 
-    headers
-     /* =========================================================
+    headers: {
+      "Content-Type": "application/json"
+    },
+
+    body: JSON.stringify(payload)
+  });
+
+  const data = await response
+    .json()
+    .catch(() => ({}));
+
+  if (!response.ok) {
+    throw new Error(
+      data.error ||
+      data.message ||
+      `Backend error ${response.status}`
+    );
+  }
+
+  return (
+    data.text ||
+    data.reply ||
+    data.output ||
+    data.response ||
+    data.message ||
+    "GALAXY received your request."
+  );
+}
+
+async function sendMessage() {
+  const input = $("#promptInput");
+
+  if (!input || state.generating) {
+    return;
+  }
+
+  const text = input.value.trim();
+
+  if (!text) {
+    return;
+  }
+
+  input.value = "";
+  autoResize(input);
+
+  state.messages.push({
+    role: "user",
+    text
+  });
+
+  renderMessage(
+    "user",
+    text
+  );
+
+  state.generating = true;
+
+  updateSendButtonState();
+
+  if ($("#draftState")) {
+    $("#draftState").textContent =
+      "GALAXY is thinking…";
+  }
+
+  try {
+    const reply = await fetchAIResponse(text);
+
+    state.messages.push({
+      role: "assistant",
+      text: reply
+    });
+
+    renderMessage(
+      "assistant",
+      reply
+    );
+
+  } catch (error) {
+    const message =
+      `GALAXY error: ${error.message}`;
+
+    renderMessage(
+      "assistant",
+      message
+    );
+
+    toast(
+      error.message,
+      "error"
+    );
+
+  } finally {
+    state.generating = false;
+
+    updateSendButtonState();
+
+    if ($("#draftState")) {
+      $("#draftState").textContent =
+        "Ready";
+    }
+  }
+}
+
+/* =========================================================
+   GAMING CENTER HOME
+   ========================================================= */
+
+function renderGames() {
+  if ($("#contentTitle")) {
+    $("#contentTitle").textContent =
+      "Gaming Center";
+  }
+
+  if ($("#contentEyebrow")) {
+    $("#contentEyebrow").textContent =
+      "PLAY WITH GALAXY";
+  }
+
+  const body = $("#contentBody");
+
+  if (!body) return;
+
+  body.innerHTML = `
+    <div class="games-home">
+
+      <div class="games-hero">
+
+        <div>
+          <span class="eyebrow">
+            GALAXY GAMING
+          </span>
+
+          <h2>
+            Choose a game
+          </h2>
+
+          <p>
+            Play against GALAXY or play with a friend.
+          </p>
+        </div>
+
+        <div class="games-hero-mark">
+          ✦
+        </div>
+
+      </div>
+
+      <div class="games-grid">
+
+        ${gameCard(
+          "chess",
+          "♟",
+          "Chess",
+          "vs GALAXY or Friend • Levels • Review"
+        )}
+
+        ${gameCard(
+          "tictactoe",
+          "✕○",
+          "Tic-Tac-Toe",
+          "vs GALAXY or Friend • Levels • Review"
+        )}
+
+        ${gameCard(
+          "connect4",
+          "●●",
+          "Connect Four",
+          "vs GALAXY or Friend • Levels • Review"
+        )}
+
+        ${gameCard(
+          "memory",
+          "▦",
+          "Memory",
+          "vs GALAXY or Friend • Levels • Review"
+        )}
+
+        ${gameCard(
+          "shooter",
+          "◎",
+          "GALAXY Shooting",
+          "Arcade target battle • GALAXY or Friend"
+        )}
+
+      </div>
+
+    </div>
+  `;
+}
+
+function gameCard(id, icon, title, subtitle) {
+  return `
+    <button
+      class="game-card"
+      data-game-open="${id}"
+    >
+
+      <div class="game-card-visual">
+        ${icon}
+      </div>
+
+      <div class="game-card-copy">
+
+        <strong>
+          ${title}
+        </strong>
+
+        <span>
+          ${subtitle}
+        </span>
+
+      </div>
+
+    </button>
+  `;
+}
+
+function modeOptions(mode = "galaxy") {
+  return `
+    <select data-game-mode>
+
+      <option
+        value="galaxy"
+        ${mode === "galaxy" ? "selected" : ""}
+      >
+        You vs GALAXY
+      </option>
+
+      <option
+        value="friend"
+        ${mode === "friend" ? "selected" : ""}
+      >
+        You vs Friend
+      </option>
+
+    </select>
+  `;
+}
+
+function levelOptions(elo = 500) {
+  return `
+    <select data-game-level>
+
+      ${GAME_LEVELS.map(level => `
+        <option
+          value="${level.elo}"
+          ${level.elo === elo ? "selected" : ""}
+        >
+          ${level.name} — ${level.elo} ELO
+        </option>
+      `).join("")}
+
+    </select>
+  `;
+}
+
+function commonToolbar(game, mode, elo) {
+  return `
+    <div class="game-toolbar">
+
+      ${modeOptions(mode)}
+
+      ${levelOptions(elo)}
+
+      <button
+        class="secondary-btn"
+        data-${game}-hint
+      >
+        Hint
+      </button>
+
+      <button
+        class="secondary-btn"
+        data-${game}-undo
+      >
+        Undo
+      </button>
+
+      <button
+        class="secondary-btn"
+        data-${game}-resign
+      >
+        Resign / End
+      </button>
+
+      <button
+        class="secondary-btn"
+        data-${game}-review
+      >
+        Game Review
+      </button>
+
+      <button
+        class="primary-btn"
+        data-${game}-reset
+      >
+        New Game
+      </button>
+
+    </div>
+  `;
+}
+
+function reviewHTML(title, items, note = "") {
+  return `
+    <div class="review-card">
+
+      <h3>
+        ${escapeHTML(title)}
+      </h3>
+
+      <div class="review-grid">
+
+        ${items.map(([key, value]) => `
+          <div class="review-metric">
+
+            <span>
+              ${escapeHTML(key)}
+            </span>
+
+            <strong>
+              ${escapeHTML(value)}
+            </strong>
+
+          </div>
+        `).join("")}
+
+      </div>
+
+      ${
+        note
+          ? `
+            <p style="color:var(--muted);font-size:11px">
+              ${escapeHTML(note)}
+            </p>
+          `
+          : ""
+      }
+
+    </div>
+  `;
+}
+
+function opponentName(mode) {
+  return mode === "friend"
+    ? "Friend"
+    : "GALAXY";
+}
+
+function difficultyChance(elo) {
+  return Math.min(
+    0.98,
+    0.30 + (elo / 1200) * 0.65
+  );
+}
+
+/* =========================================================
+   CHESS
+   ========================================================= */
+
+const CHESS = {
+  pieces: {
+    r: "♜",
+    n: "♞",
+    b: "♝",
+    q: "♛",
+    k: "♚",
+    p: "♟",
+
+    R: "♖",
+    N: "♘",
+    B: "♗",
+    Q: "♕",
+    K: "♔",
+    P: "♙"
+  },
+
+  values: {
+    p: 1,
+    n: 3,
+    b: 3,
+    q: 9,
+    r: 5,
+    k: 100
+  }
+};
+
+function chessInitialBoard() {
+  return [
+    "rnbqkbnr".split(""),
+    "pppppppp".split(""),
+
+    ...Array.from(
+      { length: 4 },
+      () => Array(8).fill("")
+    ),
+
+    "PPPPPPPP".split(""),
+    "RNBQKBNR".split("")
+  ];
+}
+
+function resetChess(keepSettings = true) {
+  const old = GameCenter.chess || {};
+
+  GameCenter.chess = {
+    board: chessInitialBoard(),
+
+    turn: "white",
+
+    selected: null,
+
+    legal: [],
+
+    mode:
+      keepSettings
+        ? old.mode || "galaxy"
+        : "galaxy",
+
+    elo:
+      keepSettings
+        ? old.elo || 500
+        : 500,
+
+    history: [],
+
+    snapshots: [],
+
+    review: {
+      best: 0,
+      good: 0,
+      mistakes: 0,
+      blunders: 0,
+      hints: 0
+    },
+
+    finished: false,
+
+    message: "Your turn"
+  };
+
+  renderChess();
+}
+
+function isWhitePiece(piece) {
+  return (
+    piece &&
+    piece === piece.toUpperCase()
+  );
+}
+
+function sameColor(a, b) {
+  return (
+    a &&
+    b &&
+    isWhitePiece(a) === isWhitePiece(b)
+  );
+}
+
+function chessMoves(board, r, c) {
+  const piece = board[r][c];
+
+  if (!piece) {
+    return [];
+  }
+
+  const white =
+    isWhitePiece(piece);
+
+  const type =
+    piece.toLowerCase();
+
+  const moves = [];
+
+  const add = (rr, cc) => {
+    if (
+      rr < 0 ||
+      rr > 7 ||
+      cc < 0 ||
+      cc > 7
+    ) {
+      return false;
+    }
+
+    if (!board[rr][cc]) {
+      moves.push([
+        rr,
+        cc
+      ]);
+
+      return true;
+    }
+
+    if (
+      !sameColor(
+        piece,
+        board[rr][cc]
+      )
+    ) {
+      moves.push([
+        rr,
+        cc
+      ]);
+    }
+
+    return false;
+  };
+
+  if (type === "p") {
+    const direction =
+      white ? -1 : 1;
+
+    const start =
+      white ? 6 : 1;
+
+    if (
+      r + direction >= 0 &&
+      r + direction < 8 &&
+      !board[r + direction][c]
+    ) {
+      moves.push([
+        r + direction,
+        c
+      ]);
+
+      if (
+        r === start &&
+        !board[r + 2 * direction][c]
+      ) {
+        moves.push([
+          r + 2 * direction,
+          c
+        ]);
+      }
+    }
+
+    [-1, 1].forEach(dc => {
+      const rr =
+        r + direction;
+
+      const cc =
+        c + dc;
+
+      if (
+        rr >= 0 &&
+        rr < 8 &&
+        cc >= 0 &&
+        cc < 8 &&
+        board[rr][cc] &&
+        !sameColor(
+          piece,
+          board[rr][cc]
+        )
+      ) {
+        moves.push([
+          rr,
+          cc
+        ]);
+      }
+    });
+  }
+
+  if (type === "n") {
+    [
+      [2, 1],
+      [2, -1],
+      [-2, 1],
+      [-2, -1],
+      [1, 2],
+      [1, -2],
+      [-1, 2],
+      [-1, -2]
+    ].forEach(([dr, dc]) => {
+      add(
+        r + dr,
+        c + dc
+      );
+    });
+  }
+
+  if (type === "k") {
+    for (
+      let dr = -1;
+      dr <= 1;
+      dr++
+    ) {
+      for (
+        let dc = -1;
+        dc <= 1;
+        dc++
+      ) {
+        if (dr || dc) {
+          add(
+            r + dr,
+            c + dc
+          );
+        }
+      }
+    }
+  }
+
+  if (
+    "rbq".includes(type)
+  ) {
+    const directions = [];
+
+    if (
+      "rq".includes(type)
+    ) {
+      directions.push(
+        [1, 0],
+        [-1, 0],
+        [0, 1],
+        [0, -1]
+      );
+    }
+
+    if (
+      "bq".includes(type)
+    ) {
+      directions.push(
+        [1, 1],
+        [1, -1],
+        [-1, 1],
+        [-1, -1]
+      );
+    }
+
+    directions.forEach(([dr, dc]) => {
+      let rr =
+        r + dr;
+
+      let cc =
+        c + dc;
+
+      while (
+        rr >= 0 &&
+        rr < 8 &&
+        cc >= 0 &&
+        cc < 8
+      ) {
+        if (!add(rr, cc)) {
+          break;
+        }
+
+        rr += dr;
+        cc += dc;
+      }
+    });
+  }
+
+  return moves;
+}
+
+function allChessMoves(side) {
+  const game = GameCenter.chess;
+  const result = [];
+
+  game.board.forEach((row, r) => {
+    row.forEach((piece, c) => {
+      if (
+        piece &&
+        (
+          side === "white"
+            ? isWhitePiece(piece)
+            : !isWhitePiece(piece)
+        )
+      ) {
+        chessMoves(
+          game.board,
+          r,
+          c
+        ).forEach(([rr, cc]) => {
+          result.push({
+            from: [r, c],
+            to: [rr, cc],
+            piece,
+            target:
+              game.board[rr][cc]
+          });
+        });
+      }
+    });
+  });
+
+  return result;
+}
+
+function chessNotation(move) {
+  const files =
+    "abcdefgh";
+
+  return (
+    `${move.piece}` +
+    `${files[move.from[1]]}` +
+    `${8 - move.from[0]}` +
+    `-` +
+    `${files[move.to[1]]}` +
+    `${8 - move.to[0]}`
+  );
+}
+
+function scoreChessMove(move) {
+  let score = 0;
+
+  if (move.target) {
+    score +=
+      (
+        CHESS.values[
+          move.target.toLowerCase()
+        ] || 0
+      ) * 10;
+  }
+
+  const center =
+    Math.abs(
+      3.5 - move.to[0]
+    ) +
+    Math.abs(
+      3.5 - move.to[1]
+    );
+
+  score +=
+    Math.max(
+      0,
+      7 - center
+    );
+
+  if (
+    move.piece.toLowerCase() === "p" &&
+    (
+      move.to[0] === 0 ||
+      move.to[0] === 7
+    )
+  ) {
+    score += 80;
+  }
+
+  return score;
+}
+
+function applyChessMove(
+  move,
+  actor = "You"
+) {
+  const game =
+    GameCenter.chess;
+
+  game.snapshots.push(
+    JSON.parse(
+      JSON.stringify({
+        board: game.board,
+        turn: game.turn,
+        history: game.history,
+        review: game.review,
+        finished: game.finished,
+        message: game.message
+      })
+    )
+  );
+
+  const beforeScore =
+    scoreChessMove(move);
+
+  game.board[
+    move.to[0]
+  ][
+    move.to[1]
+  ] =
+    move.piece;
+
+  game.board[
+    move.from[0]
+  ][
+    move.from[1]
+  ] =
+    "";
+
+  if (
+    move.piece === "P" &&
+    move.to[0] === 0
+  ) {
+    game.board[
+      move.to[0]
+    ][
+      move.to[1]
+    ] =
+      "Q";
+  }
+
+  if (
+    move.piece === "p" &&
+    move.to[0] === 7
+  ) {
+    game.board[
+      move.to[0]
+    ][
+      move.to[1]
+    ] =
+      "q";
+  }
+
+  game.history.push(
+    `${actor}: ${chessNotation(move)}`
+  );
+
+  if (actor === "You") {
+    const options =
+      allChessMoves("white")
+        .map(scoreChessMove);
+
+    const best =
+      Math.max(
+        beforeScore,
+        ...options,
+        0
+      );
+
+    if (
+      beforeScore >= best - 1
+    ) {
+      game.review.best++;
+
+    } else if (
+      beforeScore >= best - 4
+    ) {
+      game.review.good++;
+
+    } else if (
+      beforeScore >= best - 10
+    ) {
+      game.review.mistakes++;
+
+    } else {
+      game.review.blunders++;
+    }
+  }
+
+  game.selected = null;
+  game.legal = [];
+
+  game.turn =
+    game.turn === "white"
+      ? "black"
+      : "white";
+
+  const allPieces =
+    game.board.flat();
+
+  if (
+    !allPieces.includes("K") ||
+    !allPieces.includes("k")
+  ) {
+    game.finished = true;
+
+    const whiteKing =
+      allPieces.includes("K");
+
+    game.message =
+      whiteKing
+        ? "🏆 You Win!"
+        : `🏆 ${opponentName(game.mode)} Wins!`;
+  }
+}
+
+function galaxyChessMove() {
+  const game =
+    GameCenter.chess;
+
+  if (
+    !game ||
+    game.finished ||
+    game.mode !== "galaxy" ||
+    game.turn !== "black"
+  ) {
+    return;
+  }
+
+  const moves =
+    allChessMoves("black");
+
+  if (!moves.length) {
+    game.finished = true;
+    game.message = "🤝 Draw Game";
+
+    renderChess();
+    return;
+  }
+
+  moves.sort(
+    (a, b) =>
+      scoreChessMove(b) -
+      scoreChessMove(a)
+  );
+
+  const smart =
+    Math.random() <
+    difficultyChance(
+      game.elo
+    );
+
+  const pick =
+    smart
+      ? moves[
+          Math.floor(
+            Math.random() *
+            Math.min(
+              3,
+              moves.length
+            )
+          )
+        ]
+      : moves[
+          Math.floor(
+            Math.random() *
+            moves.length
+          )
+        ];
+
+  applyChessMove(
+    pick,
+    "GALAXY"
+  );
+
+  game.message =
+    game.finished
+      ? game.message
+      : "Your turn";
+
+  renderChess();
+}
+
+function clickChessSquare(r, c) {
+  const game =
+    GameCenter.chess;
+
+  if (
+    !game ||
+    game.finished
+  ) {
+    return;
+  }
+
+  const humanSide =
+    game.mode === "friend"
+      ? game.turn
+      : "white";
+
+  if (
+    game.mode === "galaxy" &&
+    game.turn !== "white"
+  ) {
+    return;
+  }
+
+  if (game.selected) {
+    const allowed =
+      game.legal.find(
+        pos =>
+          pos[0] === r &&
+          pos[1] === c
+      );
+
+    if (allowed) {
+      const [
+        fromR,
+        fromC
+      ] =
+        game.selected;
+
+      const piece =
+        game.board[fromR][fromC];
+
+      const move = {
+        from: [
+          fromR,
+          fromC
+        ],
+
+        to: [
+          r,
+          c
+        ],
+
+        piece,
+
+        target:
+          game.board[r][c]
+      };
+
+      applyChessMove(
+        move,
+
+        game.mode === "friend"
+          ? (
+              game.turn === "white"
+                ? "Player 1"
+                : "Friend"
+            )
+          : "You"
+      );
+
+      game.message =
+        game.finished
+          ? game.message
+          : (
+              game.mode === "friend"
+                ? `${
+                    game.turn === "white"
+                      ? "Player 1"
+                      : "Friend"
+                  } turn`
+                : "GALAXY is thinking…"
+            );
+
+      renderChess();
+
+      if (
+        game.mode === "galaxy" &&
+        !game.finished
+      ) {
+        setTimeout(
+          galaxyChessMove,
+          350
+        );
+      }
+
+      return;
+    }
+  }
+
+  const piece =
+    game.board[r][c];
+
+  if (
+    piece &&
+    (
+      (
+        humanSide === "white" &&
+        isWhitePiece(piece)
+      ) ||
+      (
+        humanSide === "black" &&
+        !isWhitePiece(piece)
+      )
+    )
+  ) {
+    game.selected = [
+      r,
+      c
+    ];
+
+    game.legal =
+      chessMoves(
+        game.board,
+        r,
+        c
+      );
+
+  } else {
+    game.selected = null;
+    game.legal = [];
+  }
+
+  renderChess();
+}
+
+function renderChess() {
+  const game =
+    GameCenter.chess ||
+    (
+      resetChess(),
+      GameCenter.chess
+    );
+
+  GameCenter.current =
+    "chess";
+
+  const files =
+    "abcdefgh";
+
+  const body =
+    $("#contentBody");
+
+  if (!body) return;
+
+  body.innerHTML = `
+    <div class="game-shell">
+
+      <div class="game-topline">
+
+        <button
+          class="secondary-btn"
+          data-game-back
+        >
+          ← Games
+        </button>
+
+        <div class="game-status">
+          ${escapeHTML(game.message)}
+        </div>
+
+        ${commonToolbar(
+          "chess",
+          game.mode,
+          game.elo
+        )}
+
+      </div>
+
+      <div class="game-layout">
+
+        <div class="chess-board-wrap">
+
+          <div class="chess-board">
+
+            ${
+              game.board
+                .map((row, r) =>
+                  row.map((piece, c) => {
+                    const selected =
+                      game.selected?.[0] === r &&
+                      game.selected?.[1] === c;
+
+                    const legal =
+                      game.legal.some(
+                        pos =>
+                          pos[0] === r &&
+                          pos[1] === c
+                      );
+
+                    const capture =
+                      legal &&
+                      !!piece;
+
+                    return `
+                      <button
+                        class="
+                          chess-square
+                          ${(r + c) % 2 ? "dark" : "light"}
+                          ${selected ? "selected" : ""}
+                          ${legal ? "legal" : ""}
+                          ${capture ? "capture" : ""}
+                        "
+                        data-chess-square="${r},${c}"
+                      >
+                        ${CHESS.pieces[piece] || ""}
+                      </button>
+                    `;
+                  }).join("")
+                )
+                .join("")
+            }
+
+          </div>
+
+          <div class="chess-files">
+
+            ${
+              files
+                .split("")
+                .map(
+                  file =>
+                    `<span>${file}</span>`
+                )
+                .join("")
+            }
+
+          </div>
+
+        </div>
+
+        <div class="game-side-panel">
+
+          <div class="player-card">
+
+            <div class="player-avatar">
+              Y
+            </div>
+
+            <div>
+
+              <strong>
+                Player 1 / You
+              </strong>
+
+              <span>
+                White
+              </span>
+
+            </div>
+
+          </div>
+
+          <div class="player-card">
+
+            <div class="player-avatar galaxy-avatar">
+              ${
+                game.mode === "galaxy"
+                  ? "✦"
+                  : "F"
+              }
+            </div>
+
+            <div>
+
+              <strong>
+                ${opponentName(game.mode)}
+              </strong>
+
+              <span>
+                Black
+                ${
+                  game.mode === "galaxy"
+                    ? ` • ${game.elo} ELO`
+                    : ""
+                }
+              </span>
+
+            </div>
+
+          </div>
+
+          <div class="move-history">
+
+            <strong>
+              Moves
+            </strong>
+
+            <div class="move-history-list">
+
+              ${
+                game.history.length
+                  ? game.history
+                      .map(
+                        move =>
+                          `<div>${escapeHTML(move)}</div>`
+                      )
+                      .join("")
+                  : "No moves yet"
+              }
+
+            </div>
+
+          </div>
+
+          <div id="gameReview">
+          </div>
+
+        </div>
+
+      </div>
+
+    </div>
+  `;
+
+  syncGameSelectors(game);
+}
+
+function chessHint() {
+  const game =
+    GameCenter.chess;
+
+  if (
+    !game ||
+    game.finished
+  ) {
+    return;
+  }
+
+  const side =
+    game.mode === "galaxy"
+      ? "white"
+      : game.turn;
+
+  const moves =
+    allChessMoves(side)
+      .sort(
+        (a, b) =>
+          scoreChessMove(b) -
+          scoreChessMove(a)
+      );
+
+  if (moves[0]) {
+    game.review.hints++;
+
+    toast(
+      `Hint: ${chessNotation(moves[0])}`
+    );
+  }
+}
+
+function chessUndo() {
+  const game =
+    GameCenter.chess;
+
+  if (
+    !game?.snapshots.length
+  ) {
+    return toast(
+      "Nothing to undo"
+    );
+  }
+
+  let snapshot =
+    game.snapshots.pop();
+
+  if (
+    game.mode === "galaxy" &&
+    game.turn === "white" &&
+    game.snapshots.length
+  ) {
+    snapshot =
+      game.snapshots.pop();
+  }
+
+  Object.assign(
+    game,
+    snapshot,
+    {
+      selected: null,
+      legal: []
+    }
+  );
+
+  renderChess();
+}
+
+function chessReview() {
+  const game =
+    GameCenter.chess;
+
+  const total =
+    game.review.best +
+    game.review.good +
+    game.review.mistakes +
+    game.review.blunders;
+
+  const accuracy =
+    total
+      ? Math.max(
+          0,
+          Math.round(
+            (
+              game.review.best * 100 +
+              game.review.good * 85 +
+              game.review.mistakes * 55
+            ) /
+            total
+          )
+        )
+      : 0;
+
+  const review =
+    $("#gameReview");
+
+  if (!review) return;
+
+  review.innerHTML =
+    reviewHTML(
+      "Game Review",
+
+      [
+        [
+          "Estimated accuracy",
+          `${accuracy}%`
+        ],
+
+        [
+          "Best moves",
+          String(
+            game.review.best
+          )
+        ],
+
+        [
+          "Good moves",
+          String(
+            game.review.good
+          )
+        ],
+
+        [
+          "Mistakes",
+          String(
+            game.review.mistakes
+          )
+        ],
+
+        [
+          "Blunders",
+          String(
+            game.review.blunders
+          )
+        ],
+
+        [
+          "Hints used",
+          String(
+            game.review.hints
+          )
+        ]
+      ],
+
+      "GALAXY review is heuristic, not Stockfish-certified."
+    );
+}
+
+/* =========================================================
+   END OF PART 1
+   PART 2 MUST BE PASTED DIRECTLY BELOW
+   ========================================================= */
+/* =========================================================
    PART 2 OF 2
    TIC-TAC-TOE
    ========================================================= */
@@ -262,13 +1674,23 @@ function resetTTT(keepSettings = true) {
   GameCenter.ttt = {
     board: Array(9).fill(""),
     turn: "X",
-    mode: keepSettings ? old.mode || "galaxy" : "galaxy",
-    elo: keepSettings ? old.elo || 500 : 500,
+
+    mode: keepSettings
+      ? old.mode || "galaxy"
+      : "galaxy",
+
+    elo: keepSettings
+      ? old.elo || 500
+      : 500,
+
     history: [],
     snapshots: [],
+
     finished: false,
     winner: null,
+
     message: "Your turn",
+
     review: {
       moves: 0,
       strong: 0,
@@ -286,9 +1708,11 @@ const TTT_WINS = [
   [0, 1, 2],
   [3, 4, 5],
   [6, 7, 8],
+
   [0, 3, 6],
   [1, 4, 7],
   [2, 5, 8],
+
   [0, 4, 8],
   [2, 4, 6]
 ];
@@ -330,14 +1754,18 @@ function tttBestMove(symbol) {
   const game = GameCenter.ttt;
   const board = game.board;
 
-  const winning = tttWinningMove(board, symbol);
+  const winning =
+    tttWinningMove(board, symbol);
 
   if (winning !== -1) {
     return winning;
   }
 
-  const opponent = symbol === "X" ? "O" : "X";
-  const block = tttWinningMove(board, opponent);
+  const opponent =
+    symbol === "X" ? "O" : "X";
+
+  const block =
+    tttWinningMove(board, opponent);
 
   if (block !== -1) {
     return block;
@@ -347,26 +1775,39 @@ function tttBestMove(symbol) {
     return 4;
   }
 
-  const corners = [0, 2, 6, 8].filter(i => !board[i]);
+  const corners =
+    [0, 2, 6, 8].filter(
+      i => !board[i]
+    );
 
   if (corners.length) {
     return corners[
-      Math.floor(Math.random() * corners.length)
+      Math.floor(
+        Math.random() * corners.length
+      )
     ];
   }
 
-  const empty = board
-    .map((value, index) => value ? null : index)
-    .filter(index => index !== null);
+  const empty =
+    board
+      .map((value, index) =>
+        value ? null : index
+      )
+      .filter(index => index !== null);
 
   return empty.length
-    ? empty[Math.floor(Math.random() * empty.length)]
+    ? empty[
+        Math.floor(
+          Math.random() * empty.length
+        )
+      ]
     : -1;
 }
 
 function finishTTT() {
   const game = GameCenter.ttt;
-  const winner = tttWinner(game.board);
+  const winner =
+    tttWinner(game.board);
 
   if (!winner) {
     return false;
@@ -376,12 +1817,15 @@ function finishTTT() {
   game.winner = winner;
 
   if (winner === "draw") {
-    game.message = "🤝 Draw Game";
+    game.message =
+      "🤝 Draw Game";
+
   } else if (game.mode === "galaxy") {
     game.message =
       winner === "X"
         ? "🏆 You Win!"
         : "🤖 GALAXY Wins!";
+
   } else {
     game.message =
       winner === "X"
@@ -395,7 +1839,10 @@ function finishTTT() {
 function makeTTTMove(index, actor) {
   const game = GameCenter.ttt;
 
-  if (game.finished || game.board[index]) {
+  if (
+    game.finished ||
+    game.board[index]
+  ) {
     return false;
   }
 
@@ -413,7 +1860,8 @@ function makeTTTMove(index, actor) {
     )
   );
 
-  game.board[index] = game.turn;
+  game.board[index] =
+    game.turn;
 
   game.history.push(
     `${actor}: ${game.turn} → ${index + 1}`
@@ -423,7 +1871,10 @@ function makeTTTMove(index, actor) {
     game.review.moves++;
 
     const opponentWin =
-      tttWinningMove(game.board, "O");
+      tttWinningMove(
+        game.board,
+        "O"
+      );
 
     if (opponentWin !== -1) {
       game.review.mistakes++;
@@ -448,7 +1899,10 @@ function makeTTTMove(index, actor) {
 function clickTTT(index) {
   const game = GameCenter.ttt;
 
-  if (!game || game.finished) {
+  if (
+    !game ||
+    game.finished
+  ) {
     return;
   }
 
@@ -461,12 +1915,19 @@ function clickTTT(index) {
 
   const actor =
     game.mode === "friend"
-      ? game.turn === "X"
-        ? "Player 1"
-        : "Friend"
+      ? (
+          game.turn === "X"
+            ? "Player 1"
+            : "Friend"
+        )
       : "You";
 
-  if (!makeTTTMove(index, actor)) {
+  if (
+    !makeTTTMove(
+      index,
+      actor
+    )
+  ) {
     return;
   }
 
@@ -484,10 +1945,15 @@ function clickTTT(index) {
     return;
   }
 
-  game.message = "GALAXY is thinking…";
+  game.message =
+    "GALAXY is thinking…";
+
   renderTTT();
 
-  setTimeout(galaxyTTTMove, 300);
+  setTimeout(
+    galaxyTTTMove,
+    300
+  );
 }
 
 function galaxyTTTMove() {
@@ -502,9 +1968,12 @@ function galaxyTTTMove() {
     return;
   }
 
-  const empty = game.board
-    .map((v, i) => v ? null : i)
-    .filter(i => i !== null);
+  const empty =
+    game.board
+      .map((v, i) =>
+        v ? null : i
+      )
+      .filter(i => i !== null);
 
   if (!empty.length) {
     finishTTT();
@@ -518,20 +1987,26 @@ function galaxyTTTMove() {
     Math.random() <
     difficultyChance(game.elo)
   ) {
-    move = tttBestMove("O");
+    move =
+      tttBestMove("O");
   } else {
     move =
       empty[
         Math.floor(
-          Math.random() * empty.length
+          Math.random() *
+          empty.length
         )
       ];
   }
 
-  makeTTTMove(move, "GALAXY");
+  makeTTTMove(
+    move,
+    "GALAXY"
+  );
 
   if (!game.finished) {
-    game.message = "Your turn";
+    game.message =
+      "Your turn";
   }
 
   renderTTT();
@@ -540,11 +2015,18 @@ function galaxyTTTMove() {
 function tttHint() {
   const game = GameCenter.ttt;
 
-  if (!game || game.finished) {
+  if (
+    !game ||
+    game.finished
+  ) {
     return;
   }
 
-  const move = tttBestMove(game.turn);
+  const symbol =
+    game.turn;
+
+  const move =
+    tttBestMove(symbol);
 
   if (move !== -1) {
     game.review.hints++;
@@ -558,22 +2040,29 @@ function tttHint() {
 function tttUndo() {
   const game = GameCenter.ttt;
 
-  if (!game?.snapshots.length) {
+  if (
+    !game?.snapshots.length
+  ) {
     toast("Nothing to undo");
     return;
   }
 
-  let snapshot = game.snapshots.pop();
+  let snapshot =
+    game.snapshots.pop();
 
   if (
     game.mode === "galaxy" &&
     game.turn === "X" &&
     game.snapshots.length
   ) {
-    snapshot = game.snapshots.pop();
+    snapshot =
+      game.snapshots.pop();
   }
 
-  Object.assign(game, snapshot);
+  Object.assign(
+    game,
+    snapshot
+  );
 
   renderTTT();
 }
@@ -582,14 +2071,21 @@ function tttReview() {
   const game = GameCenter.ttt;
 
   const total =
-    Math.max(1, game.review.moves);
+    Math.max(
+      1,
+      game.review.moves
+    );
 
   const accuracy =
     Math.round(
-      (game.review.strong / total) * 100
+      (
+        game.review.strong /
+        total
+      ) * 100
     );
 
-  const review = $("#gameReview");
+  const review =
+    $("#gameReview");
 
   if (!review) return;
 
@@ -597,11 +2093,26 @@ function tttReview() {
     reviewHTML(
       "Tic-Tac-Toe Review",
       [
-        ["Accuracy", `${accuracy}%`],
-        ["Moves", String(game.review.moves)],
-        ["Strong moves", String(game.review.strong)],
-        ["Mistakes", String(game.review.mistakes)],
-        ["Hints", String(game.review.hints)]
+        [
+          "Accuracy",
+          `${accuracy}%`
+        ],
+        [
+          "Moves",
+          String(game.review.moves)
+        ],
+        [
+          "Strong moves",
+          String(game.review.strong)
+        ],
+        [
+          "Mistakes",
+          String(game.review.mistakes)
+        ],
+        [
+          "Hints",
+          String(game.review.hints)
+        ]
       ]
     );
 }
@@ -612,11 +2123,14 @@ function renderTTT() {
     return;
   }
 
-  const game = GameCenter.ttt;
+  const game =
+    GameCenter.ttt;
 
-  GameCenter.current = "tictactoe";
+  GameCenter.current =
+    "tictactoe";
 
-  const body = $("#contentBody");
+  const body =
+    $("#contentBody");
 
   if (!body) return;
 
@@ -673,6 +2187,7 @@ function renderTTT() {
         <div class="game-side-panel">
 
           <div class="player-card">
+
             <div class="player-avatar">
               X
             </div>
@@ -686,8 +2201,11 @@ function renderTTT() {
                 }
               </strong>
 
-              <span>X</span>
+              <span>
+                X
+              </span>
             </div>
+
           </div>
 
           <div class="player-card">
@@ -701,8 +2219,11 @@ function renderTTT() {
                 ${opponentName(game.mode)}
               </strong>
 
-              <span>O</span>
+              <span>
+                O
+              </span>
             </div>
+
           </div>
 
           ${
@@ -718,10 +2239,13 @@ function renderTTT() {
               : ""
           }
 
-          <div id="gameReview"></div>
+          <div id="gameReview">
+          </div>
 
         </div>
+
       </div>
+
     </div>
   `;
 
@@ -739,16 +2263,24 @@ const CONNECT_COLS = 7;
 function newConnectBoard() {
   return Array.from(
     { length: CONNECT_ROWS },
-    () => Array(CONNECT_COLS).fill("")
+    () =>
+      Array(CONNECT_COLS)
+        .fill("")
   );
 }
 
-function resetConnect(keepSettings = true) {
-  const old = GameCenter.connect || {};
+function resetConnect(
+  keepSettings = true
+) {
+  const old =
+    GameCenter.connect || {};
 
   GameCenter.connect = {
-    board: newConnectBoard(),
-    turn: "R",
+    board:
+      newConnectBoard(),
+
+    turn:
+      "R",
 
     mode:
       keepSettings
@@ -760,11 +2292,20 @@ function resetConnect(keepSettings = true) {
         ? old.elo || 500
         : 500,
 
-    finished: false,
-    winner: null,
-    message: "Your turn",
-    history: [],
-    snapshots: [],
+    finished:
+      false,
+
+    winner:
+      null,
+
+    message:
+      "Your turn",
+
+    history:
+      [],
+
+    snapshots:
+      [],
 
     review: {
       moves: 0,
@@ -778,9 +2319,13 @@ function resetConnect(keepSettings = true) {
   renderConnect();
 }
 
-function connectDropRow(board, col) {
+function connectDropRow(
+  board,
+  col
+) {
   for (
-    let row = CONNECT_ROWS - 1;
+    let row =
+      CONNECT_ROWS - 1;
     row >= 0;
     row--
   ) {
@@ -810,11 +2355,15 @@ function connectWinner(board) {
       c < CONNECT_COLS;
       c++
     ) {
-      const token = board[r][c];
+      const token =
+        board[r][c];
 
       if (!token) continue;
 
-      for (const [dr, dc] of directions) {
+      for (
+        const [dr, dc]
+        of directions
+      ) {
         let count = 1;
 
         for (
@@ -822,8 +2371,11 @@ function connectWinner(board) {
           k < 4;
           k++
         ) {
-          const rr = r + dr * k;
-          const cc = c + dc * k;
+          const rr =
+            r + dr * k;
+
+          const cc =
+            c + dc * k;
 
           if (
             rr < 0 ||
@@ -845,31 +2397,45 @@ function connectWinner(board) {
     }
   }
 
-  if (board.flat().every(Boolean)) {
+  if (
+    board
+      .flat()
+      .every(Boolean)
+  ) {
     return "draw";
   }
 
   return null;
 }
 
-function connectWinningColumn(board, token) {
+function connectWinningColumn(
+  board,
+  token
+) {
   for (
     let col = 0;
     col < CONNECT_COLS;
     col++
   ) {
     const row =
-      connectDropRow(board, col);
+      connectDropRow(
+        board,
+        col
+      );
 
     if (row === -1) continue;
 
     const test =
-      board.map(row => [...row]);
+      board.map(
+        row => [...row]
+      );
 
-    test[row][col] = token;
+    test[row][col] =
+      token;
 
     if (
-      connectWinner(test) === token
+      connectWinner(test) ===
+      token
     ) {
       return col;
     }
@@ -878,19 +2444,29 @@ function connectWinningColumn(board, token) {
   return -1;
 }
 
-function connectBestColumn(token) {
-  const game = GameCenter.connect;
-  const board = game.board;
+function connectBestColumn(
+  token
+) {
+  const game =
+    GameCenter.connect;
+
+  const board =
+    game.board;
 
   const winning =
-    connectWinningColumn(board, token);
+    connectWinningColumn(
+      board,
+      token
+    );
 
   if (winning !== -1) {
     return winning;
   }
 
   const enemy =
-    token === "R" ? "Y" : "R";
+    token === "R"
+      ? "Y"
+      : "R";
 
   const block =
     connectWinningColumn(
@@ -917,16 +2493,23 @@ function connectBestColumn(token) {
 }
 
 function finishConnect() {
-  const game = GameCenter.connect;
+  const game =
+    GameCenter.connect;
+
   const winner =
-    connectWinner(game.board);
+    connectWinner(
+      game.board
+    );
 
   if (!winner) {
     return false;
   }
 
-  game.finished = true;
-  game.winner = winner;
+  game.finished =
+    true;
+
+  game.winner =
+    winner;
 
   if (winner === "draw") {
     game.message =
@@ -950,10 +2533,17 @@ function finishConnect() {
   return true;
 }
 
-function makeConnectMove(col, actor) {
-  const game = GameCenter.connect;
+function makeConnectMove(
+  col,
+  actor
+) {
+  const game =
+    GameCenter.connect;
 
-  if (!game || game.finished) {
+  if (
+    !game ||
+    game.finished
+  ) {
     return false;
   }
 
@@ -970,13 +2560,26 @@ function makeConnectMove(col, actor) {
   game.snapshots.push(
     JSON.parse(
       JSON.stringify({
-        board: game.board,
-        turn: game.turn,
-        history: game.history,
-        finished: game.finished,
-        winner: game.winner,
-        message: game.message,
-        review: game.review
+        board:
+          game.board,
+
+        turn:
+          game.turn,
+
+        history:
+          game.history,
+
+        finished:
+          game.finished,
+
+        winner:
+          game.winner,
+
+        message:
+          game.message,
+
+        review:
+          game.review
       })
     )
   );
@@ -1013,9 +2616,13 @@ function makeConnectMove(col, actor) {
 }
 
 function clickConnect(col) {
-  const game = GameCenter.connect;
+  const game =
+    GameCenter.connect;
 
-  if (!game || game.finished) {
+  if (
+    !game ||
+    game.finished
+  ) {
     return;
   }
 
@@ -1028,9 +2635,11 @@ function clickConnect(col) {
 
   const actor =
     game.mode === "friend"
-      ? game.turn === "R"
-        ? "Player 1"
-        : "Friend"
+      ? (
+          game.turn === "R"
+            ? "Player 1"
+            : "Friend"
+        )
       : "You";
 
   if (
@@ -1039,7 +2648,10 @@ function clickConnect(col) {
       actor
     )
   ) {
-    toast("That column is full");
+    toast(
+      "That column is full"
+    );
+
     return;
   }
 
@@ -1048,7 +2660,9 @@ function clickConnect(col) {
     return;
   }
 
-  if (game.mode === "friend") {
+  if (
+    game.mode === "friend"
+  ) {
     game.message =
       game.turn === "R"
         ? "Player 1 turn"
@@ -1070,7 +2684,8 @@ function clickConnect(col) {
 }
 
 function galaxyConnectMove() {
-  const game = GameCenter.connect;
+  const game =
+    GameCenter.connect;
 
   if (
     !game ||
@@ -1085,7 +2700,8 @@ function galaxyConnectMove() {
     Array.from(
       { length: CONNECT_COLS },
       (_, i) => i
-    ).filter(
+    )
+    .filter(
       col =>
         connectDropRow(
           game.board,
@@ -1103,10 +2719,13 @@ function galaxyConnectMove() {
 
   if (
     Math.random() <
-    difficultyChance(game.elo)
+    difficultyChance(
+      game.elo
+    )
   ) {
     col =
       connectBestColumn("Y");
+
   } else {
     col =
       available[
@@ -1123,21 +2742,28 @@ function galaxyConnectMove() {
   );
 
   if (!game.finished) {
-    game.message = "Your turn";
+    game.message =
+      "Your turn";
   }
 
   renderConnect();
 }
 
 function connectHint() {
-  const game = GameCenter.connect;
+  const game =
+    GameCenter.connect;
 
-  if (!game || game.finished) {
+  if (
+    !game ||
+    game.finished
+  ) {
     return;
   }
 
   const col =
-    connectBestColumn(game.turn);
+    connectBestColumn(
+      game.turn
+    );
 
   if (col !== -1) {
     game.review.hints++;
@@ -1149,10 +2775,16 @@ function connectHint() {
 }
 
 function connectUndo() {
-  const game = GameCenter.connect;
+  const game =
+    GameCenter.connect;
 
-  if (!game?.snapshots.length) {
-    toast("Nothing to undo");
+  if (
+    !game?.snapshots.length
+  ) {
+    toast(
+      "Nothing to undo"
+    );
+
     return;
   }
 
@@ -1177,7 +2809,8 @@ function connectUndo() {
 }
 
 function connectReview() {
-  const game = GameCenter.connect;
+  const game =
+    GameCenter.connect;
 
   const total =
     Math.max(
@@ -1208,23 +2841,33 @@ function connectReview() {
         ],
         [
           "Moves",
-          String(game.review.moves)
+          String(
+            game.review.moves
+          )
         ],
         [
           "Strong moves",
-          String(game.review.strong)
+          String(
+            game.review.strong
+          )
         ],
         [
           "Blocks",
-          String(game.review.blocks)
+          String(
+            game.review.blocks
+          )
         ],
         [
           "Mistakes",
-          String(game.review.mistakes)
+          String(
+            game.review.mistakes
+          )
         ],
         [
           "Hints",
-          String(game.review.hints)
+          String(
+            game.review.hints
+          )
         ]
       ]
     );
@@ -1320,7 +2963,9 @@ function renderConnect() {
                 }
               </strong>
 
-              <span>Red</span>
+              <span>
+                Red
+              </span>
             </div>
           </div>
 
@@ -1335,8 +2980,11 @@ function renderConnect() {
                 ${opponentName(game.mode)}
               </strong>
 
-              <span>Yellow</span>
+              <span>
+                Yellow
+              </span>
             </div>
+
           </div>
 
           ${
@@ -1352,11 +3000,13 @@ function renderConnect() {
               : ""
           }
 
-          <div id="gameReview"></div>
+          <div id="gameReview">
+          </div>
 
         </div>
 
       </div>
+
     </div>
   `;
 
@@ -1369,10 +3019,12 @@ function renderConnect() {
    ========================================================= */
 
 function shuffleArray(array) {
-  const result = [...array];
+  const result =
+    [...array];
 
   for (
-    let i = result.length - 1;
+    let i =
+      result.length - 1;
     i > 0;
     i--
   ) {
@@ -1385,7 +3037,8 @@ function shuffleArray(array) {
     [
       result[i],
       result[j]
-    ] = [
+    ] =
+    [
       result[j],
       result[i]
     ];
@@ -1429,6 +3082,7 @@ function resetMemory(
       ),
 
     selected: [],
+
     lock: false,
 
     mode:
@@ -1441,23 +3095,38 @@ function resetMemory(
         ? old.elo || 500
         : 500,
 
-    turn: "you",
+    turn:
+      "you",
 
-    youScore: 0,
-    opponentScore: 0,
+    youScore:
+      0,
 
-    attempts: 0,
-    matches: 0,
-    mismatches: 0,
+    opponentScore:
+      0,
 
-    streak: 0,
-    bestStreak: 0,
+    attempts:
+      0,
 
-    finished: false,
+    matches:
+      0,
 
-    message: "Your turn",
+    mismatches:
+      0,
 
-    known: {}
+    streak:
+      0,
+
+    bestStreak:
+      0,
+
+    finished:
+      false,
+
+    message:
+      "Your turn",
+
+    known:
+      {}
   };
 
   renderMemory();
@@ -1486,7 +3155,8 @@ function finishMemoryIfNeeded() {
     return false;
   }
 
-  game.finished = true;
+  game.finished =
+    true;
 
   if (
     game.youScore >
@@ -1542,7 +3212,8 @@ function memorySelectCard(id) {
     return;
   }
 
-  card.open = true;
+  card.open =
+    true;
 
   game.selected.push(id);
 
@@ -1568,7 +3239,9 @@ function resolveMemoryPair() {
     return;
   }
 
-  game.lock = true;
+  game.lock =
+    true;
+
   game.attempts++;
 
   const [a, b] =
@@ -1586,8 +3259,11 @@ function resolveMemoryPair() {
 
   setTimeout(() => {
     if (match) {
-      cardA.matched = true;
-      cardB.matched = true;
+      cardA.matched =
+        true;
+
+      cardB.matched =
+        true;
 
       game.matches++;
       game.streak++;
@@ -1602,13 +3278,17 @@ function resolveMemoryPair() {
         game.turn === "you"
       ) {
         game.youScore++;
+
       } else {
         game.opponentScore++;
       }
 
     } else {
-      cardA.open = false;
-      cardB.open = false;
+      cardA.open =
+        false;
+
+      cardB.open =
+        false;
 
       game.mismatches++;
       game.streak = 0;
@@ -1695,9 +3375,14 @@ function galaxyMemoryTurn() {
   if (smart) {
     const knownGroups = {};
 
-    for (const card of available) {
+    for (
+      const card
+      of available
+    ) {
       const symbol =
-        game.known[card.id];
+        game.known[
+          card.id
+        ];
 
       if (!symbol) continue;
 
@@ -1712,7 +3397,8 @@ function galaxyMemoryTurn() {
     const pair =
       Object.values(
         knownGroups
-      ).find(
+      )
+      .find(
         group =>
           group.length >= 2
       );
@@ -1721,7 +3407,8 @@ function galaxyMemoryTurn() {
       [
         first,
         second
-      ] = pair.slice(0, 2);
+      ] =
+        pair.slice(0, 2);
     }
   }
 
@@ -1734,10 +3421,14 @@ function galaxyMemoryTurn() {
     [
       first,
       second
-    ] = shuffled.slice(0, 2);
+    ] =
+      shuffled.slice(0, 2);
   }
 
-  if (!first || !second) {
+  if (
+    !first ||
+    !second
+  ) {
     return;
   }
 
@@ -1770,7 +3461,10 @@ function memoryHint() {
   const game =
     GameCenter.memory;
 
-  if (!game || game.finished) {
+  if (
+    !game ||
+    game.finished
+  ) {
     return;
   }
 
@@ -1834,23 +3528,35 @@ function memoryReview() {
         ],
         [
           "Pairs found",
-          String(game.matches)
+          String(
+            game.matches
+          )
         ],
         [
           "Mismatches",
-          String(game.mismatches)
+          String(
+            game.mismatches
+          )
         ],
         [
           "Best streak",
-          String(game.bestStreak)
+          String(
+            game.bestStreak
+          )
         ],
         [
           "Your score",
-          String(game.youScore)
+          String(
+            game.youScore
+          )
         ],
         [
-          opponentName(game.mode),
-          String(game.opponentScore)
+          opponentName(
+            game.mode
+          ),
+          String(
+            game.opponentScore
+          )
         ]
       ]
     );
@@ -1921,6 +3627,7 @@ function renderMemory() {
           </button>
 
         </div>
+
       </div>
 
       <div class="game-layout">
@@ -1964,7 +3671,9 @@ function renderMemory() {
         <div class="game-side-panel">
 
           <div class="score-card">
-            <span>You</span>
+            <span>
+              You
+            </span>
 
             <strong>
               ${game.youScore}
@@ -1994,10 +3703,13 @@ function renderMemory() {
               : ""
           }
 
-          <div id="gameReview"></div>
+          <div id="gameReview">
+          </div>
 
         </div>
+
       </div>
+
     </div>
   `;
 
@@ -2026,8 +3738,11 @@ function clearShooterTimers() {
     );
   }
 
-  GameCenter.shooterTimer = null;
-  GameCenter.shooterGalaxyTimer = null;
+  GameCenter.shooterTimer =
+    null;
+
+  GameCenter.shooterGalaxyTimer =
+    null;
 }
 
 function resetShooter(
@@ -2049,30 +3764,53 @@ function resetShooter(
         ? old.elo || 500
         : 500,
 
-    running: false,
-    finished: false,
-    round: 1,
+    running:
+      false,
+
+    finished:
+      false,
+
+    round:
+      1,
 
     activePlayer:
       "you",
 
-    time: 30,
+    time:
+      30,
 
-    targetX: 50,
-    targetY: 50,
-    targetSize: 56,
+    targetX:
+      50,
 
-    youScore: 0,
-    opponentScore: 0,
+    targetY:
+      50,
 
-    youShots: 0,
-    youHits: 0,
+    targetSize:
+      56,
 
-    opponentShots: 0,
-    opponentHits: 0,
+    youScore:
+      0,
 
-    streak: 0,
-    bestStreak: 0,
+    opponentScore:
+      0,
+
+    youShots:
+      0,
+
+    youHits:
+      0,
+
+    opponentShots:
+      0,
+
+    opponentHits:
+      0,
+
+    streak:
+      0,
+
+    bestStreak:
+      0,
 
     message:
       "Press Start Game"
@@ -2099,7 +3837,7 @@ function moveShooterTarget() {
 }
 
 function shooterStart() {
-  const game =
+  let game =
     GameCenter.shooter;
 
   if (
@@ -2111,11 +3849,17 @@ function shooterStart() {
 
   if (game.finished) {
     resetShooter();
+    game = GameCenter.shooter;
   }
 
-  game.running = true;
-  game.time = 30;
-  game.activePlayer = "you";
+  game.running =
+    true;
+
+  game.time =
+    30;
+
+  game.activePlayer =
+    "you";
 
   game.message =
     game.mode === "friend"
@@ -2165,7 +3909,8 @@ function shooterTick() {
       game.activePlayer =
         "opponent";
 
-      game.time = 30;
+      game.time =
+        30;
 
       game.message =
         "Friend round";
@@ -2173,6 +3918,7 @@ function shooterTick() {
       moveShooterTarget();
 
       renderShooter();
+
       return;
     }
 
@@ -2261,6 +4007,7 @@ function shooterHit() {
     game.youShots++;
     game.youHits++;
     game.youScore++;
+
     game.streak++;
 
     game.bestStreak =
@@ -2313,12 +4060,16 @@ function updateShooterScoreUI() {
 
   if (you) {
     you.textContent =
-      String(game.youScore);
+      String(
+        game.youScore
+      );
   }
 
   if (opponent) {
     opponent.textContent =
-      String(game.opponentScore);
+      String(
+        game.opponentScore
+      );
   }
 }
 
@@ -2328,8 +4079,11 @@ function finishShooter() {
 
   clearShooterTimers();
 
-  game.running = false;
-  game.finished = true;
+  game.running =
+    false;
+
+  game.finished =
+    true;
 
   const scoreText =
     `You ${game.youScore} - ${opponentName(game.mode)} ${game.opponentScore}`;
@@ -2393,15 +4147,21 @@ function shooterReview() {
       [
         [
           "Your score",
-          String(game.youScore)
+          String(
+            game.youScore
+          )
         ],
         [
           "Shots",
-          String(game.youShots)
+          String(
+            game.youShots
+          )
         ],
         [
           "Hits",
-          String(game.youHits)
+          String(
+            game.youHits
+          )
         ],
         [
           "Accuracy",
@@ -2409,11 +4169,15 @@ function shooterReview() {
         ],
         [
           "Best streak",
-          String(game.bestStreak)
+          String(
+            game.bestStreak
+          )
         ],
         [
           `${opponentName(game.mode)} score`,
-          String(game.opponentScore)
+          String(
+            game.opponentScore
+          )
         ],
         [
           `${opponentName(game.mode)} accuracy`,
@@ -2498,6 +4262,7 @@ function renderShooter() {
           </button>
 
         </div>
+
       </div>
 
       <div class="game-layout">
@@ -2566,7 +4331,9 @@ function renderShooter() {
 
           <div class="score-card">
 
-            <span>You</span>
+            <span>
+              You
+            </span>
 
             <strong id="shooterYouScore">
               ${game.youScore}
@@ -2586,10 +4353,13 @@ function renderShooter() {
 
           </div>
 
-          <div id="gameReview"></div>
+          <div id="gameReview">
+          </div>
 
         </div>
+
       </div>
+
     </div>
   `;
 
@@ -2602,7 +4372,9 @@ function renderShooter() {
    ========================================================= */
 
 function currentGameObject() {
-  switch (GameCenter.current) {
+  switch (
+    GameCenter.current
+  ) {
     case "chess":
       return GameCenter.chess;
 
@@ -2637,7 +4409,9 @@ function syncGameSelectors(game) {
 
   if (level) {
     level.value =
-      String(game.elo);
+      String(
+        game.elo
+      );
 
     level.disabled =
       game.mode === "friend";
@@ -2645,7 +4419,9 @@ function syncGameSelectors(game) {
 }
 
 function rerenderCurrentGame() {
-  switch (GameCenter.current) {
+  switch (
+    GameCenter.current
+  ) {
     case "chess":
       renderChess();
       break;
@@ -2669,7 +4445,9 @@ function rerenderCurrentGame() {
 }
 
 function resetCurrentGame() {
-  switch (GameCenter.current) {
+  switch (
+    GameCenter.current
+  ) {
     case "chess":
       resetChess();
       break;
@@ -2704,7 +4482,10 @@ async function sendWork() {
   const output =
     $("#workOutput");
 
-  if (!input || !output) {
+  if (
+    !input ||
+    !output
+  ) {
     return;
   }
 
@@ -2721,7 +4502,8 @@ async function sendWork() {
   try {
     const reply =
       await fetchAIResponse(
-        prompt
+        prompt,
+        false
       );
 
     output.textContent =
@@ -2748,7 +4530,11 @@ document.addEventListener(
   event => {
 
     const target =
-      event.target;
+      event.target instanceof Element
+        ? event.target
+        : null;
+
+    if (!target) return;
 
     const action =
       target.closest(
@@ -2765,12 +4551,16 @@ document.addEventListener(
         return;
       }
 
-      if (type === "new-chat") {
+      if (
+        type === "new-chat"
+      ) {
         newChat();
         return;
       }
 
-      if (type === "work-send") {
+      if (
+        type === "work-send"
+      ) {
         sendWork();
         return;
       }
@@ -2852,10 +4642,14 @@ document.addEventListener(
           .split(",")
           .map(Number);
 
-      clickChessSquare(r, c);
+      clickChessSquare(
+        r,
+        c
+      );
 
       return;
     }
+
 
     if (
       target.closest(
@@ -2905,7 +4699,8 @@ document.addEventListener(
         game &&
         !game.finished
       ) {
-        game.finished = true;
+        game.finished =
+          true;
 
         game.message =
           game.mode === "galaxy"
@@ -2982,7 +4777,8 @@ document.addEventListener(
         game &&
         !game.finished
       ) {
-        game.finished = true;
+        game.finished =
+          true;
 
         game.message =
           game.mode === "galaxy"
@@ -3059,7 +4855,8 @@ document.addEventListener(
         game &&
         !game.finished
       ) {
-        game.finished = true;
+        game.finished =
+          true;
 
         game.message =
           game.mode === "galaxy"
@@ -3239,20 +5036,18 @@ function initializePromptInput() {
   const input =
     $("#promptInput");
 
-  if (!input) {
-    return;
-  }
+  if (!input) return;
 
   input.addEventListener(
     "input",
-    () => {
-      autoResize(input);
-    }
+    () =>
+      autoResize(input)
   );
 
   input.addEventListener(
     "keydown",
     event => {
+
       if (
         event.key === "Enter" &&
         !event.shiftKey
@@ -3267,107 +5062,80 @@ function initializePromptInput() {
 
 
 /* =========================================================
-   WORK INPUT
-   ========================================================= */
-
-function initializeWorkInput() {
-  const input =
-    $("#workPrompt");
-
-  if (!input) {
-    return;
-  }
-
-  input.addEventListener(
-    "keydown",
-    event => {
-      if (
-        event.key === "Enter" &&
-        !event.shiftKey
-      ) {
-        event.preventDefault();
-
-        sendWork();
-      }
-    }
-  );
-}
-
-
-/* =========================================================
-   SEND BUTTON
+   SEND BUTTON — DIRECT BACKUP
    ========================================================= */
 
 function initializeSendButton() {
   const button =
     $("#sendButton");
 
-  if (!button) {
-    return;
-  }
+  if (!button) return;
 
-  button.onclick =
-    event => {
-      event.preventDefault();
-      event.stopPropagation();
-
-      if (state.generating) {
-        toast(
-          "GALAXY is already generating."
-        );
-
-        return;
-      }
-
-      sendMessage();
-    };
+  button.type =
+    "button";
 }
 
 
 /* =========================================================
-   GEMINI-ONLY LOCK
+   WORK MODE INITIALIZATION
+   ========================================================= */
+
+function initializeWork() {
+  const input =
+    $("#workPrompt");
+
+  if (input) {
+    input.addEventListener(
+      "keydown",
+      event => {
+
+        if (
+          event.key === "Enter" &&
+          (
+            event.ctrlKey ||
+            event.metaKey
+          )
+        ) {
+          event.preventDefault();
+
+          sendWork();
+        }
+      }
+    );
+  }
+
+  const button =
+    $(
+      "#workSend, " +
+      "[data-work-send]"
+    );
+
+  if (button) {
+    button.addEventListener(
+      "click",
+      sendWork
+    );
+  }
+}
+
+
+/* =========================================================
+   GEMINI ONLY
    ========================================================= */
 
 function forceGeminiOnly() {
   const provider =
     $("#aiProvider");
 
-  if (!provider) {
-    return;
-  }
+  if (!provider) return;
 
-  const options =
-    [...provider.options];
+  const openAI =
+    provider.querySelector(
+      'option[value="openai"]'
+    );
 
-  options.forEach(option => {
-    if (
-      String(option.value)
-        .toLowerCase() !==
-      "gemini"
-    ) {
-      option.remove();
-    }
-  });
-
-  if (
-    ![...provider.options]
-      .some(
-        option =>
-          option.value === "gemini"
-      )
-  ) {
-    const option =
-      document.createElement(
-        "option"
-      );
-
-    option.value =
-      "gemini";
-
-    option.textContent =
-      "Gemini";
-
-    provider.appendChild(option);
+  if (openAI) {
+    openAI.remove();
   }
 
   provider.value =
@@ -3375,26 +5143,26 @@ function forceGeminiOnly() {
 
   provider.disabled =
     true;
+
+  provider.title =
+    "GALAXY AI powered by Gemini";
 }
 
 
 /* =========================================================
-   INITIALIZATION
+   INITIALIZE GALAXY
    ========================================================= */
 
 function initializeGalaxy() {
   forceGeminiOnly();
 
   initializePromptInput();
-  initializeWorkInput();
+
   initializeSendButton();
 
-  updateSendButtonState();
+  initializeWork();
 
-  setView(
-    state.activeView ||
-    "chat"
-  );
+  updateSendButtonState();
 
   const input =
     $("#promptInput");
@@ -3403,15 +5171,15 @@ function initializeGalaxy() {
     autoResize(input);
   }
 
-  if ($("#draftState")) {
-    $("#draftState").textContent =
-      "Ready";
-  }
-
   console.log(
     "GALAXY AI initialized — Gemini only"
   );
 }
+
+
+/* =========================================================
+   START
+   ========================================================= */
 
 if (
   document.readyState ===
@@ -3428,93 +5196,42 @@ if (
 
 
 /* =========================================================
-   PUBLIC GALAXY API
+   GALAXY GLOBAL API
    ========================================================= */
 
 window.GALAXY = {
   state,
-  GameCenter,
+
+  games:
+    GameCenter,
 
   newChat,
-
-  setView,
 
   sendMessage,
 
   sendWork,
 
-  games: {
-    open:
-      renderGames,
+  openGames:
+    renderGames,
 
-    chess: {
-      reset:
-        resetChess,
+  openChess:
+    () => resetChess(),
 
-      hint:
-        chessHint,
+  openTicTacToe:
+    () => resetTTT(),
 
-      undo:
-        chessUndo,
+  openConnectFour:
+    () => resetConnect(),
 
-      review:
-        chessReview
-    },
+  openMemory:
+    () => resetMemory(),
 
-    tictactoe: {
-      reset:
-        resetTTT,
-
-      hint:
-        tttHint,
-
-      undo:
-        tttUndo,
-
-      review:
-        tttReview
-    },
-
-    connect4: {
-      reset:
-        resetConnect,
-
-      hint:
-        connectHint,
-
-      undo:
-        connectUndo,
-
-      review:
-        connectReview
-    },
-
-    memory: {
-      reset:
-        resetMemory,
-
-      hint:
-        memoryHint,
-
-      review:
-        memoryReview
-    },
-
-    shooter: {
-      reset:
-        resetShooter,
-
-      start:
-        shooterStart,
-
-      review:
-        shooterReview
-    }
-  }
+  openShooter:
+    () => resetShooter()
 };
 
 
 /* =========================================================
    END OF GALAXY AI SCRIPT.JS
-   GEMINI ONLY
+   PART 1 + PART 2 = COMPLETE SCRIPT
    ========================================================= */
