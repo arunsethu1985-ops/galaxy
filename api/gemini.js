@@ -344,9 +344,12 @@ Do not invent facts when uncertain.
 
               contents,
 
-              generationConfig: {
-                maxOutputTokens: 4096
-              }
+             generationConfig: {
+  maxOutputTokens: 1024,
+  thinkingConfig: {
+    thinkingLevel: "minimal"
+  }
+}
             })
           }
         );
