@@ -6525,28 +6525,31 @@ body{overflow:hidden}
     rgba(90, 210, 120, 0.85);
 }
 
-/* YOUR SIDE — SILVER */
+.chess-piece {
+  display: grid;
+  place-items: center;
+  width: 82%;
+  height: 82%;
+  line-height: 1;
+  pointer-events: none;
+  user-select: none;
+}
 
-.chess-square {
-  color: #dddddd;
-
+.chess-piece.silver-piece {
+  color: #e4e7ec;
   text-shadow:
     0 1px 0 #ffffff,
     0 2px 2px #000000,
-    0 0 7px rgba(255, 255, 255, 0.3);
+    0 0 8px rgba(255, 255, 255, 0.35);
 }
 
-/* GALAXY SIDE — GOLD */
-
-.chess-square:nth-child(-n + 16) {
+.chess-piece.gold-piece {
   color: #d7a84d;
-
   text-shadow:
     0 1px 0 #ffe3a1,
     0 2px 2px #2b1700,
     0 0 8px rgba(218, 169, 76, 0.45);
 }
-
 .chess-files {
   display: grid;
 
@@ -6595,6 +6598,256 @@ linear-gradient(#171a20,#0d0f13);overflow:hidden;cursor:crosshair}
 .scorebox{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:10px}
 .scorebox strong,.scorebox span{display:block}
 .scorebox span{font-size:10px;color:var(--muted);margin-bottom:2px}
+
+
+/* =========================================================
+   NOKIA-STYLE SNAKE
+   ========================================================= */
+
+.snake-game {
+  width: min(100%, 560px);
+  margin: 0 auto;
+}
+
+.snake-screen {
+  position: relative;
+  width: 100%;
+  aspect-ratio: 1 / 1;
+  overflow: hidden;
+  border: 8px solid #30382f;
+  border-radius: 18px;
+  background: #a8ba78;
+  box-shadow:
+    inset 0 0 0 4px #697653,
+    0 18px 44px rgba(0, 0, 0, 0.32);
+}
+
+.snake-grid {
+  width: 100%;
+  height: 100%;
+  display: grid;
+  grid-template-columns: repeat(20, minmax(0, 1fr));
+  grid-template-rows: repeat(20, minmax(0, 1fr));
+  gap: 1px;
+  padding: 8px;
+  background:
+    linear-gradient(rgba(40, 52, 34, 0.06) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(40, 52, 34, 0.06) 1px, transparent 1px),
+    #a8ba78;
+  background-size: 5% 5%;
+}
+
+.snake-cell {
+  min-width: 0;
+  min-height: 0;
+  border-radius: 2px;
+}
+
+.snake-cell.snake-body {
+  background: #263322;
+  box-shadow: inset 0 0 0 1px rgba(255,255,255,.08);
+}
+
+.snake-cell.snake-head {
+  background: #111a10;
+  border-radius: 4px;
+}
+
+.snake-cell.snake-food {
+  position: relative;
+  background: transparent;
+}
+
+.snake-cell.snake-food::after {
+  content: "";
+  position: absolute;
+  inset: 18%;
+  border-radius: 50%;
+  background: #263322;
+  box-shadow: 5px -5px 0 -3px #263322;
+}
+
+.snake-hud,
+.chicken-hud {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  margin-bottom: 10px;
+  padding: 9px 12px;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: var(--bg-elevated);
+  color: var(--text-soft);
+  font-size: 12px;
+}
+
+.snake-controls,
+.chicken-controls {
+  display: grid;
+  grid-template-columns: repeat(3, 52px);
+  grid-template-rows: repeat(2, 44px);
+  justify-content: center;
+  gap: 6px;
+  margin-top: 12px;
+}
+
+.snake-controls button,
+.chicken-controls button {
+  border: 1px solid var(--border);
+  border-radius: 11px;
+  background: var(--bg-elevated);
+  color: var(--text);
+  font-size: 18px;
+}
+
+.snake-controls button[data-dir="up"],
+.chicken-controls button[data-move="up"] {
+  grid-column: 2;
+  grid-row: 1;
+}
+
+.snake-controls button[data-dir="left"],
+.chicken-controls button[data-move="left"] {
+  grid-column: 1;
+  grid-row: 2;
+}
+
+.snake-controls button[data-dir="down"],
+.chicken-controls button[data-move="down"] {
+  grid-column: 2;
+  grid-row: 2;
+}
+
+.snake-controls button[data-dir="right"],
+.chicken-controls button[data-move="right"] {
+  grid-column: 3;
+  grid-row: 2;
+}
+
+
+/* =========================================================
+   NOKIA-STYLE CHICKEN CROSSING
+   ========================================================= */
+
+.chicken-game {
+  width: min(100%, 620px);
+  margin: 0 auto;
+}
+
+.chicken-stage {
+  position: relative;
+  width: 100%;
+  aspect-ratio: 4 / 5;
+  overflow: hidden;
+  border: 8px solid #30382f;
+  border-radius: 18px;
+  background: #a8ba78;
+  box-shadow:
+    inset 0 0 0 4px #697653,
+    0 18px 44px rgba(0, 0, 0, 0.32);
+}
+
+.chicken-road {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  grid-template-rows: repeat(10, 1fr);
+  background:
+    repeating-linear-gradient(
+      to bottom,
+      #a8ba78 0,
+      #a8ba78 10%,
+      #8fa166 10%,
+      #8fa166 20%
+    );
+}
+
+.chicken-lane {
+  position: relative;
+  min-height: 0;
+  border-bottom: 1px dashed rgba(38, 51, 34, 0.22);
+}
+
+.chicken-player {
+  position: absolute;
+  z-index: 5;
+  width: 8%;
+  aspect-ratio: 1;
+  transform: translate(-50%, -50%);
+  display: grid;
+  place-items: center;
+  border-radius: 4px;
+  color: #1d281c;
+  font-size: clamp(20px, 5vw, 38px);
+  line-height: 1;
+}
+
+.chicken-player::before {
+  content: "🐔";
+  filter: grayscale(1) contrast(1.8);
+}
+
+.chicken-car {
+  position: absolute;
+  z-index: 3;
+  width: 13%;
+  height: 6.5%;
+  border-radius: 5px;
+  background: #263322;
+  box-shadow:
+    inset 0 0 0 2px rgba(168, 186, 120, 0.35),
+    0 2px 0 rgba(38, 51, 34, 0.35);
+}
+
+.chicken-car::before,
+.chicken-car::after {
+  content: "";
+  position: absolute;
+  bottom: -3px;
+  width: 18%;
+  aspect-ratio: 1;
+  border-radius: 50%;
+  background: #111a10;
+}
+
+.chicken-car::before {
+  left: 14%;
+}
+
+.chicken-car::after {
+  right: 14%;
+}
+
+.chicken-goal {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 8%;
+  display: grid;
+  place-items: center;
+  border-bottom: 3px double #263322;
+  color: #263322;
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: .18em;
+  text-transform: uppercase;
+}
+
+@media(max-width:560px){
+  .snake-screen,
+  .chicken-stage {
+    border-width: 5px;
+    border-radius: 13px;
+  }
+
+  .snake-controls,
+  .chicken-controls {
+    grid-template-columns: repeat(3, 46px);
+    grid-template-rows: repeat(2, 40px);
+  }
+}
 
 @media(max-width:900px){
   .app-shell{grid-template-columns:1fr}
