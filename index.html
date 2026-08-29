@@ -6,163 +6,339 @@
   <title>GALAXY AI</title>
   <link rel="stylesheet" href="style.css" />
 </head>
+
 <body>
 
   <div class="app-shell">
 
+    <!-- =========================
+         SIDEBAR
+         ========================= -->
+
     <aside class="sidebar">
-      <div class="brand">
-        <div class="brand-mark">✦</div>
-        <div>
-          <strong>GALAXY AI</strong>
-          <span>by Harshavardhan</span>
-        </div>
+
+      <div class="sidebar-header">
+
+        <button
+          class="sidebar-primary"
+          data-action="new-chat"
+          type="button"
+        >
+          <span>＋</span>
+          <span>New chat</span>
+        </button>
+
       </div>
 
-      <button class="sidebar-primary" data-action="new-chat">
-        ＋ New chat
-      </button>
 
       <nav class="nav">
-        <button class="nav-row active" data-view="chat"><span>◌</span>Chat</button>
-        <button class="nav-row" data-view="work"><span>▦</span>Work</button>
-        <button class="nav-row" data-view="games"><span>♛</span>Gaming Center</button>
-        <button class="nav-row" data-view="projects"><span>▱</span>Projects</button>
-        <button class="nav-row" data-view="library"><span>◫</span>Library</button>
-        <button class="nav-row" data-view="studio"><span>▷</span>Create Studio</button>
+
+        <button
+          class="nav-row active"
+          data-view="chat"
+          type="button"
+        >
+          <span>◌</span>
+          <span>Chat</span>
+        </button>
+
+        <button
+          class="nav-row"
+          data-view="work"
+          type="button"
+        >
+          <span>▦</span>
+          <span>Work</span>
+        </button>
+
+        <button
+          class="nav-row"
+          data-view="games"
+          type="button"
+        >
+          <span>♛</span>
+          <span>Gaming Center</span>
+        </button>
+
+        <button
+          class="nav-row"
+          data-view="projects"
+          type="button"
+        >
+          <span>▱</span>
+          <span>Projects</span>
+        </button>
+
+        <button
+          class="nav-row"
+          data-view="library"
+          type="button"
+        >
+          <span>◫</span>
+          <span>Library</span>
+        </button>
+
+        <button
+          class="nav-row"
+          data-view="studio"
+          type="button"
+        >
+          <span>▷</span>
+          <span>Create Studio</span>
+        </button>
+
       </nav>
+
+
+      <div class="sidebar-section">
+
+        <div class="sidebar-label">
+          Recent
+        </div>
+
+        <div
+          id="recentChats"
+          class="recent-list"
+        ></div>
+
+      </div>
+
 
       <div class="sidebar-spacer"></div>
 
-      <div class="sidebar-section">
-        <span class="sidebar-label">RECENT</span>
-        <div id="recentChats" class="recent-list"></div>
+
+      <div class="sidebar-profile">
+
+        <div class="profile-avatar">
+          H
+        </div>
+
+        <div class="profile-text">
+          <strong>Harshavardhan</strong>
+          <span>GALAXY AI</span>
+        </div>
+
       </div>
+
     </aside>
 
 
+    <!-- =========================
+         MAIN
+         ========================= -->
+
     <main class="main-shell">
 
+
+      <!-- TOP BAR -->
+
       <header class="topbar">
-        <div class="mode-tabs">
-          <button class="mode-tab active" data-view="chat">Chat</button>
-          <button class="mode-tab" data-view="work">Work</button>
-          <button class="mode-tab" data-view="games">Games</button>
+
+        <div class="topbar-left">
+
+          <button
+            class="mobile-menu"
+            type="button"
+            aria-label="Menu"
+          >
+            ☰
+          </button>
+
+
+          <button
+            class="galaxy-model-button"
+            type="button"
+          >
+            GALAXY AI
+            <span>⌄</span>
+          </button>
+
         </div>
+
 
         <div class="topbar-right">
-          <select id="aiProvider" aria-label="AI provider">
-            <option value="gemini" selected>Gemini</option>
-            <option value="openai">OpenAI</option>
+
+          <select
+            id="aiProvider"
+            aria-label="AI provider"
+          >
+            <option value="gemini" selected>
+              Gemini
+            </option>
+
+            <option value="openai">
+              OpenAI
+            </option>
           </select>
 
-          <span class="status-dot"></span>
+
+          <span
+            class="status-dot"
+            title="Online"
+          ></span>
+
         </div>
+
       </header>
 
 
-      <section id="chatView" class="view active-view">
+      <!-- =========================
+           CHAT VIEW
+           ========================= -->
 
-        <div id="chatEmpty" class="empty-state">
-          <div class="empty-logo">✦</div>
+      <section
+        id="chatView"
+        class="view active-view"
+      >
 
-          <h1>
-            What can GALAXY help with?
-          </h1>
-
-          <p>
-            Chat, create, build, research, code and play.
-          </p>
-        </div>
+        <div class="chat-container">
 
 
-        <div id="messages" class="messages"></div>
-
-
-        <div class="composer-dock">
+          <!-- EMPTY HOME SCREEN -->
 
           <div
-            id="attachmentTray"
-            class="attachment-tray"
-          ></div>
-
-
-          <div
-            id="composer"
-            class="composer"
+            id="chatEmpty"
+            class="empty-state"
           >
 
-            <button
-              class="composer-icon"
-              data-action="attach"
-              title="Add files"
-            >
-              ＋
-            </button>
+            <div class="empty-content">
 
+              <div class="empty-logo">
+                ✦
+              </div>
 
-            <textarea
-              id="promptInput"
-              rows="1"
-              maxlength="50000"
-              placeholder="Ask anything"
-              aria-label="Message GALAXY AI"
-            ></textarea>
+              <h1>
+                What can I help with?
+              </h1>
 
-
-            <button
-              class="composer-icon"
-              data-action="web-search"
-              title="Web search"
-            >
-              ⌕
-            </button>
-
-            <button
-              class="composer-icon"
-              data-action="image"
-              title="Images"
-            >
-              ◫
-            </button>
-
-            <button
-              class="composer-icon"
-              data-action="video"
-              title="Videos"
-            >
-              ▷
-            </button>
-
-            <button
-              class="composer-icon"
-              data-action="voice"
-              title="Voice"
-            >
-              ◉
-            </button>
-
-
-            <button
-              id="sendButton"
-              class="send-arrow"
-              data-action="send"
-              aria-label="Send"
-              title="Send"
-              type="button"
-            >
-              ↑
-            </button>
+            </div>
 
           </div>
 
 
-          <div class="composer-footer">
-            <span id="draftState">Ready</span>
+          <!-- CHAT MESSAGES -->
 
-            <span>
-              GALAXY can make mistakes. Check important information.
-            </span>
+          <div
+            id="messages"
+            class="messages"
+          ></div>
+
+
+          <!-- =====================
+               COMPOSER
+               ===================== -->
+
+          <div class="composer-dock">
+
+            <div
+              id="attachmentTray"
+              class="attachment-tray"
+            ></div>
+
+
+            <div
+              id="composer"
+              class="composer"
+            >
+
+              <textarea
+                id="promptInput"
+                rows="1"
+                maxlength="50000"
+                placeholder="Ask anything"
+                aria-label="Message GALAXY AI"
+              ></textarea>
+
+
+              <div class="composer-bottom">
+
+
+                <div class="composer-left">
+
+                  <button
+                    class="composer-icon"
+                    data-action="attach"
+                    type="button"
+                    title="Add files"
+                  >
+                    ＋
+                  </button>
+
+
+                  <button
+                    class="composer-tool"
+                    data-action="web-search"
+                    type="button"
+                  >
+                    ⌕
+                    <span>Search</span>
+                  </button>
+
+
+                  <button
+                    class="composer-tool"
+                    data-action="image"
+                    type="button"
+                  >
+                    ◫
+                    <span>Image</span>
+                  </button>
+
+
+                  <button
+                    class="composer-tool"
+                    data-action="video"
+                    type="button"
+                  >
+                    ▷
+                    <span>Video</span>
+                  </button>
+
+                </div>
+
+
+                <div class="composer-right">
+
+                  <button
+                    class="composer-icon"
+                    data-action="voice"
+                    type="button"
+                    title="Voice"
+                  >
+                    ◉
+                  </button>
+
+
+                  <button
+                    id="sendButton"
+                    class="send-arrow"
+                    data-action="send"
+                    type="button"
+                    aria-label="Send"
+                    title="Send"
+                  >
+                    ↑
+                  </button>
+
+                </div>
+
+              </div>
+
+            </div>
+
+
+            <div class="composer-footer">
+
+              <span id="draftState">
+                Ready
+              </span>
+
+              <span>
+                GALAXY can make mistakes. Check important information.
+              </span>
+
+            </div>
+
           </div>
 
         </div>
@@ -170,47 +346,68 @@
       </section>
 
 
-      <section id="workView" class="view">
+      <!-- =========================
+           WORK VIEW
+           ========================= -->
+
+      <section
+        id="workView"
+        class="view"
+      >
 
         <div class="page">
 
           <div class="page-head">
+
             <div>
-              <span class="eyebrow">WORKSPACE</span>
+              <span class="eyebrow">
+                WORK
+              </span>
 
               <h1>
                 Work with GALAXY
               </h1>
 
               <p>
-                Draft, edit and improve structured work.
+                Create, edit and improve your work.
               </p>
             </div>
+
           </div>
 
 
           <div class="work-grid">
 
             <div class="panel">
-              <h3>Work request</h3>
+
+              <h3>
+                Work request
+              </h3>
+
 
               <textarea
                 id="workPrompt"
                 class="large-textarea"
-                placeholder="Ask GALAXY to create or improve something..."
+                placeholder="Tell GALAXY what you want to create..."
               ></textarea>
+
 
               <button
                 class="primary-btn"
                 data-action="send-work"
+                type="button"
               >
                 Run with GALAXY
               </button>
+
             </div>
 
 
             <div class="panel">
-              <h3>Output</h3>
+
+              <h3>
+                Output
+              </h3>
 
               <div
                 id="workOutput"
@@ -218,6 +415,7 @@
               >
                 Your work output will appear here.
               </div>
+
             </div>
 
           </div>
@@ -227,13 +425,26 @@
       </section>
 
 
-      <section id="contentView" class="view">
+      <!-- =========================
+           CONTENT VIEW
+
+           Games
+           Projects
+           Library
+           Create Studio
+           ========================= -->
+
+      <section
+        id="contentView"
+        class="view"
+      >
 
         <div class="content-shell">
 
           <div class="content-head">
 
             <div>
+
               <span
                 id="contentEyebrow"
                 class="eyebrow"
@@ -241,23 +452,32 @@
                 GALAXY
               </span>
 
+
               <h1 id="contentTitle">
                 Workspace
               </h1>
+
             </div>
 
           </div>
 
-          <div id="contentBody"></div>
+
+          <div
+            id="contentBody"
+            class="content-body"
+          ></div>
 
         </div>
 
       </section>
 
+
     </main>
 
   </div>
 
+
+  <!-- FILE INPUT -->
 
   <input
     id="fileInput"
@@ -267,11 +487,15 @@
   />
 
 
+  <!-- TOAST -->
+
   <div
     id="toastRoot"
     class="toast-root"
   ></div>
 
+
+  <!-- JAVASCRIPT -->
 
   <script src="script.js"></script>
 
