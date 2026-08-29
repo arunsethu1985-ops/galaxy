@@ -1,7668 +1,13557 @@
 "use strict";
 
+/* ============================================================
+GALAXY AI — COMPLETE SCRIPT.JS
+Chat + Work + Gaming Center + Arena + GALAXY PALS
+============================================================ */
+
 const $ = (s, r = document) => r.querySelector(s);
 const $$ = (s, r = document) => [...r.querySelectorAll(s)];
 
-const clamp = (n, a, b) => Math.max(a, Math.min(b, n));
-const rand = (a, b) => a + Math.random() * (b - a);
-const pick = a => a[Math.floor(Math.random() * a.length)];
+const clamp = (n, a, b) =>
+Math.max(a, Math.min(b, n));
 
-const esc = (s = "") =>
-  String(s).replace(
-    /[&<>"']/g,
-    m =>
-      ({
-        "&": "&amp;",
-        "<": "&lt;",
-        ">": "&gt;",
-        '"': "&quot;",
-        "'": "&#39;"
-      })[m]
-  );
+const escapeHTML = (v = "") =>
+String(v).replace(
+/[&<>"']/g,
+m =>
+({
+"&": "&amp;",
+"<": "&lt;",
+">": "&gt;",
+'"': "&quot;",
+"'": "&#39;"
+})[m]
+);
 
-const store = {
-  get(k, f = null) {
-    try {
-      const v = localStorage.getItem(k);
-      return v == null ? f : JSON.parse(v);
-    } catch {
-      return f;
-    }
-  },
+const clone = v =>
+JSON.parse(
+JSON.stringify(v)
+);
 
-  set(k, v) {
-    try {
-      localStorage.setItem(k, JSON.stringify(v));
-    } catch {}
-  }
+const rand = (a, b) =>
+a + Math.random() * (b - a);
+
+const pick = a =>
+a[
+Math.floor(
+Math.random() * a.length
+)
+];
+
+const storage = {
+
+get(k, f = null) {
+
+try {
+
+const v =
+localStorage.getItem(k);
+
+return v == null
+? f
+: JSON.parse(v);
+
+} catch {
+
+return f;
+
+}
+
+},
+
+set(k, v) {
+
+try {
+
+localStorage.setItem(
+k,
+JSON.stringify(v)
+);
+
+} catch {}
+
+},
+
+del(k) {
+
+try {
+
+localStorage.removeItem(k);
+
+} catch {}
+
+}
+
 };
+
+
+/* ============================================================
+GLOBAL STATE
+============================================================ */
 
 const state = {
-  messages: [],
-  generating: false,
-  view: "chat"
+
+messages: [],
+
+generating: false,
+
+activeView: "chat"
+
 };
+
 
 const GameCenter = {
-  current: null,
-  snake: null,
-  chicken: null,
-  pals: null,
-  raf: 0,
-  cleanup: []
+
+current: null,
+
+chess: null,
+
+ttt: null,
+
+connect: null,
+
+memory: null,
+
+snake: null,
+
+chicken: null,
+
+arena: null,
+
+pals: null,
+
+timers: new Set()
+
 };
 
-const on3D = (el, type, fn, options) => {
-  el.addEventListener(type, fn, options);
 
-  GameCenter.cleanup.push(() =>
-    el.removeEventListener(type, fn, options)
-  );
-};
+const GAME_LEVELS = [
 
-function cleanup3D() {
-  cancelAnimationFrame(GameCenter.raf);
+100,
 
-  GameCenter.cleanup
-    .splice(0)
-    .forEach(fn => {
-      try {
-        fn();
-      } catch {}
-    });
+200,
 
-  try {
-    document.exitPointerLock?.();
-  } catch {}
+500,
 
-  GameCenter.current = null;
+800,
+
+1000,
+
+1200
+
+];
+
+
+/* ============================================================
+BASIC UI
+============================================================ */
+
+function toast(
+message,
+type = ""
+) {
+
+let root =
+$("#toastRoot");
+
+if (!root) {
+
+root =
+document.createElement(
+"div"
+);
+
+root.id =
+"toastRoot";
+
+root.className =
+"toast-root";
+
+document.body.appendChild(
+root
+);
+
 }
 
-function toast(msg) {
-  const root = $("#toastRoot");
+const el =
+document.createElement(
+"div"
+);
 
-  if (!root) {
-    return;
-  }
+el.className =
+`toast ${type}`.trim();
 
-  const el = document.createElement("div");
+el.textContent =
+message;
 
-  el.className = "toast";
-  el.textContent = msg;
+root.appendChild(el);
 
-  root.appendChild(el);
+setTimeout(
+() => el.remove(),
+2600
+);
 
-  setTimeout(() => el.remove(), 2200);
 }
+
+
+function clearGameTimers() {
+
+for (
+const timer of
+GameCenter.timers
+) {
+
+clearInterval(timer);
+
+clearTimeout(timer);
+
+}
+
+GameCenter.timers.clear();
+
+}
+
+
+function trackTimer(timer) {
+
+GameCenter.timers.add(
+timer
+);
+
+return timer;
+
+}
+
 
 function setView(name) {
-  state.view = name;
 
-  $$(".view").forEach(view =>
-    view.classList.remove("active-view")
-  );
+state.activeView =
+name;
 
-  const selector =
-    {
-      chat: "#chatView",
-      work: "#workView",
-      games: "#contentView",
-      projects: "#contentView",
-      library: "#contentView",
-      studio: "#contentView"
-    }[name] || "#chatView";
+$$(".view").forEach(
+view => {
 
-  $(selector)?.classList.add("active-view");
+view.classList.remove(
+"active-view"
+);
 
-  $$("[data-view]").forEach(button => {
-    button.classList.toggle(
-      "active",
-      button.dataset.view === name
-    );
-  });
-
-  if (name !== "games") {
-    cleanup3D();
-  }
-
-  if (name === "games") {
-    renderGames();
-  } else if (
-    ["projects", "library", "studio"].includes(name)
-  ) {
-    simplePage(name);
-  }
 }
+);
 
-function simplePage(name) {
-  const title =
-    name[0].toUpperCase() +
-    name.slice(1);
+const map = {
 
-  if ($("#contentTitle")) {
-    $("#contentTitle").textContent = title;
-  }
+chat: "#chatView",
 
-  if ($("#contentEyebrow")) {
-    $("#contentEyebrow").textContent =
-      "GALAXY";
-  }
+work: "#workView",
 
-  if ($("#contentBody")) {
-    $("#contentBody").innerHTML = `
-      <div class="panel">
+games: "#contentView",
 
-        <h3>${title}</h3>
+projects: "#contentView",
 
-        <p>
-          ${
-            name === "projects"
-              ? "Your GALAXY projects will appear here."
-              : name === "library"
-              ? "Files, images and generated assets."
-              : "Creative tools."
-          }
-        </p>
+library: "#contentView",
 
-      </div>
-    `;
-  }
-}
+studio: "#contentView"
 
-function newChat() {
-  state.messages = [];
-
-  if ($("#messages")) {
-    $("#messages").innerHTML = "";
-  }
-
-  $("#chatEmpty")
-    ?.classList
-    .remove("hidden");
-
-  setView("chat");
-
-  $("#promptInput")
-    ?.focus();
-}
-
-function autoResize(el) {
-  if (!el) return;
-
-  el.style.height = "auto";
-
-  el.style.height =
-    Math.min(
-      el.scrollHeight,
-      180
-    ) + "px";
-}
-
-function renderMessage(role, text) {
-  const root = $("#messages");
-
-  if (!root) {
-    return;
-  }
-
-  $("#chatEmpty")
-    ?.classList
-    .add("hidden");
-
-  const row =
-    document.createElement("div");
-
-  row.className =
-    `message ${role}`;
-
-  const bubble =
-    document.createElement("div");
-
-  bubble.className = "bubble";
-  bubble.textContent = text;
-
-  row.appendChild(bubble);
-  root.appendChild(row);
-
-  row.scrollIntoView({
-    block: "end",
-    behavior: "smooth"
-  });
-}
-
-async function fetchAIResponse(
-  message,
-  useHistory = true
-) {
-  const system =
-    "You are GALAXY AI. " +
-    "GALAXY AI was created and founded by Harshavardhan. " +
-    "Be helpful, intelligent, clear and concise.";
-
-  const messages = [
-    {
-      role: "system",
-      content: system
-    },
-
-    ...(
-      useHistory
-        ? state.messages
-            .slice(0, -1)
-            .slice(-20)
-            .map(item => ({
-              role: item.role,
-              content: item.text
-            }))
-        : []
-    ),
-
-    {
-      role: "user",
-      content: message
-    }
-  ];
-
-  const response =
-    await fetch(
-      "/api/gemini",
-      {
-        method: "POST",
-
-        headers: {
-          "Content-Type":
-            "application/json"
-        },
-
-        body: JSON.stringify({
-          message,
-          prompt: message,
-          mode:
-            useHistory
-              ? "chat"
-              : "work",
-          system,
-          messages,
-          history: messages
-        })
-      }
-    );
-
-  const data =
-    await response
-      .json()
-      .catch(() => ({}));
-
-  if (!response.ok) {
-    throw new Error(
-      data.error ||
-      data.message ||
-      `Backend error ${response.status}`
-    );
-  }
-
-  return (
-    data.text ||
-    data.reply ||
-    data.output ||
-    data.response ||
-    data.message ||
-    "GALAXY received your request."
-  );
-}
-
-async function sendMessage() {
-  const input =
-    $("#promptInput");
-
-  if (
-    !input ||
-    state.generating
-  ) {
-    return;
-  }
-
-  const text =
-    input.value.trim();
-
-  if (!text) {
-    return;
-  }
-
-  input.value = "";
-
-  autoResize(input);
-
-  state.messages.push({
-    role: "user",
-    text
-  });
-
-  renderMessage(
-    "user",
-    text
-  );
-
-  state.generating = true;
-
-  if ($("#draftState")) {
-    $("#draftState").textContent =
-      "GALAXY is thinking…";
-  }
-
-  try {
-    const reply =
-      await fetchAIResponse(
-        text,
-        true
-      );
-
-    state.messages.push({
-      role: "assistant",
-      text: reply
-    });
-
-    renderMessage(
-      "assistant",
-      reply
-    );
-  } catch (error) {
-    renderMessage(
-      "assistant",
-      "GALAXY error: " +
-      error.message
-    );
-  } finally {
-    state.generating = false;
-
-    if ($("#draftState")) {
-      $("#draftState").textContent =
-        "Ready";
-    }
-  }
-}
-
-async function sendWork() {
-  const input =
-    $("#workPrompt");
-
-  const output =
-    $("#workOutput");
-
-  if (
-    !input ||
-    !output
-  ) {
-    return;
-  }
-
-  const prompt =
-    input.value.trim();
-
-  if (!prompt) {
-    return;
-  }
-
-  output.textContent =
-    "GALAXY is working…";
-
-  try {
-    output.textContent =
-      await fetchAIResponse(
-        prompt,
-        false
-      );
-  } catch (error) {
-    output.textContent =
-      "GALAXY error: " +
-      error.message;
-  }
-}
-
-/* =========================================================
-   GAMING CENTER
-   ========================================================= */
-
-function gameCard(
-  id,
-  icon,
-  title,
-  subtitle
-) {
-  return `
-    <button
-      class="game-card"
-      data-game-open="${id}"
-    >
-
-      <div class="game-card-visual">
-        ${icon}
-      </div>
-
-      <div class="game-card-copy">
-        <strong>${title}</strong>
-        <span>${subtitle}</span>
-      </div>
-
-    </button>
-  `;
-}
-
-function renderGames() {
-  cleanup3D();
-
-  GameCenter.current = null;
-
-  if ($("#contentTitle")) {
-    $("#contentTitle").textContent =
-      "Gaming Center";
-  }
-
-  if ($("#contentEyebrow")) {
-    $("#contentEyebrow").textContent =
-      "PLAY WITH GALAXY";
-  }
-
-  $("#contentBody").innerHTML = `
-
-    <div class="games-home">
-
-      <div class="games-hero">
-
-        <div>
-
-          <span class="eyebrow">
-            GALAXY GAMING
-          </span>
-
-          <h2>
-            Choose a game
-          </h2>
-
-          <p>
-            Classic games,
-            Arena and a creature-survival world.
-          </p>
-
-        </div>
-
-        <div class="games-hero-mark">
-          ✦
-        </div>
-
-      </div>
-
-      <div class="games-grid">
-
-        ${gameCard(
-          "chess",
-          "♟",
-          "Chess",
-          "Play a simple chess match"
-        )}
-
-        ${gameCard(
-          "tictactoe",
-          "✕○",
-          "Tic-Tac-Toe",
-          "vs GALAXY or Friend"
-        )}
-
-        ${gameCard(
-          "connect4",
-          "●●",
-          "Connect Four",
-          "vs GALAXY"
-        )}
-
-        ${gameCard(
-          "memory",
-          "▦",
-          "Memory",
-          "Match the pairs"
-        )}
-
-        ${gameCard(
-          "arena",
-          "⌖",
-          "GALAXY Arena",
-          "3D training range"
-        )}
-
-        ${gameCard(
-          "snake",
-          "◉",
-          "Snake",
-          "Levels and high score"
-        )}
-
-        ${gameCard(
-          "chicken",
-          "🐔",
-          "Chicken Crossing",
-          "Road and safe grass"
-        )}
-
-        ${gameCard(
-          "pals",
-          "✦",
-          "GALAXY PALS",
-          "30+ visibly different original creatures"
-        )}
-
-      </div>
-
-    </div>
-  `;
-}
-
-function gameTop(
-  title,
-  message = ""
-) {
-  return `
-    <div class="game-topline">
-
-      <button
-        class="secondary-btn"
-        data-game-back
-      >
-        ← Games
-      </button>
-
-      <div class="game-status">
-        ${esc(message || title)}
-      </div>
-
-    </div>
-  `;
-}
-
-/* =========================================================
-   TIC TAC TOE
-   ========================================================= */
-
-const TTT_WINS = [
-  [0, 1, 2],
-  [3, 4, 5],
-  [6, 7, 8],
-  [0, 3, 6],
-  [1, 4, 7],
-  [2, 5, 8],
-  [0, 4, 8],
-  [2, 4, 6]
-];
-
-let ttt = null;
-
-function tttWinner(board) {
-  for (
-    const [a, b, c]
-    of TTT_WINS
-  ) {
-    if (
-      board[a] &&
-      board[a] === board[b] &&
-      board[a] === board[c]
-    ) {
-      return board[a];
-    }
-  }
-
-  return board.every(Boolean)
-    ? "draw"
-    : null;
-}
-
-function openTTT() {
-  ttt = {
-    board:
-      Array(9).fill(""),
-    finished: false,
-    message: "Your turn"
-  };
-
-  renderTTT();
-}
-
-function renderTTT() {
-  GameCenter.current =
-    "tictactoe";
-
-  $("#contentBody").innerHTML = `
-    <div class="game-shell">
-
-      ${gameTop(
-        "Tic-Tac-Toe",
-        ttt.message
-      )}
-
-      <div class="ttt-board">
-
-        ${
-          ttt.board
-            .map(
-              (value, index) => `
-                <button
-                  class="ttt-cell"
-                  data-ttt="${index}"
-                >
-                  ${value}
-                </button>
-              `
-            )
-            .join("")
-        }
-
-      </div>
-
-      <button
-        class="primary-btn"
-        data-ttt-reset
-      >
-        New Game
-      </button>
-
-    </div>
-  `;
-}
-
-function tttMove(index) {
-  if (
-    ttt.finished ||
-    ttt.board[index]
-  ) {
-    return;
-  }
-
-  ttt.board[index] = "X";
-
-  let winner =
-    tttWinner(ttt.board);
-
-  if (winner) {
-    ttt.finished = true;
-
-    ttt.message =
-      winner === "draw"
-        ? "Draw"
-        : "You win";
-
-    renderTTT();
-
-    return;
-  }
-
-  const empty =
-    ttt.board
-      .map(
-        (value, i) =>
-          value
-            ? null
-            : i
-      )
-      .filter(
-        value =>
-          value !== null
-      );
-
-  let ai =
-    empty.find(i => {
-      const copy =
-        [...ttt.board];
-
-      copy[i] = "O";
-
-      return (
-        tttWinner(copy) === "O"
-      );
-    });
-
-  if (ai == null) {
-    ai =
-      empty.find(i => {
-        const copy =
-          [...ttt.board];
-
-        copy[i] = "X";
-
-        return (
-          tttWinner(copy) === "X"
-        );
-      });
-  }
-
-  if (ai == null) {
-    ai =
-      empty.includes(4)
-        ? 4
-        : pick(empty);
-  }
-
-  if (ai != null) {
-    ttt.board[ai] = "O";
-  }
-
-  winner =
-    tttWinner(ttt.board);
-
-  if (winner) {
-    ttt.finished = true;
-
-    ttt.message =
-      winner === "draw"
-        ? "Draw"
-        : "GALAXY wins";
-  }
-
-  renderTTT();
-}
-
-/* =========================================================
-   CONNECT FOUR
-   ========================================================= */
-
-let connect4 = null;
-
-function openConnect4() {
-  connect4 = {
-    board:
-      Array.from(
-        { length: 6 },
-        () =>
-          Array(7).fill("")
-      ),
-
-    finished: false,
-
-    message:
-      "Your turn"
-  };
-
-  renderConnect4();
-}
-
-function connect4Win(
-  board,
-  player
-) {
-  for (
-    let row = 0;
-    row < 6;
-    row++
-  ) {
-    for (
-      let col = 0;
-      col < 7;
-      col++
-    ) {
-      for (
-        const [dr, dc]
-        of [
-          [0, 1],
-          [1, 0],
-          [1, 1],
-          [1, -1]
-        ]
-      ) {
-        if (
-          [0, 1, 2, 3]
-            .every(
-              step =>
-                board[
-                  row +
-                  dr *
-                  step
-                ]?.[
-                  col +
-                  dc *
-                  step
-                ] === player
-            )
-        ) {
-          return true;
-        }
-      }
-    }
-  }
-
-  return false;
-}
-
-function connectDrop(
-  col,
-  player
-) {
-  for (
-    let row = 5;
-    row >= 0;
-    row--
-  ) {
-    if (
-      !connect4.board[row][col]
-    ) {
-      connect4.board[row][col] =
-        player;
-
-      return true;
-    }
-  }
-
-  return false;
-}
-
-function connectMove(col) {
-  if (
-    connect4.finished ||
-    !connectDrop(
-      col,
-      "R"
-    )
-  ) {
-    return;
-  }
-
-  if (
-    connect4Win(
-      connect4.board,
-      "R"
-    )
-  ) {
-    connect4.finished = true;
-    connect4.message =
-      "You win";
-
-    renderConnect4();
-
-    return;
-  }
-
-  const choices =
-    [
-      3,
-      2,
-      4,
-      1,
-      5,
-      0,
-      6
-    ]
-      .filter(
-        col =>
-          !connect4.board[0][col]
-      );
-
-  if (choices.length) {
-    connectDrop(
-      pick(
-        choices.slice(
-          0,
-          Math.min(
-            3,
-            choices.length
-          )
-        )
-      ),
-      "Y"
-    );
-  }
-
-  if (
-    connect4Win(
-      connect4.board,
-      "Y"
-    )
-  ) {
-    connect4.finished = true;
-    connect4.message =
-      "GALAXY wins";
-  }
-
-  renderConnect4();
-}
-
-function renderConnect4() {
-  GameCenter.current =
-    "connect4";
-
-  $("#contentBody").innerHTML = `
-    <div class="game-shell">
-
-      ${gameTop(
-        "Connect Four",
-        connect4.message
-      )}
-
-      <div class="connect-board">
-
-        ${
-          connect4.board
-            .flatMap(
-              row =>
-                row.map(
-                  (
-                    value,
-                    col
-                  ) => `
-                    <button
-                      class="
-                        connect-cell
-                        ${
-                          value === "R"
-                            ? "red"
-                            : value === "Y"
-                            ? "yellow"
-                            : ""
-                        }
-                      "
-                      data-c4="${col}"
-                    >
-                      <span></span>
-                    </button>
-                  `
-                )
-            )
-            .join("")
-        }
-
-      </div>
-
-      <button
-        class="primary-btn"
-        data-c4-reset
-      >
-        New Game
-      </button>
-
-    </div>
-  `;
-}
-
-/* =========================================================
-   MEMORY
-   ========================================================= */
-
-let memory = null;
-
-function openMemory() {
-  const values = [
-    "✦",
-    "☾",
-    "◆",
-    "⚡",
-    "❄",
-    "🔥",
-    "🌿",
-    "💧"
-  ];
-
-  memory = {
-    cards:
-      [
-        ...values,
-        ...values
-      ].sort(
-        () =>
-          Math.random() -
-          0.5
-      ),
-
-    open: [],
-
-    done:
-      new Set(),
-
-    moves: 0,
-
-    lock: false
-  };
-
-  renderMemory();
-}
-
-function memoryFlip(index) {
-  if (
-    memory.lock ||
-    memory.done.has(index) ||
-    memory.open.includes(index)
-  ) {
-    return;
-  }
-
-  memory.open.push(index);
-
-  if (
-    memory.open.length === 2
-  ) {
-    memory.moves++;
-
-    const [a, b] =
-      memory.open;
-
-    if (
-      memory.cards[a] ===
-      memory.cards[b]
-    ) {
-      memory.done.add(a);
-      memory.done.add(b);
-
-      memory.open = [];
-
-      renderMemory();
-    } else {
-      memory.lock = true;
-
-      renderMemory();
-
-      setTimeout(
-        () => {
-          memory.open = [];
-          memory.lock = false;
-
-          renderMemory();
-        },
-        600
-      );
-    }
-  } else {
-    renderMemory();
-  }
-}
-
-function renderMemory() {
-  GameCenter.current =
-    "memory";
-
-  $("#contentBody").innerHTML = `
-    <div class="game-shell">
-
-      ${gameTop(
-        "Memory",
-        `Moves ${memory.moves}`
-      )}
-
-      <div class="memory-board">
-
-        ${
-          memory.cards
-            .map(
-              (
-                value,
-                index
-              ) => `
-                <button
-                  class="
-                    memory-card
-                    ${
-                      memory.open.includes(
-                        index
-                      ) ||
-                      memory.done.has(
-                        index
-                      )
-                        ? "flipped"
-                        : ""
-                    }
-                  "
-                  data-memory="${index}"
-                >
-                  <span>
-                    ${
-                      memory.open.includes(
-                        index
-                      ) ||
-                      memory.done.has(
-                        index
-                      )
-                        ? value
-                        : "?"
-                    }
-                  </span>
-                </button>
-              `
-            )
-            .join("")
-        }
-
-      </div>
-
-      <button
-        class="primary-btn"
-        data-memory-reset
-      >
-        New Game
-      </button>
-
-    </div>
-  `;
-}
-
-/* =========================================================
-   SNAKE
-   ========================================================= */
-
-function openSnake() {
-  GameCenter.snake = {
-    size: 20,
-
-    body: [
-      [10, 10],
-      [9, 10]
-    ],
-
-    direction:
-      [1, 0],
-
-    nextDirection:
-      [1, 0],
-
-    food:
-      [15, 10],
-
-    score: 0,
-
-    over: false,
-
-    timer: null
-  };
-
-  renderSnake();
-  runSnake();
-}
-
-function newSnakeFood(game) {
-  do {
-    game.food = [
-      Math.floor(
-        rand(
-          0,
-          game.size
-        )
-      ),
-
-      Math.floor(
-        rand(
-          0,
-          game.size
-        )
-      )
-    ];
-  } while (
-    game.body.some(
-      point =>
-        point[0] ===
-          game.food[0] &&
-        point[1] ===
-          game.food[1]
-    )
-  );
-}
-
-function runSnake() {
-  clearInterval(
-    GameCenter.snake.timer
-  );
-
-  GameCenter.snake.timer =
-    setInterval(
-      () => {
-        const game =
-          GameCenter.snake;
-
-        if (
-          !game ||
-          game.over
-        ) {
-          return;
-        }
-
-        game.direction =
-          game.nextDirection;
-
-        const head = [
-          game.body[0][0] +
-            game.direction[0],
-
-          game.body[0][1] +
-            game.direction[1]
-        ];
-
-        if (
-          head[0] < 0 ||
-          head[1] < 0 ||
-          head[0] >=
-            game.size ||
-          head[1] >=
-            game.size ||
-          game.body.some(
-            point =>
-              point[0] ===
-                head[0] &&
-              point[1] ===
-                head[1]
-          )
-        ) {
-          game.over = true;
-
-          clearInterval(
-            game.timer
-          );
-
-          renderSnake();
-
-          return;
-        }
-
-        game.body.unshift(
-          head
-        );
-
-        if (
-          head[0] ===
-            game.food[0] &&
-          head[1] ===
-            game.food[1]
-        ) {
-          game.score++;
-
-          newSnakeFood(game);
-        } else {
-          game.body.pop();
-        }
-
-        renderSnake();
-      },
-      120
-    );
-}
-
-function renderSnake() {
-  GameCenter.current =
-    "snake";
-
-  const game =
-    GameCenter.snake;
-
-  $("#contentBody").innerHTML = `
-    <div class="game-shell">
-
-      ${
-        gameTop(
-          "Snake",
-          game.over
-            ? `Game over • ${game.score}`
-            : `Score ${game.score}`
-        )
-      }
-
-      <div class="snake-board">
-
-        ${
-          Array.from(
-            {
-              length:
-                game.size *
-                game.size
-            },
-            (_, index) => {
-              const x =
-                index %
-                game.size;
-
-              const y =
-                Math.floor(
-                  index /
-                  game.size
-                );
-
-              const snake =
-                game.body.some(
-                  point =>
-                    point[0] === x &&
-                    point[1] === y
-                );
-
-              const food =
-                game.food[0] === x &&
-                game.food[1] === y;
-
-              return `
-                <div
-                  class="
-                    snake-cell
-                    ${
-                      snake
-                        ? "snake-body"
-                        : ""
-                    }
-                    ${
-                      food
-                        ? "snake-food"
-                        : ""
-                    }
-                  "
-                ></div>
-              `;
-            }
-          )
-          .join("")
-        }
-
-      </div>
-
-      <button
-        class="primary-btn"
-        data-snake-reset
-      >
-        New Game
-      </button>
-
-    </div>
-  `;
-}
-
-/* =========================================================
-   CHICKEN CROSSING
-   ========================================================= */
-
-function openChicken() {
-  GameCenter.chicken = {
-    row: 6,
-    col: 4,
-    score: 0,
-
-    cars:
-      Array.from(
-        { length: 10 },
-        (_, index) => ({
-          row:
-            [1, 3, 5][
-              index % 3
-            ],
-
-          x:
-            rand(
-              -1,
-              8
-            ),
-
-          speed:
-            rand(
-              0.7,
-              1.6
-            ) *
-            (
-              index % 2
-                ? 1
-                : -1
-            )
-        })
-      ),
-
-    timer: null,
-
-    over: false
-  };
-
-  renderChicken();
-  runChicken();
-}
-
-function runChicken() {
-  clearInterval(
-    GameCenter.chicken.timer
-  );
-
-  GameCenter.chicken.timer =
-    setInterval(
-      () => {
-        const game =
-          GameCenter.chicken;
-
-        if (
-          !game ||
-          game.over
-        ) {
-          return;
-        }
-
-        for (
-          const car
-          of game.cars
-        ) {
-          car.x +=
-            car.speed *
-            0.15;
-
-          if (
-            car.x > 9
-          ) {
-            car.x = -1;
-          }
-
-          if (
-            car.x < -1
-          ) {
-            car.x = 9;
-          }
-
-          if (
-            car.row ===
-              game.row &&
-            Math.abs(
-              car.x -
-              game.col
-            ) < 0.55
-          ) {
-            game.over = true;
-
-            clearInterval(
-              game.timer
-            );
-          }
-        }
-
-        renderChicken();
-      },
-      90
-    );
-}
-
-function chickenMove(
-  dx,
-  dy
-) {
-  const game =
-    GameCenter.chicken;
-
-  if (
-    !game ||
-    game.over
-  ) {
-    return;
-  }
-
-  game.col =
-    clamp(
-      game.col + dx,
-      0,
-      8
-    );
-
-  game.row =
-    clamp(
-      game.row + dy,
-      0,
-      6
-    );
-
-  if (
-    game.row === 0
-  ) {
-    game.score++;
-    game.row = 6;
-    game.col = 4;
-  }
-
-  renderChicken();
-}
-
-function renderChicken() {
-  GameCenter.current =
-    "chicken";
-
-  const game =
-    GameCenter.chicken;
-
-  $("#contentBody").innerHTML = `
-    <div class="game-shell">
-
-      ${
-        gameTop(
-          "Chicken Crossing",
-
-          game.over
-            ? `Hit! Score ${game.score}`
-            : `Score ${game.score}`
-        )
-      }
-
-      <div class="chicken-board">
-
-        ${
-          Array.from(
-            {
-              length: 63
-            },
-            (_, index) => {
-              const col =
-                index % 9;
-
-              const row =
-                Math.floor(
-                  index / 9
-                );
-
-              const road =
-                [1, 3, 5]
-                  .includes(row);
-
-              const player =
-                game.row === row &&
-                game.col === col;
-
-              const car =
-                game.cars.some(
-                  vehicle =>
-                    vehicle.row ===
-                      row &&
-                    Math.round(
-                      vehicle.x
-                    ) === col
-                );
-
-              return `
-                <div
-                  class="
-                    chicken-cell
-                    ${
-                      road
-                        ? "road"
-                        : "grass"
-                    }
-                  "
-                >
-                  ${
-                    player
-                      ? "🐔"
-                      : car
-                      ? "🚗"
-                      : ""
-                  }
-                </div>
-              `;
-            }
-          )
-          .join("")
-        }
-
-      </div>
-
-      <p>
-        Arrow keys / WASD
-      </p>
-
-      <button
-        class="primary-btn"
-        data-chicken-reset
-      >
-        New Game
-      </button>
-
-    </div>
-  `;
-}
-
-/* =========================================================
-   CHESS
-   ========================================================= */
-
-let chess = null;
-
-const CHESS_SYMBOLS = {
-  r: "♜",
-  n: "♞",
-  b: "♝",
-  q: "♛",
-  k: "♚",
-  p: "♟",
-
-  R: "♖",
-  N: "♘",
-  B: "♗",
-  Q: "♕",
-  K: "♔",
-  P: "♙"
 };
 
-function openChess() {
-  chess = {
-    board: [
-      "rnbqkbnr",
-      "pppppppp",
-      "........",
-      "........",
-      "........",
-      "........",
-      "PPPPPPPP",
-      "RNBQKBNR"
-    ].map(
-      row =>
-        [...row]
-          .map(
-            char =>
-              char === "."
-                ? ""
-                : char
-          )
-    ),
-
-    selected: null,
-
-    message:
-      "Select a white piece"
-  };
-
-  renderChess();
-}
-
-function getChessMoves(
-  row,
-  col
-) {
-  const piece =
-    chess.board[row][col];
-
-  const white =
-    piece &&
-    piece ===
-      piece.toUpperCase();
-
-  const type =
-    piece
-      ?.toLowerCase();
-
-  const moves = [];
-
-  const add = (
-    r,
-    c
-  ) => {
-    if (
-      r < 0 ||
-      c < 0 ||
-      r > 7 ||
-      c > 7
-    ) {
-      return false;
-    }
-
-    const target =
-      chess.board[r][c];
-
-    if (!target) {
-      moves.push([
-        r,
-        c
-      ]);
-
-      return true;
-    }
-
-    const sameSide =
-      (
-        target ===
-        target.toUpperCase()
-      ) === white;
-
-    if (!sameSide) {
-      moves.push([
-        r,
-        c
-      ]);
-    }
-
-    return false;
-  };
-
-  if (
-    type === "p"
-  ) {
-    const direction =
-      white
-        ? -1
-        : 1;
-
-    if (
-      !chess.board[
-        row +
-        direction
-      ]?.[col]
-    ) {
-      moves.push([
-        row +
-        direction,
-        col
-      ]);
-    }
-
-    for (
-      const dc
-      of [-1, 1]
-    ) {
-      const target =
-        chess.board[
-          row +
-          direction
-        ]?.[
-          col +
-          dc
-        ];
-
-      if (
-        target &&
-        (
-          target ===
-          target.toUpperCase()
-        ) !== white
-      ) {
-        moves.push([
-          row +
-          direction,
-          col +
-          dc
-        ]);
-      }
-    }
-  }
-
-  if (
-    type === "n"
-  ) {
-    for (
-      const [dr, dc]
-      of [
-        [2, 1],
-        [2, -1],
-        [-2, 1],
-        [-2, -1],
-        [1, 2],
-        [1, -2],
-        [-1, 2],
-        [-1, -2]
-      ]
-    ) {
-      add(
-        row + dr,
-        col + dc
-      );
-    }
-  }
-
-  if (
-    type === "k"
-  ) {
-    for (
-      let dr = -1;
-      dr <= 1;
-      dr++
-    ) {
-      for (
-        let dc = -1;
-        dc <= 1;
-        dc++
-      ) {
-        if (
-          dr ||
-          dc
-        ) {
-          add(
-            row + dr,
-            col + dc
-          );
-        }
-      }
-    }
-  }
-
-  if (
-    "rbq".includes(type)
-  ) {
-    const directions = [];
-
-    if (
-      "rq".includes(type)
-    ) {
-      directions.push(
-        [1, 0],
-        [-1, 0],
-        [0, 1],
-        [0, -1]
-      );
-    }
-
-    if (
-      "bq".includes(type)
-    ) {
-      directions.push(
-        [1, 1],
-        [1, -1],
-        [-1, 1],
-        [-1, -1]
-      );
-    }
-
-    for (
-      const [dr, dc]
-      of directions
-    ) {
-      let r =
-        row + dr;
-
-      let c =
-        col + dc;
-
-      while (
-        add(
-          r,
-          c
-        )
-      ) {
-        r += dr;
-        c += dc;
-      }
-    }
-  }
-
-  return moves;
-}
-
-function chessClick(
-  row,
-  col
-) {
-  const piece =
-    chess.board[row][col];
-
-  if (
-    chess.selected
-  ) {
-    const [
-      fromRow,
-      fromCol
-    ] =
-      chess.selected;
-
-    const legal =
-      getChessMoves(
-        fromRow,
-        fromCol
-      )
-      .some(
-        (
-          [
-            r,
-            c
-          ]
-        ) =>
-          r === row &&
-          c === col
-      );
-
-    if (legal) {
-      chess.board[row][col] =
-        chess.board[
-          fromRow
-        ][
-          fromCol
-        ];
-
-      chess.board[
-        fromRow
-      ][
-        fromCol
-      ] = "";
-
-      chess.selected = null;
-
-      chess.message =
-        "Move complete";
-
-      renderChess();
-
-      return;
-    }
-  }
-
-  if (
-    piece &&
-    piece ===
-      piece.toUpperCase()
-  ) {
-    chess.selected = [
-      row,
-      col
-    ];
-
-    chess.message =
-      "Choose destination";
-  } else {
-    chess.selected = null;
-  }
-
-  renderChess();
-}
-
-function renderChess() {
-  GameCenter.current =
-    "chess";
-
-  $("#contentBody").innerHTML = `
-    <div class="game-shell">
-
-      ${
-        gameTop(
-          "Chess",
-          chess.message
-        )
-      }
-
-      <div class="chess-board">
-
-        ${
-          chess.board
-            .map(
-              (
-                row,
-                r
-              ) =>
-                row.map(
-                  (
-                    piece,
-                    c
-                  ) => `
-                    <button
-                      class="
-                        chess-square
-                        ${
-                          (
-                            r +
-                            c
-                          ) %
-                          2
-                            ? "dark"
-                            : "light"
-                        }
-                        ${
-                          chess.selected?.[0] ===
-                            r &&
-                          chess.selected?.[1] ===
-                            c
-                            ? "selected"
-                            : ""
-                        }
-                      "
-                      data-chess="${r},${c}"
-                    >
-                      <span class="chess-piece">
-                        ${
-                          piece
-                            ? CHESS_SYMBOLS[piece]
-                            : ""
-                        }
-                      </span>
-                    </button>
-                  `
-                )
-                .join("")
-            )
-            .join("")
-        }
-
-      </div>
-
-      <button
-        class="primary-btn"
-        data-chess-reset
-      >
-        New Game
-      </button>
-
-    </div>
-  `;
-}
-
-/* =========================================================
-   THREE.JS
-   ========================================================= */
-
-let THREE_PROMISE = null;
-
-function loadThree() {
-  if (
-    window.THREE
-  ) {
-    return Promise.resolve(
-      window.THREE
-    );
-  }
-
-  if (
-    !THREE_PROMISE
-  ) {
-    THREE_PROMISE =
-      import(
-        "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js"
-      );
-  }
-
-  return THREE_PROMISE;
-}
-
-/* =========================================================
-   GALAXY ARENA
-   ========================================================= */
-
-async function openArena() {
-  cleanup3D();
-
-  GameCenter.current =
-    "arena";
-
-  $("#contentBody").innerHTML = `
-    <div class="arena-shell">
-
-      <div class="arena-game">
-
-        <canvas
-          id="arenaCanvas"
-          class="arena-canvas"
-        ></canvas>
-
-        <div class="arena-crosshair"></div>
-
-        <div class="arena-center-message">
-          Click to look • WASD to move
-        </div>
-
-      </div>
-
-    </div>
-  `;
-
-  try {
-    const THREE =
-      await loadThree();
-
-    const canvas =
-      $("#arenaCanvas");
-
-    const scene =
-      new THREE.Scene();
-
-    scene.background =
-      new THREE.Color(
-        0x7fa8c8
-      );
-
-    const camera =
-      new THREE
-        .PerspectiveCamera(
-          70,
-          1,
-          0.1,
-          200
-        );
-
-    const renderer =
-      new THREE
-        .WebGLRenderer({
-          canvas,
-          antialias: true
-        });
-
-    const ground =
-      new THREE.Mesh(
-        new THREE
-          .PlaneGeometry(
-            100,
-            100
-          ),
-
-        new THREE
-          .MeshStandardMaterial({
-            color:
-              0x6a7f62
-          })
-      );
-
-    ground.rotation.x =
-      -Math.PI / 2;
-
-    scene.add(ground);
-
-    scene.add(
-      new THREE
-        .HemisphereLight(
-          0xffffff,
-          0x334422,
-          2
-        )
-    );
-
-    for (
-      let i = 0;
-      i < 20;
-      i++
-    ) {
-      const width =
-        rand(1, 4);
-
-      const height =
-        rand(1, 5);
-
-      const depth =
-        rand(1, 4);
-
-      const block =
-        new THREE.Mesh(
-          new THREE
-            .BoxGeometry(
-              width,
-              height,
-              depth
-            ),
-
-          new THREE
-            .MeshStandardMaterial({
-              color:
-                0x777777
-            })
-        );
-
-      block.position.set(
-        rand(
-          -40,
-          40
-        ),
-
-        height / 2,
-
-        rand(
-          -40,
-          40
-        )
-      );
-
-      scene.add(block);
-    }
-
-    let x = 0;
-    let z = 8;
-    let yaw = 0;
-    let pitch = 0;
-
-    const keys =
-      new Set();
-
-    on3D(
-      canvas,
-      "click",
-      () =>
-        canvas
-          .requestPointerLock
-          ?.()
-    );
-
-    on3D(
-      document,
-      "mousemove",
-      event => {
-        if (
-          document.pointerLockElement !==
-          canvas
-        ) {
-          return;
-        }
-
-        yaw -=
-          event.movementX *
-          0.0025;
-
-        pitch =
-          clamp(
-            pitch -
-            event.movementY *
-            0.002,
-
-            -0.5,
-            0.5
-          );
-      }
-    );
-
-    on3D(
-      document,
-      "keydown",
-      event =>
-        keys.add(
-          event.code
-        )
-    );
-
-    on3D(
-      document,
-      "keyup",
-      event =>
-        keys.delete(
-          event.code
-        )
-    );
-
-    function resize() {
-      const parent =
-        canvas.parentElement;
-
-      renderer.setSize(
-        parent.clientWidth,
-        parent.clientHeight,
-        false
-      );
-
-      camera.aspect =
-        parent.clientWidth /
-        parent.clientHeight;
-
-      camera
-        .updateProjectionMatrix();
-    }
-
-    on3D(
-      window,
-      "resize",
-      resize
-    );
-
-    resize();
-
-    let last =
-      performance.now();
-
-    function loop(now) {
-      if (
-        GameCenter.current !==
-        "arena"
-      ) {
-        return;
-      }
-
-      const dt =
-        Math.min(
-          0.05,
-          (
-            now -
-            last
-          ) /
-          1000
-        );
-
-      last = now;
-
-      const forward =
-        (
-          keys.has("KeyW")
-            ? 1
-            : 0
-        ) -
-        (
-          keys.has("KeyS")
-            ? 1
-            : 0
-        );
-
-      const right =
-        (
-          keys.has("KeyD")
-            ? 1
-            : 0
-        ) -
-        (
-          keys.has("KeyA")
-            ? 1
-            : 0
-        );
-
-      const speed = 6;
-
-      x +=
-        (
-          -Math.sin(yaw) *
-            forward +
-          Math.cos(yaw) *
-            right
-        ) *
-        speed *
-        dt;
-
-      z +=
-        (
-          -Math.cos(yaw) *
-            forward -
-          Math.sin(yaw) *
-            right
-        ) *
-        speed *
-        dt;
-
-      camera.position.set(
-        x,
-        1.7,
-        z
-      );
-
-      camera.rotation.order =
-        "YXZ";
-
-      camera.rotation.y =
-        yaw;
-
-      camera.rotation.x =
-        pitch;
-
-      renderer.render(
-        scene,
-        camera
-      );
-
-      GameCenter.raf =
-        requestAnimationFrame(
-          loop
-        );
-    }
-
-    GameCenter.raf =
-      requestAnimationFrame(
-        loop
-      );
-  } catch (error) {
-    $("#contentBody").innerHTML = `
-      <div class="panel">
-
-        <h3>
-          Arena could not start
-        </h3>
-
-        <p>
-          ${esc(error.message)}
-        </p>
-
-      </div>
-    `;
-  }
-}
-
-/* =========================================================
-   GALAXY PALS
-   ========================================================= */
-
-const PALS_SAVE =
-  "galaxy.pals.v4";
-
-const PALS_ORBS = [
-  {
-    name:
-      "Basic Orb",
-    bonus: 1
-  },
-  {
-    name:
-      "Mega Orb",
-    bonus: 1.35
-  },
-  {
-    name:
-      "Giga Orb",
-    bonus: 1.7
-  },
-  {
-    name:
-      "Hyper Orb",
-    bonus: 2.1
-  },
-  {
-    name:
-      "Ultra Orb",
-    bonus: 2.6
-  }
-];
-
-const PALS = [
-
-  [
-    "emberfox",
-    "Emberfox",
-    "fox",
-    "Fire",
-    0xe76c45,
-    0xffd06b,
-    1,
-    90,
-    2.8,
-    "🦊"
-  ],
-
-  [
-    "mossbun",
-    "Mossbun",
-    "rabbit",
-    "Grass",
-    0x70b66a,
-    0xe9ffd2,
-    1,
-    92,
-    2.7,
-    "🐰"
-  ],
-
-  [
-    "voltlynx",
-    "Voltlynx",
-    "lynx",
-    "Electric",
-    0xe3c94e,
-    0x2b2b35,
-    2,
-    96,
-    3.2,
-    "🐱"
-  ],
-
-  [
-    "aquafin",
-    "Aquafin",
-    "shark",
-    "Water",
-    0x4d9fd4,
-    0xc8f4ff,
-    2,
-    110,
-    2.8,
-    "🦈"
-  ],
-
-  [
-    "stonehorn",
-    "Stonehorn",
-    "rhino",
-    "Ground",
-    0x8b7d6a,
-    0xd8c4a5,
-    2,
-    145,
-    2,
-    "🦏"
-  ],
-
-  [
-    "frostwolf",
-    "Frostwolf",
-    "wolf",
-    "Ice",
-    0xa3d7e8,
-    0xffffff,
-    3,
-    125,
-    3.4,
-    "🐺"
-  ],
-
-  [
-    "shadebat",
-    "Shadebat",
-    "bat",
-    "Dark",
-    0x544269,
-    0xbda3e3,
-    2,
-    82,
-    3.8,
-    "🦇"
-  ],
-
-  [
-    "ironape",
-    "Ironape",
-    "ape",
-    "Metal",
-    0x77828c,
-    0x2d3439,
-    3,
-    165,
-    2.1,
-    "🦍"
-  ],
-
-  [
-    "stormgryph",
-    "Stormgryph",
-    "gryphon",
-    "Electric",
-    0xd5b949,
-    0x674b2d,
-    4,
-    170,
-    3.6,
-    "🦅"
-  ],
-
-  [
-    "cinderdrake",
-    "Cinderdrake",
-    "dragon",
-    "Fire",
-    0xb94c37,
-    0xff985d,
-    4,
-    190,
-    3.1,
-    "🐉"
-  ],
-
-  [
-    "glacierox",
-    "Glacierox",
-    "ox",
-    "Ice",
-    0x8fc7da,
-    0xeafcff,
-    4,
-    215,
-    1.8,
-    "🐂"
-  ],
-
-  [
-    "voidlion",
-    "Voidlion",
-    "lion",
-    "Dark",
-    0x4d3b66,
-    0xc57aff,
-    5,
-    205,
-    3.2,
-    "🦁"
-  ],
-
-  [
-    "solara",
-    "Solara",
-    "phoenix",
-    "Light",
-    0xe4bd59,
-    0xfff0a8,
-    5,
-    195,
-    4,
-    "🪽"
-  ],
-
-  [
-    "bloomdeer",
-    "Bloomdeer",
-    "deer",
-    "Grass",
-    0x77b76a,
-    0xf2b6db,
-    2,
-    118,
-    3,
-    "🦌"
-  ],
-
-  [
-    "tidefin",
-    "Tidefin",
-    "whale",
-    "Water",
-    0x4f8eaa,
-    0xa7e5ef,
-    3,
-    180,
-    2,
-    "🐋"
-  ],
-
-  [
-    "sparkmouse",
-    "Sparkmouse",
-    "mouse",
-    "Electric",
-    0xf0d65d,
-    0x8f6849,
-    1,
-    65,
-    3.8,
-    "🐭"
-  ],
-
-  [
-    "flarepanda",
-    "Flarepanda",
-    "panda",
-    "Fire",
-    0x28282b,
-    0xe77648,
-    3,
-    160,
-    2,
-    "🐼"
-  ],
-
-  [
-    "moonowl",
-    "Moonowl",
-    "owl",
-    "Dark",
-    0x665678,
-    0xcbb7e4,
-    2,
-    90,
-    3.4,
-    "🦉"
-  ],
-
-  [
-    "thornzilla",
-    "Thornzilla",
-    "dino",
-    "Grass",
-    0x5e9b56,
-    0x9fcb59,
-    4,
-    220,
-    2.3,
-    "🦖"
-  ],
-
-  [
-    "shelltide",
-    "Shelltide",
-    "turtle",
-    "Water",
-    0x4d8e85,
-    0x9fc496,
-    2,
-    160,
-    1.5,
-    "🐢"
-  ],
-
-  [
-    "fluffhorn",
-    "Fluffhorn",
-    "sheep",
-    "Neutral",
-    0xe9e4d6,
-    0x8a725e,
-    1,
-    105,
-    2.2,
-    "🐑"
-  ],
-
-  [
-    "nightfang",
-    "Nightfang",
-    "wolf",
-    "Dark",
-    0x292d38,
-    0x7b62a6,
-    3,
-    140,
-    3.7,
-    "🐺"
-  ],
-
-  [
-    "skywhale",
-    "Skywhale",
-    "whale",
-    "Air",
-    0x86b9d2,
-    0xf5fbff,
-    5,
-    230,
-    2.5,
-    "🐋"
-  ],
-
-  [
-    "venomantis",
-    "Venomantis",
-    "mantis",
-    "Poison",
-    0x6eaa50,
-    0xb6e95d,
-    4,
-    135,
-    3,
-    "🦗"
-  ],
-
-  [
-    "starwyrm",
-    "Starwyrm",
-    "serpent",
-    "Dragon",
-    0x6554a4,
-    0xf0c9ff,
-    5,
-    240,
-    3.5,
-    "🐲"
-  ],
-
-  [
-    "sunmare",
-    "Sunmare",
-    "horse",
-    "Light",
-    0xe7b75b,
-    0xfff2b0,
-    3,
-    155,
-    4,
-    "🐎"
-  ],
-
-  [
-    "boghopper",
-    "Boghopper",
-    "frog",
-    "Water",
-    0x68a95e,
-    0xb7e67d,
-    1,
-    88,
-    2.6,
-    "🐸"
-  ],
-
-  [
-    "magmaboar",
-    "Magmaboar",
-    "boar",
-    "Fire",
-    0x743f32,
-    0xff6b3c,
-    3,
-    175,
-    2.5,
-    "🐗"
-  ],
-
-  [
-    "crystalstag",
-    "Crystalstag",
-    "stag",
-    "Ice",
-    0xa8d8e6,
-    0xcba8ff,
-    4,
-    165,
-    3.1,
-    "🦌"
-  ],
-
-  [
-    "webclaw",
-    "Webclaw",
-    "spider",
-    "Dark",
-    0x493d52,
-    0xbd88df,
-    3,
-    120,
-    3.2,
-    "🕷️"
-  ],
-
-  [
-    "rockgolem",
-    "Rockgolem",
-    "golem",
-    "Ground",
-    0x777368,
-    0xb7aa8e,
-    4,
-    260,
-    1.4,
-    "🗿"
-  ],
-
-  [
-    "frostpeng",
-    "Frostpeng",
-    "penguin",
-    "Ice",
-    0x222d39,
-    0xeefaff,
-    1,
-    82,
-    2.4,
-    "🐧"
-  ]
-
-].map(
-  (
-    [
-      id,
-      name,
-      form,
-      element,
-      body,
-      accent,
-      rarity,
-      hp,
-      speed,
-      emoji
-    ]
-  ) => ({
-    id,
-    name,
-    form,
-    element,
-    body,
-    accent,
-    rarity,
-    hp,
-    speed,
-    emoji
-  })
+$(
+map[name] ||
+"#chatView"
+)?.classList.add(
+"active-view"
 );
 
-function palsDefault() {
-  return store.get(
-    PALS_SAVE,
-    {
-      level: 1,
-      xp: 0,
-
-      hp: 100,
-      stamina: 100,
-      hunger: 100,
-
-      x: 0,
-      z: 8,
-
-      orb: 0,
-
-      inventory: {
-        wood: 20,
-        stone: 16,
-        ore: 6,
-
-        orbs: [
-          12,
-          4,
-          1,
-          0,
-          0
-        ]
-      },
-
-      party: [],
-      box: [],
-      bases: []
-    }
-  );
-}
-
-function palsSave(game) {
-  store.set(
-    PALS_SAVE,
-    game
-  );
-}
-
-/* =========================================================
-   CREATURE GEOMETRY HELPERS
-   ========================================================= */
-
-function palMaterial(
-  THREE,
-  color,
-  extras = {}
-) {
-  return new THREE
-    .MeshStandardMaterial({
-      color,
-      roughness: 0.68,
-      ...extras
-    });
-}
-
-function palSphere(
-  THREE,
-  radius,
-  color,
-
-  x = 0,
-  y = 0,
-  z = 0,
-
-  sx = 1,
-  sy = 1,
-  sz = 1
-) {
-  const mesh =
-    new THREE.Mesh(
-      new THREE
-        .SphereGeometry(
-          radius,
-          16,
-          12
-        ),
-
-      palMaterial(
-        THREE,
-        color
-      )
-    );
-
-  mesh.position.set(
-    x,
-    y,
-    z
-  );
-
-  mesh.scale.set(
-    sx,
-    sy,
-    sz
-  );
-
-  mesh.castShadow = true;
-
-  return mesh;
-}
-
-function palBox(
-  THREE,
-  width,
-  height,
-  depth,
-  color,
-
-  x = 0,
-  y = 0,
-  z = 0
-) {
-  const mesh =
-    new THREE.Mesh(
-      new THREE
-        .BoxGeometry(
-          width,
-          height,
-          depth
-        ),
-
-      palMaterial(
-        THREE,
-        color
-      )
-    );
-
-  mesh.position.set(
-    x,
-    y,
-    z
-  );
-
-  mesh.castShadow = true;
-
-  return mesh;
-}
-
-function palCone(
-  THREE,
-  radius,
-  height,
-  color,
-
-  x = 0,
-  y = 0,
-  z = 0
-) {
-  const mesh =
-    new THREE.Mesh(
-      new THREE
-        .ConeGeometry(
-          radius,
-          height,
-          8
-        ),
-
-      palMaterial(
-        THREE,
-        color
-      )
-    );
-
-  mesh.position.set(
-    x,
-    y,
-    z
-  );
-
-  mesh.castShadow = true;
-
-  return mesh;
-}
-
-function palCylinder(
-  THREE,
-  radiusTop,
-  radiusBottom,
-  height,
-  color,
-
-  x = 0,
-  y = 0,
-  z = 0
-) {
-  const mesh =
-    new THREE.Mesh(
-      new THREE
-        .CylinderGeometry(
-          radiusTop,
-          radiusBottom,
-          height,
-          10
-        ),
-
-      palMaterial(
-        THREE,
-        color
-      )
-    );
-
-  mesh.position.set(
-    x,
-    y,
-    z
-  );
-
-  mesh.castShadow = true;
-
-  return mesh;
-}
-
-function addEyes(
-  THREE,
-  group,
-  y,
-  z,
-  spread = 0.18
-) {
-  for (
-    const x
-    of [
-      -spread,
-      spread
-    ]
-  ) {
-    group.add(
-      palSphere(
-        THREE,
-        0.065,
-        0xffffff,
-        x,
-        y,
-        z
-      ),
-
-      palSphere(
-        THREE,
-        0.028,
-        0x101015,
-        x,
-        y,
-        z - 0.065
-      )
-    );
-  }
-}
-
-function addFourLegs(
-  THREE,
-  group,
-  color,
-  points = [
-    [-0.38, -0.45],
-    [0.38, -0.45],
-    [-0.4, 0.45],
-    [0.4, 0.45]
-  ],
-  length = 0.65
-) {
-  const result = [];
-
-  for (
-    const [
-      x,
-      z
-    ]
-    of points
-  ) {
-    const pivot =
-      new THREE.Group();
-
-    pivot.position.set(
-      x,
-      0.75,
-      z
-    );
-
-    pivot.add(
-      palBox(
-        THREE,
-        0.2,
-        length,
-        0.22,
-        color,
-        0,
-        -length / 2,
-        0
-      )
-    );
-
-    group.add(pivot);
-
-    result.push(pivot);
-  }
-
-  return result;
-}
-
-function makeWing(
-  THREE,
-  color,
-  side
-) {
-  const wing =
-    new THREE.Mesh(
-      new THREE
-        .ConeGeometry(
-          0.48,
-          1.5,
-          3
-        ),
-
-      palMaterial(
-        THREE,
-        color
-      )
-    );
-
-  wing.rotation.z =
-    side *
-    Math.PI /
-    2;
-
-  wing.scale.z =
-    0.28;
-
-  return wing;
-}
-
-/* =========================================================
-   DIFFERENT PAL BODY BUILDERS
-   ========================================================= */
-
-function buildPal(
-  THREE,
-  species
-) {
-  const group =
-    new THREE.Group();
-
-  const bodyColor =
-    species.body;
-
-  const accent =
-    species.accent;
-
-  let legs = [];
-  let wings = [];
-  let tail = null;
-  let head = null;
-  let body = null;
-
-  const addTail = (
-    length = 0.9,
-    thickness = 0.15,
-    y = 1.05
-  ) => {
-    tail =
-      new THREE.Group();
-
-    tail.position.set(
-      0,
-      y,
-      0.5
-    );
-
-    const mesh =
-      palCylinder(
-        THREE,
-        thickness,
-        thickness * 0.65,
-        length,
-        accent,
-        0,
-        0,
-        length / 2
-      );
-
-    mesh.rotation.x =
-      Math.PI / 2;
-
-    tail.add(mesh);
-    group.add(tail);
-  };
-
-  switch (
-    species.form
-  ) {
-
-    /* FOX / WOLF / LYNX */
-    case "fox":
-    case "wolf":
-    case "lynx": {
-      body =
-        palSphere(
-          THREE,
-          0.55,
-          bodyColor,
-          0,
-          1,
-          0,
-          1.4,
-          0.8,
-          1.65
-        );
-
-      head =
-        palSphere(
-          THREE,
-          0.38,
-          bodyColor,
-          0,
-          1.55,
-          -0.75,
-          1,
-          0.9,
-          1
-        );
-
-      group.add(
-        body,
-        head
-      );
-
-      addEyes(
-        THREE,
-        group,
-        1.63,
-        -1.08
-      );
-
-      group.add(
-        palCone(
-          THREE,
-          0.14,
-          0.52,
-          accent,
-          -0.24,
-          1.98,
-          -0.72
-        ),
-
-        palCone(
-          THREE,
-          0.14,
-          0.52,
-          accent,
-          0.24,
-          1.98,
-          -0.72
-        ),
-
-        palSphere(
-          THREE,
-          0.18,
-          accent,
-          0,
-          1.45,
-          -1.09,
-          1.1,
-          0.7,
-          1
-        )
-      );
-
-      legs =
-        addFourLegs(
-          THREE,
-          group,
-          bodyColor,
-          undefined,
-          0.68
-        );
-
-      addTail(
-        species.form === "fox"
-          ? 1.4
-          : 1,
-
-        0.18,
-        1.05
-      );
-
-      if (
-        species.form ===
-        "lynx"
-      ) {
-        group.add(
-          palCone(
-            THREE,
-            0.06,
-            0.22,
-            0x222222,
-            -0.24,
-            2.18,
-            -0.72
-          ),
-
-          palCone(
-            THREE,
-            0.06,
-            0.22,
-            0x222222,
-            0.24,
-            2.18,
-            -0.72
-          )
-        );
-      }
-
-      break;
-    }
-
-    /* RABBIT */
-    case "rabbit": {
-      body =
-        palSphere(
-          THREE,
-          0.52,
-          bodyColor,
-          0,
-          0.9,
-          0,
-          1.05,
-          1.15,
-          1.1
-        );
-
-      head =
-        palSphere(
-          THREE,
-          0.38,
-          bodyColor,
-          0,
-          1.55,
-          -0.42
-        );
-
-      group.add(
-        body,
-        head
-      );
-
-      addEyes(
-        THREE,
-        group,
-        1.65,
-        -0.73,
-        0.16
-      );
-
-      for (
-        const x
-        of [
-          -0.18,
-          0.18
-        ]
-      ) {
-        const ear =
-          palSphere(
-            THREE,
-            0.18,
-            accent,
-            x,
-            2.23,
-            -0.35,
-            0.45,
-            2.3,
-            0.55
-          );
-
-        ear.rotation.z =
-          x < 0
-            ? -0.08
-            : 0.08;
-
-        group.add(ear);
-      }
-
-      legs =
-        addFourLegs(
-          THREE,
-          group,
-          bodyColor,
-
-          [
-            [-0.32, -0.18],
-            [0.32, -0.18],
-            [-0.38, 0.38],
-            [0.38, 0.38]
-          ],
-
-          0.55
-        );
-
-      group.add(
-        palSphere(
-          THREE,
-          0.18,
-          0xffffff,
-          0,
-          0.9,
-          0.65
-        )
-      );
-
-      break;
-    }
-
-    /* RHINO */
-    case "rhino": {
-      body =
-        palSphere(
-          THREE,
-          0.75,
-          bodyColor,
-          0,
-          1,
-          0,
-          1.45,
-          0.85,
-          1.6
-        );
-
-      head =
-        palSphere(
-          THREE,
-          0.5,
-          bodyColor,
-          0,
-          1.35,
-          -1,
-          1.1,
-          0.75,
-          1.1
-        );
-
-      group.add(
-        body,
-        head,
-
-        palCone(
-          THREE,
-          0.13,
-          0.75,
-          accent,
-          0,
-          1.55,
-          -1.58
-        )
-      );
-
-      addEyes(
-        THREE,
-        group,
-        1.48,
-        -1.45,
-        0.2
-      );
-
-      legs =
-        addFourLegs(
-          THREE,
-          group,
-          bodyColor,
-
-          [
-            [-0.5, -0.5],
-            [0.5, -0.5],
-            [-0.5, 0.5],
-            [0.5, 0.5]
-          ],
-
-          0.75
-        );
-
-      addTail(
-        0.55,
-        0.08,
-        0.95
-      );
-
-      break;
-    }
-
-    /* BAT */
-    case "bat": {
-      body =
-        palSphere(
-          THREE,
-          0.42,
-          bodyColor,
-          0,
-          1.2,
-          0,
-          1,
-          0.85,
-          1.25
-        );
-
-      head =
-        palSphere(
-          THREE,
-          0.31,
-          bodyColor,
-          0,
-          1.62,
-          -0.42
-        );
-
-      group.add(
-        body,
-        head
-      );
-
-      addEyes(
-        THREE,
-        group,
-        1.68,
-        -0.72,
-        0.13
-      );
-
-      group.add(
-        palCone(
-          THREE,
-          0.1,
-          0.4,
-          accent,
-          -0.2,
-          2,
-          -0.4
-        ),
-
-        palCone(
-          THREE,
-          0.1,
-          0.4,
-          accent,
-          0.2,
-          2,
-          -0.4
-        )
-      );
-
-      for (
-        const side
-        of [-1, 1]
-      ) {
-        const pivot =
-          new THREE.Group();
-
-        pivot.position.set(
-          side * 0.4,
-          1.35,
-          0
-        );
-
-        pivot.add(
-          makeWing(
-            THREE,
-            accent,
-            side
-          )
-        );
-
-        group.add(pivot);
-
-        wings.push(pivot);
-      }
-
-      break;
-    }
-
-    /* APE */
-    case "ape": {
-      body =
-        palSphere(
-          THREE,
-          0.75,
-          bodyColor,
-          0,
-          1.05,
-          0,
-          1.1,
-          1.2,
-          0.8
-        );
-
-      head =
-        palSphere(
-          THREE,
-          0.43,
-          bodyColor,
-          0,
-          1.95,
-          -0.2
-        );
-
-      group.add(
-        body,
-        head,
-
-        palSphere(
-          THREE,
-          0.28,
-          accent,
-          0,
-          1.82,
-          -0.5,
-          1.2,
-          0.65,
-          0.7
-        )
-      );
-
-      addEyes(
-        THREE,
-        group,
-        2.02,
-        -0.55,
-        0.16
-      );
-
-      for (
-        const side
-        of [-1, 1]
-      ) {
-        const arm =
-          new THREE.Group();
-
-        arm.position.set(
-          side * 0.7,
-          1.35,
-          0
-        );
-
-        const limb =
-          palCylinder(
-            THREE,
-            0.18,
-            0.2,
-            1.25,
-            bodyColor,
-            0,
-            -0.48,
-            0
-          );
-
-        limb.rotation.z =
-          side * 0.22;
-
-        arm.add(limb);
-
-        group.add(arm);
-
-        legs.push(arm);
-      }
-
-      legs.push(
-        ...addFourLegs(
-          THREE,
-          group,
-          bodyColor,
-
-          [
-            [-0.3, 0.15],
-            [0.3, 0.15]
-          ],
-
-          0.75
-        )
-      );
-
-      break;
-    }
-
-    /* GRYPHON / PHOENIX */
-    case "gryphon":
-    case "phoenix": {
-      body =
-        palSphere(
-          THREE,
-          0.58,
-          bodyColor,
-          0,
-          1.15,
-          0,
-          1,
-          0.9,
-          1.55
-        );
-
-      head =
-        palSphere(
-          THREE,
-          0.34,
-          bodyColor,
-          0,
-          1.75,
-          -0.7
-        );
-
-      group.add(
-        body,
-        head,
-
-        palCone(
-          THREE,
-          0.12,
-          0.45,
-          accent,
-          0,
-          1.7,
-          -1.18
-        )
-      );
-
-      addEyes(
-        THREE,
-        group,
-        1.83,
-        -0.98,
-        0.14
-      );
-
-      for (
-        const side
-        of [-1, 1]
-      ) {
-        const pivot =
-          new THREE.Group();
-
-        pivot.position.set(
-          side * 0.48,
-          1.3,
-          0
-        );
-
-        const wing =
-          makeWing(
-            THREE,
-            accent,
-            side
-          );
-
-        wing.scale.multiplyScalar(
-          species.form ===
-          "phoenix"
-            ? 1.5
-            : 1.2
-        );
-
-        pivot.add(wing);
-
-        group.add(pivot);
-
-        wings.push(pivot);
-      }
-
-      legs =
-        addFourLegs(
-          THREE,
-          group,
-          accent,
-
-          [
-            [-0.24, -0.15],
-            [0.24, -0.15]
-          ],
-
-          0.55
-        );
-
-      addTail(
-        species.form ===
-        "phoenix"
-          ? 1.5
-          : 0.9,
-
-        0.1,
-        1.1
-      );
-
-      break;
-    }
-
-    /* DRAGON */
-    case "dragon": {
-      body =
-        palSphere(
-          THREE,
-          0.68,
-          bodyColor,
-          0,
-          1.15,
-          0,
-          1.15,
-          0.85,
-          1.7
-        );
-
-      head =
-        palSphere(
-          THREE,
-          0.42,
-          bodyColor,
-          0,
-          1.72,
-          -0.9,
-          1,
-          0.8,
-          1.2
-        );
-
-      group.add(
-        body,
-        head,
-
-        palCone(
-          THREE,
-          0.12,
-          0.5,
-          accent,
-          -0.23,
-          2.15,
-          -0.85
-        ),
-
-        palCone(
-          THREE,
-          0.12,
-          0.5,
-          accent,
-          0.23,
-          2.15,
-          -0.85
-        )
-      );
-
-      addEyes(
-        THREE,
-        group,
-        1.82,
-        -1.28,
-        0.17
-      );
-
-      legs =
-        addFourLegs(
-          THREE,
-          group,
-          bodyColor,
-          undefined,
-          0.7
-        );
-
-      for (
-        const side
-        of [-1, 1]
-      ) {
-        const pivot =
-          new THREE.Group();
-
-        pivot.position.set(
-          side * 0.5,
-          1.45,
-          0.1
-        );
-
-        pivot.add(
-          makeWing(
-            THREE,
-            accent,
-            side
-          )
-        );
-
-        group.add(pivot);
-
-        wings.push(pivot);
-      }
-
-      addTail(
-        1.7,
-        0.16,
-        1.1
-      );
-
-      break;
-    }
-
-    /* OX / BOAR */
-    case "ox":
-    case "boar": {
-      body =
-        palSphere(
-          THREE,
-          0.72,
-          bodyColor,
-          0,
-          0.95,
-          0,
-          1.45,
-          0.9,
-          1.55
-        );
-
-      head =
-        palSphere(
-          THREE,
-          0.46,
-          bodyColor,
-          0,
-          1.35,
-          -1,
-          1.1,
-          0.85,
-          1.1
-        );
-
-      group.add(
-        body,
-        head
-      );
-
-      addEyes(
-        THREE,
-        group,
-        1.48,
-        -1.4,
-        0.18
-      );
-
-      legs =
-        addFourLegs(
-          THREE,
-          group,
-          bodyColor,
-          undefined,
-          0.68
-        );
-
-      if (
-        species.form ===
-        "ox"
-      ) {
-        group.add(
-          palCone(
-            THREE,
-            0.13,
-            0.65,
-            accent,
-            -0.38,
-            1.75,
-            -0.9
-          ),
-
-          palCone(
-            THREE,
-            0.13,
-            0.65,
-            accent,
-            0.38,
-            1.75,
-            -0.9
-          )
-        );
-      } else {
-        group.add(
-          palCone(
-            THREE,
-            0.08,
-            0.32,
-            accent,
-            -0.18,
-            1.18,
-            -1.45
-          ),
-
-          palCone(
-            THREE,
-            0.08,
-            0.32,
-            accent,
-            0.18,
-            1.18,
-            -1.45
-          )
-        );
-      }
-
-      addTail(
-        0.45,
-        0.07,
-        0.95
-      );
-
-      break;
-    }
-
-    /* LION */
-    case "lion": {
-      body =
-        palSphere(
-          THREE,
-          0.65,
-          bodyColor,
-          0,
-          1,
-          0,
-          1.35,
-          0.85,
-          1.45
-        );
-
-      head =
-        palSphere(
-          THREE,
-          0.45,
-          accent,
-          0,
-          1.62,
-          -0.75,
-          1.3,
-          1.3,
-          1.1
-        );
-
-      group.add(
-        body,
-        head,
-
-        palSphere(
-          THREE,
-          0.34,
-          bodyColor,
-          0,
-          1.62,
-          -0.84
-        )
-      );
-
-      addEyes(
-        THREE,
-        group,
-        1.72,
-        -1.13,
-        0.17
-      );
-
-      legs =
-        addFourLegs(
-          THREE,
-          group,
-          bodyColor
-        );
-
-      addTail(
-        1.15,
-        0.08,
-        1
-      );
-
-      break;
-    }
-
-    /* DEER / STAG */
-    case "deer":
-    case "stag": {
-      body =
-        palSphere(
-          THREE,
-          0.56,
-          bodyColor,
-          0,
-          1.1,
-          0,
-          1.2,
-          0.85,
-          1.55
-        );
-
-      const neck =
-        palCylinder(
-          THREE,
-          0.24,
-          0.32,
-          0.95,
-          bodyColor,
-          0,
-          1.55,
-          -0.55
-        );
-
-      neck.rotation.x =
-        -0.42;
-
-      head =
-        palSphere(
-          THREE,
-          0.34,
-          bodyColor,
-          0,
-          2.05,
-          -0.85,
-          1,
-          0.75,
-          1.1
-        );
-
-      group.add(
-        body,
-        neck,
-        head
-      );
-
-      addEyes(
-        THREE,
-        group,
-        2.12,
-        -1.17,
-        0.14
-      );
-
-      legs =
-        addFourLegs(
-          THREE,
-          group,
-          bodyColor,
-          undefined,
-          0.85
-        );
-
-      for (
-        const side
-        of [-1, 1]
-      ) {
-        const horn =
-          palCone(
-            THREE,
-            0.08,
-            0.75,
-            accent,
-            side * 0.22,
-            2.6,
-            -0.8
-          );
-
-        horn.rotation.z =
-          side * 0.2;
-
-        group.add(horn);
-      }
-
-      addTail(
-        0.45,
-        0.1,
-        1.15
-      );
-
-      break;
-    }
-
-    /* SHARK / WHALE */
-    case "shark":
-    case "whale": {
-      body =
-        palSphere(
-          THREE,
-          0.75,
-          bodyColor,
-          0,
-          1.25,
-          0,
-          1.1,
-          0.75,
-
-          species.form ===
-          "whale"
-            ? 2.3
-            : 1.8
-        );
-
-      head =
-        palSphere(
-          THREE,
-          0.48,
-          bodyColor,
-          0,
-          1.25,
-          -1.15,
-          1.2,
-          0.75,
-          1.2
-        );
-
-      group.add(
-        body,
-        head
-      );
-
-      addEyes(
-        THREE,
-        group,
-        1.38,
-        -1.54,
-        0.22
-      );
-
-      const dorsal =
-        palCone(
-          THREE,
-          0.18,
-          0.9,
-          accent,
-          0,
-          2,
-          0.15
-        );
-
-      dorsal.rotation.x =
-        Math.PI;
-
-      group.add(dorsal);
-
-      for (
-        const side
-        of [-1, 1]
-      ) {
-        const fin =
-          palCone(
-            THREE,
-            0.14,
-            0.8,
-            accent,
-            side * 0.78,
-            1.25,
-            0
-          );
-
-        fin.rotation.z =
-          side *
-          Math.PI /
-          2;
-
-        group.add(fin);
-      }
-
-      addTail(
-        1.1,
-        0.16,
-        1.25
-      );
-
-      group.position.y =
-        0.35;
-
-      break;
-    }
-
-    /* MOUSE */
-    case "mouse": {
-      body =
-        palSphere(
-          THREE,
-          0.35,
-          bodyColor,
-          0,
-          0.55,
-          0,
-          1,
-          0.8,
-          1.3
-        );
-
-      head =
-        palSphere(
-          THREE,
-          0.28,
-          bodyColor,
-          0,
-          0.88,
-          -0.42
-        );
-
-      group.add(
-        body,
-        head,
-
-        palSphere(
-          THREE,
-          0.15,
-          accent,
-          -0.24,
-          1.12,
-          -0.38
-        ),
-
-        palSphere(
-          THREE,
-          0.15,
-          accent,
-          0.24,
-          1.12,
-          -0.38
-        )
-      );
-
-      addEyes(
-        THREE,
-        group,
-        0.96,
-        -0.67,
-        0.11
-      );
-
-      legs =
-        addFourLegs(
-          THREE,
-          group,
-          bodyColor,
-
-          [
-            [-0.2, -0.1],
-            [0.2, -0.1],
-            [-0.2, 0.2],
-            [0.2, 0.2]
-          ],
-
-          0.28
-        );
-
-      addTail(
-        1.2,
-        0.045,
-        0.55
-      );
-
-      break;
-    }
-
-    /* PANDA */
-    case "panda": {
-      body =
-        palSphere(
-          THREE,
-          0.68,
-          0xf2f2ed,
-          0,
-          1,
-          0,
-          1.1,
-          1.15,
-          0.9
-        );
-
-      head =
-        palSphere(
-          THREE,
-          0.48,
-          0xf2f2ed,
-          0,
-          1.82,
-          -0.15
-        );
-
-      group.add(
-        body,
-        head,
-
-        palSphere(
-          THREE,
-          0.17,
-          0x222222,
-          -0.34,
-          2.15,
-          -0.15
-        ),
-
-        palSphere(
-          THREE,
-          0.17,
-          0x222222,
-          0.34,
-          2.15,
-          -0.15
-        ),
-
-        palSphere(
-          THREE,
-          0.12,
-          0x222222,
-          -0.17,
-          1.88,
-          -0.52
-        ),
-
-        palSphere(
-          THREE,
-          0.12,
-          0x222222,
-          0.17,
-          1.88,
-          -0.52
-        )
-      );
-
-      addEyes(
-        THREE,
-        group,
-        1.9,
-        -0.61,
-        0.16
-      );
-
-      legs =
-        addFourLegs(
-          THREE,
-          group,
-          0x222222,
-          undefined,
-          0.65
-        );
-
-      break;
-    }
-
-    /* OWL */
-    case "owl": {
-      body =
-        palSphere(
-          THREE,
-          0.5,
-          bodyColor,
-          0,
-          1.15,
-          0,
-          1,
-          1.2,
-          0.9
-        );
-
-      head =
-        palSphere(
-          THREE,
-          0.48,
-          bodyColor,
-          0,
-          1.72,
-          -0.12,
-          1.1,
-          1,
-          0.85
-        );
-
-      group.add(
-        body,
-        head,
-
-        palSphere(
-          THREE,
-          0.22,
-          accent,
-          -0.2,
-          1.8,
-          -0.42
-        ),
-
-        palSphere(
-          THREE,
-          0.22,
-          accent,
-          0.2,
-          1.8,
-          -0.42
-        ),
-
-        palCone(
-          THREE,
-          0.09,
-          0.3,
-          accent,
-          0,
-          1.62,
-          -0.66
-        )
-      );
-
-      addEyes(
-        THREE,
-        group,
-        1.83,
-        -0.61,
-        0.16
-      );
-
-      for (
-        const side
-        of [-1, 1]
-      ) {
-        const pivot =
-          new THREE.Group();
-
-        pivot.position.set(
-          side * 0.45,
-          1.25,
-          0
-        );
-
-        pivot.add(
-          makeWing(
-            THREE,
-            accent,
-            side
-          )
-        );
-
-        group.add(pivot);
-
-        wings.push(pivot);
-      }
-
-      break;
-    }
-
-    /* DINOSAUR */
-    case "dino": {
-      body =
-        palSphere(
-          THREE,
-          0.72,
-          bodyColor,
-          0,
-          1.05,
-          0,
-          1.2,
-          1,
-          1.8
-        );
-
-      head =
-        palSphere(
-          THREE,
-          0.42,
-          bodyColor,
-          0,
-          1.65,
-          -1.1,
-          1.1,
-          0.75,
-          1.2
-        );
-
-      group.add(
-        body,
-        head
-      );
-
-      addEyes(
-        THREE,
-        group,
-        1.75,
-        -1.48,
-        0.16
-      );
-
-      legs =
-        addFourLegs(
-          THREE,
-          group,
-          bodyColor,
-
-          [
-            [-0.42, -0.35],
-            [0.42, -0.35],
-            [-0.45, 0.45],
-            [0.45, 0.45]
-          ],
-
-          0.78
-        );
-
-      for (
-        let i = 0;
-        i < 5;
-        i++
-      ) {
-        group.add(
-          palCone(
-            THREE,
-            0.1,
-            0.38,
-            accent,
-            0,
-            1.75,
-            -0.3 +
-            i *
-            0.27
-          )
-        );
-      }
-
-      addTail(
-        1.8,
-        0.18,
-        1.05
-      );
-
-      break;
-    }
-
-    /* TURTLE */
-    case "turtle": {
-      body =
-        palSphere(
-          THREE,
-          0.72,
-          accent,
-          0,
-          0.65,
-          0,
-          1.2,
-          0.45,
-          1.35
-        );
-
-      const shell =
-        palSphere(
-          THREE,
-          0.68,
-          bodyColor,
-          0,
-          0.9,
-          0.15,
-          1.05,
-          0.55,
-          1.2
-        );
-
-      head =
-        palSphere(
-          THREE,
-          0.3,
-          bodyColor,
-          0,
-          0.72,
-          -0.85
-        );
-
-      group.add(
-        body,
-        shell,
-        head
-      );
-
-      addEyes(
-        THREE,
-        group,
-        0.79,
-        -1.12,
-        0.12
-      );
-
-      legs =
-        addFourLegs(
-          THREE,
-          group,
-          bodyColor,
-
-          [
-            [-0.48, -0.25],
-            [0.48, -0.25],
-            [-0.48, 0.4],
-            [0.48, 0.4]
-          ],
-
-          0.35
-        );
-
-      break;
-    }
-
-    /* SHEEP */
-    case "sheep": {
-      body =
-        palSphere(
-          THREE,
-          0.72,
-          0xf0eee5,
-          0,
-          1,
-          0,
-          1.25,
-          1,
-          1.3
-        );
-
-      head =
-        palSphere(
-          THREE,
-          0.34,
-          bodyColor,
-          0,
-          1.38,
-          -0.78
-        );
-
-      group.add(
-        body,
-        head
-      );
-
-      addEyes(
-        THREE,
-        group,
-        1.48,
-        -1.07,
-        0.14
-      );
-
-      legs =
-        addFourLegs(
-          THREE,
-          group,
-          bodyColor,
-          undefined,
-          0.55
-        );
-
-      for (
-        const side
-        of [-1, 1]
-      ) {
-        const horn =
-          new THREE.Mesh(
-            new THREE
-              .TorusGeometry(
-                0.18,
-                0.05,
-                7,
-                12,
-                Math.PI *
-                1.4
-              ),
-
-            palMaterial(
-              THREE,
-              accent
-            )
-          );
-
-        horn.position.set(
-          side * 0.25,
-          1.67,
-          -0.72
-        );
-
-        horn.rotation.y =
-          side * 0.6;
-
-        group.add(horn);
-      }
-
-      break;
-    }
-
-    /* MANTIS */
-    case "mantis": {
-      body =
-        palCylinder(
-          THREE,
-          0.22,
-          0.28,
-          1.25,
-          bodyColor,
-          0,
-          1.2,
-          0
-        );
-
-      body.rotation.x =
-        Math.PI / 2;
-
-      head =
-        palSphere(
-          THREE,
-          0.28,
-          bodyColor,
-          0,
-          1.65,
-          -0.65,
-          1.2,
-          0.7,
-          0.9
-        );
-
-      group.add(
-        body,
-        head
-      );
-
-      addEyes(
-        THREE,
-        group,
-        1.78,
-        -0.88,
-        0.13
-      );
-
-      for (
-        const side
-        of [-1, 1]
-      ) {
-        const arm =
-          palCylinder(
-            THREE,
-            0.06,
-            0.08,
-            0.9,
-            accent,
-            side * 0.32,
-            1.5,
-            -0.25
-          );
-
-        arm.rotation.z =
-          side * 0.7;
-
-        group.add(arm);
-      }
-
-      legs =
-        addFourLegs(
-          THREE,
-          group,
-          bodyColor,
-
-          [
-            [-0.3, 0.1],
-            [0.3, 0.1],
-            [-0.32, 0.45],
-            [0.32, 0.45]
-          ],
-
-          0.65
-        );
-
-      break;
-    }
-
-    /* SERPENT */
-    case "serpent": {
-      for (
-        let i = 0;
-        i < 7;
-        i++
-      ) {
-        group.add(
-          palSphere(
-            THREE,
-            0.28 -
-            i *
-            0.018,
-
-            bodyColor,
-
-            0,
-            0.55 +
-            i *
-            0.07,
-
-            i *
-            0.38,
-
-            1,
-            1,
-            1.25
-          )
-        );
-      }
-
-      head =
-        palSphere(
-          THREE,
-          0.38,
-          bodyColor,
-          0,
-          1.05,
-          -0.35,
-          1.1,
-          0.8,
-          1.1
-        );
-
-      group.add(
-        head,
-
-        palCone(
-          THREE,
-          0.1,
-          0.42,
-          accent,
-          -0.18,
-          1.5,
-          -0.32
-        ),
-
-        palCone(
-          THREE,
-          0.1,
-          0.42,
-          accent,
-          0.18,
-          1.5,
-          -0.32
-        )
-      );
-
-      addEyes(
-        THREE,
-        group,
-        1.14,
-        -0.7,
-        0.14
-      );
-
-      break;
-    }
-
-    /* HORSE */
-    case "horse": {
-      body =
-        palSphere(
-          THREE,
-          0.62,
-          bodyColor,
-          0,
-          1.15,
-          0,
-          1.25,
-          0.8,
-          1.65
-        );
-
-      const neck =
-        palCylinder(
-          THREE,
-          0.22,
-          0.28,
-          1.05,
-          bodyColor,
-          0,
-          1.65,
-          -0.62
-        );
-
-      neck.rotation.x =
-        -0.42;
-
-      head =
-        palSphere(
-          THREE,
-          0.34,
-          bodyColor,
-          0,
-          2.12,
-          -0.95,
-          1,
-          0.75,
-          1.2
-        );
-
-      group.add(
-        body,
-        neck,
-        head,
-
-        palCone(
-          THREE,
-          0.11,
-          0.45,
-          accent,
-          -0.17,
-          2.5,
-          -0.9
-        ),
-
-        palCone(
-          THREE,
-          0.11,
-          0.45,
-          accent,
-          0.17,
-          2.5,
-          -0.9
-        )
-      );
-
-      addEyes(
-        THREE,
-        group,
-        2.2,
-        -1.27,
-        0.14
-      );
-
-      legs =
-        addFourLegs(
-          THREE,
-          group,
-          bodyColor,
-          undefined,
-          0.9
-        );
-
-      addTail(
-        1,
-        0.12,
-        1.2
-      );
-
-      break;
-    }
-
-    /* FROG */
-    case "frog": {
-      body =
-        palSphere(
-          THREE,
-          0.55,
-          bodyColor,
-          0,
-          0.55,
-          0,
-          1.25,
-          0.65,
-          1.05
-        );
-
-      head =
-        palSphere(
-          THREE,
-          0.48,
-          bodyColor,
-          0,
-          0.9,
-          -0.3,
-          1.15,
-          0.7,
-          1
-        );
-
-      group.add(
-        body,
-        head,
-
-        palSphere(
-          THREE,
-          0.16,
-          accent,
-          -0.24,
-          1.25,
-          -0.42
-        ),
-
-        palSphere(
-          THREE,
-          0.16,
-          accent,
-          0.24,
-          1.25,
-          -0.42
-        )
-      );
-
-      addEyes(
-        THREE,
-        group,
-        1.28,
-        -0.57,
-        0.23
-      );
-
-      legs =
-        addFourLegs(
-          THREE,
-          group,
-          bodyColor,
-
-          [
-            [-0.4, -0.05],
-            [0.4, -0.05],
-            [-0.5, 0.35],
-            [0.5, 0.35]
-          ],
-
-          0.35
-        );
-
-      break;
-    }
-
-    /* SPIDER */
-    case "spider": {
-      body =
-        palSphere(
-          THREE,
-          0.52,
-          bodyColor,
-          0,
-          0.55,
-          0.2,
-          1,
-          0.8,
-          1.1
-        );
-
-      head =
-        palSphere(
-          THREE,
-          0.35,
-          accent,
-          0,
-          0.55,
-          -0.55
-        );
-
-      group.add(
-        body,
-        head
-      );
-
-      addEyes(
-        THREE,
-        group,
-        0.65,
-        -0.86,
-        0.15
-      );
-
-      for (
-        const side
-        of [-1, 1]
-      ) {
-        for (
-          let i = 0;
-          i < 4;
-          i++
-        ) {
-          const leg =
-            palCylinder(
-              THREE,
-              0.045,
-              0.06,
-              0.95,
-              bodyColor,
-
-              side *
-              (
-                0.45 +
-                i *
-                0.06
-              ),
-
-              0.55,
-
-              -0.35 +
-              i *
-              0.25
-            );
-
-          leg.rotation.z =
-            side *
-            (
-              0.9 -
-              0.13 *
-              i
-            );
-
-          group.add(leg);
-        }
-      }
-
-      break;
-    }
-
-    /* GOLEM */
-    case "golem": {
-      body =
-        palBox(
-          THREE,
-          1.2,
-          1.35,
-          0.85,
-          bodyColor,
-          0,
-          1.1,
-          0
-        );
-
-      head =
-        palBox(
-          THREE,
-          0.78,
-          0.62,
-          0.65,
-          accent,
-          0,
-          2.05,
-          -0.08
-        );
-
-      group.add(
-        body,
-        head
-      );
-
-      addEyes(
-        THREE,
-        group,
-        2.1,
-        -0.43,
-        0.18
-      );
-
-      for (
-        const side
-        of [-1, 1]
-      ) {
-        group.add(
-          palBox(
-            THREE,
-            0.35,
-            1.05,
-            0.4,
-            bodyColor,
-            side * 0.82,
-            1.2,
-            0
-          )
-        );
-      }
-
-      legs =
-        addFourLegs(
-          THREE,
-          group,
-          bodyColor,
-
-          [
-            [-0.34, 0.15],
-            [0.34, 0.15]
-          ],
-
-          0.85
-        );
-
-      break;
-    }
-
-    /* PENGUIN */
-    case "penguin": {
-      body =
-        palSphere(
-          THREE,
-          0.52,
-          0x273545,
-          0,
-          0.9,
-          0,
-          0.9,
-          1.3,
-          0.85
-        );
-
-      const belly =
-        palSphere(
-          THREE,
-          0.4,
-          0xf4fbff,
-          0,
-          0.88,
-          -0.32,
-          0.75,
-          1,
-          0.45
-        );
-
-      head =
-        palSphere(
-          THREE,
-          0.38,
-          0x273545,
-          0,
-          1.55,
-          -0.08
-        );
-
-      group.add(
-        body,
-        belly,
-        head,
-
-        palCone(
-          THREE,
-          0.09,
-          0.28,
-          accent,
-          0,
-          1.48,
-          -0.47
-        )
-      );
-
-      addEyes(
-        THREE,
-        group,
-        1.65,
-        -0.4,
-        0.14
-      );
-
-      legs =
-        addFourLegs(
-          THREE,
-          group,
-          accent,
-
-          [
-            [-0.22, 0.05],
-            [0.22, 0.05]
-          ],
-
-          0.3
-        );
-
-      break;
-    }
-
-    default: {
-      body =
-        palSphere(
-          THREE,
-          0.6,
-          bodyColor,
-          0,
-          1,
-          0
-        );
-
-      head =
-        palSphere(
-          THREE,
-          0.35,
-          accent,
-          0,
-          1.6,
-          -0.5
-        );
-
-      group.add(
-        body,
-        head
-      );
-
-      legs =
-        addFourLegs(
-          THREE,
-          group,
-          bodyColor
-        );
-    }
-  }
-
-  group.userData = {
-    species,
-    body,
-    head,
-    legs,
-    wings,
-    tail,
-
-    animationTime:
-      Math.random() *
-      10
-  };
-
-  group.traverse(
-    object => {
-      if (
-        object.isMesh
-      ) {
-        object.castShadow = true;
-        object.receiveShadow = true;
-      }
-    }
-  );
-
-  return group;
-}
-
-function animatePal(
-  creature,
-  dt,
-  moving = true
-) {
-  const data =
-    creature.model.userData;
-
-  data.animationTime +=
-    dt;
-
-  const time =
-    data.animationTime;
-
-  if (
-    data.body
-  ) {
-    data.body.position.y +=
-      Math.sin(
-        time *
-        2
-      ) *
-      0.0007;
-  }
-
-  if (
-    data.head
-  ) {
-    data.head.rotation.y =
-      Math.sin(
-        time *
-        0.8
-      ) *
-      0.12;
-  }
-
-  if (
-    data.tail
-  ) {
-    data.tail.rotation.y =
-      Math.sin(
-        time *
-        3
-      ) *
-      0.35;
-  }
-
-  data.legs
-    ?.forEach(
-      (
-        leg,
-        index
-      ) => {
-        leg.rotation.x =
-          moving
-
-            ? Math.sin(
-                time *
-                6 +
-                index *
-                Math.PI
-              ) *
-              0.42
-
-            : 0;
-      }
-    );
-
-  data.wings
-    ?.forEach(
-      (
-        wing,
-        index
-      ) => {
-        wing.rotation.z =
-          Math.sin(
-            time *
-            4
-          ) *
-          0.35 *
-          (
-            index
-              ? 1
-              : -1
-          );
-      }
-    );
-}
-
-function createPlayerModel(
-  THREE
-) {
-  const group =
-    new THREE.Group();
-
-  group.add(
-    palBox(
-      THREE,
-      0.55,
-      0.85,
-      0.32,
-      0x39516e,
-      0,
-      1.15,
-      0
-    ),
-
-    palSphere(
-      THREE,
-      0.24,
-      0xd4ad8e,
-      0,
-      1.83,
-      0
-    )
-  );
-
-  const legs = [];
-
-  for (
-    const x
-    of [
-      -0.17,
-      0.17
-    ]
-  ) {
-    const pivot =
-      new THREE.Group();
-
-    pivot.position.set(
-      x,
-      0.75,
-      0
-    );
-
-    pivot.add(
-      palBox(
-        THREE,
-        0.18,
-        0.72,
-        0.2,
-        0x263448,
-        0,
-        -0.35,
-        0
-      )
-    );
-
-    group.add(pivot);
-
-    legs.push(pivot);
-  }
-
-  group.userData = {
-    legs,
-    time: 0
-  };
-
-  return group;
-}
-
-/* =========================================================
-   PALS HOME
-   ========================================================= */
-
-function openPals() {
-  cleanup3D();
-
-  GameCenter.current =
-    "pals";
-
-  const game =
-    palsDefault();
-
-  GameCenter.pals =
-    game;
-
-  $("#contentBody").innerHTML = `
-    <div class="pals-shell">
-
-      <div class="pals-home">
-
-        <section class="pals-hero">
-
-          <span class="pals-hero-badge">
-            GALAXY PALS V4
-          </span>
-
-          <h2>
-            30+ different creature silhouettes
-          </h2>
-
-          <p>
-            Foxes, dragons, wolves, birds,
-            rhinos, apes, sharks, turtles,
-            golems and many more.
-            No single body recolored everywhere.
-          </p>
-
-          <div class="pals-hero-actions">
-
-            <button
-              class="pals-primary"
-              data-pals-start
-            >
-              PLAY WORLD
-            </button>
-
-            <button
-              class="pals-secondary"
-              data-pals-reset
-            >
-              RESET SAVE
-            </button>
-
-          </div>
-
-        </section>
-
-        <aside class="pals-side">
-
-          <div class="pals-card">
-            <strong>Captured</strong>
-            <span>
-              ${game.box.length}
-            </span>
-          </div>
-
-          <div class="pals-card">
-            <strong>Party</strong>
-            <span>
-              ${game.party.length}/5
-            </span>
-          </div>
-
-        </aside>
-
-      </div>
-
-    </div>
-  `;
-}
-
-/* =========================================================
-   PALS 3D WORLD
-   ========================================================= */
-
-async function startPals() {
-  cleanup3D();
-
-  GameCenter.current =
-    "pals";
-
-  const game =
-    GameCenter.pals ||
-    palsDefault();
-
-  GameCenter.pals =
-    game;
-
-  $("#contentBody").innerHTML = `
-    <div class="pals-shell">
-
-      <div
-        class="pals-world"
-        id="palsWorld"
-      >
-
-        <canvas
-          id="palsCanvas"
-          class="pals-canvas"
-        ></canvas>
-
-        <div class="pals-vignette"></div>
-
-        <div class="pals-hud-top">
-
-          <div
-            class="pals-zone"
-            id="palsZone"
-          >
-            Verdant Wilds
-          </div>
-
-          <div class="pals-clock">
-            GALAXY PALS
-          </div>
-
-          <div class="pals-level">
-            LV ${game.level}
-          </div>
-
-        </div>
-
-        <div
-          id="palsTarget"
-          class="pals-target-card"
-          hidden
-        ></div>
-
-        <div
-          id="pParty"
-          class="pals-party"
-        ></div>
-
-        <div
-          id="palsFeed"
-          class="pals-feed"
-        ></div>
-
-        <div class="pals-crosshair"></div>
-
-        <div class="pals-interact">
-          Click world • WASD move • Shift sprint •
-          Click attack • Q capture • F summon •
-          1–5 Orbs
-        </div>
-
-        <div class="pals-hud-left">
-
-          <div class="pals-bar-row">
-            <span>HEALTH</span>
-
-            <div class="pals-bar">
-              <span
-                id="palsHP"
-                class="pals-health-fill"
-              ></span>
-            </div>
-
-            <strong id="palsHPText">
-              100
-            </strong>
-          </div>
-
-          <div class="pals-bar-row">
-            <span>STAMINA</span>
-
-            <div class="pals-bar">
-              <span
-                id="palsStamina"
-                class="pals-stamina-fill"
-              ></span>
-            </div>
-
-            <strong id="palsStaminaText">
-              100
-            </strong>
-          </div>
-
-          <div class="pals-bar-row">
-            <span>FOOD</span>
-
-            <div class="pals-bar">
-              <span
-                id="palsFood"
-                class="pals-hunger-fill"
-              ></span>
-            </div>
-
-            <strong id="palsFoodText">
-              100
-            </strong>
-          </div>
-
-        </div>
-
-        <div
-          id="palsOrbWheel"
-          class="pals-sphere-wheel"
-        ></div>
-
-      </div>
-
-    </div>
-  `;
-
-  try {
-    const THREE =
-      await loadThree();
-
-    const canvas =
-      $("#palsCanvas");
-
-    const worldElement =
-      $("#palsWorld");
-
-    const scene =
-      new THREE.Scene();
-
-    scene.background =
-      new THREE.Color(
-        0x8bc7e2
-      );
-
-    scene.fog =
-      new THREE
-        .FogExp2(
-          0x9dcfdd,
-          0.0065
-        );
-
-    const camera =
-      new THREE
-        .PerspectiveCamera(
-          65,
-          1,
-          0.1,
-          300
-        );
-
-    const renderer =
-      new THREE
-        .WebGLRenderer({
-          canvas,
-          antialias: true
-        });
-
-    renderer.shadowMap.enabled =
-      true;
-
-    scene.add(
-      new THREE
-        .HemisphereLight(
-          0xdff5ff,
-          0x405337,
-          1.7
-        )
-    );
-
-    const sun =
-      new THREE
-        .DirectionalLight(
-          0xfff0c9,
-          2.2
-        );
-
-    sun.position.set(
-      40,
-      60,
-      25
-    );
-
-    sun.castShadow = true;
-
-    scene.add(sun);
-
-    const world =
-      new THREE.Group();
-
-    scene.add(world);
-
-    const ground =
-      new THREE.Mesh(
-        new THREE
-          .PlaneGeometry(
-            340,
-            340
-          ),
-
-        palMaterial(
-          THREE,
-          0x5c874d
-        )
-      );
-
-    ground.rotation.x =
-      -Math.PI / 2;
-
-    ground.receiveShadow =
-      true;
-
-    world.add(ground);
-
-    /* WORLD TREES AND ROCKS */
-
-    for (
-      let i = 0;
-      i < 120;
-      i++
-    ) {
-      const x =
-        rand(
-          -155,
-          155
-        );
-
-      const z =
-        rand(
-          -155,
-          155
-        );
-
-      if (
-        Math.hypot(
-          x,
-          z
-        ) < 15
-      ) {
-        continue;
-      }
-
-      if (
-        Math.random() <
-        0.68
-      ) {
-        const tree =
-          new THREE.Group();
-
-        const height =
-          rand(
-            3,
-            6
-          );
-
-        tree.add(
-          palCylinder(
-            THREE,
-            0.22,
-            0.42,
-            height,
-            0x67462d,
-            0,
-            height / 2,
-            0
-          )
-        );
-
-        for (
-          let j = 0;
-          j < 3;
-          j++
-        ) {
-          tree.add(
-            palSphere(
-              THREE,
-              rand(
-                1.1,
-                2
-              ),
-
-              pick([
-                0x3f6f39,
-                0x4d7d43,
-                0x5a8848
-              ]),
-
-              rand(
-                -0.35,
-                0.35
-              ),
-
-              height *
-                0.72 +
-              j *
-                0.5,
-
-              rand(
-                -0.35,
-                0.35
-              )
-            )
-          );
-        }
-
-        tree.position.set(
-          x,
-          0,
-          z
-        );
-
-        world.add(tree);
-      } else {
-        const rock =
-          new THREE.Mesh(
-            new THREE
-              .DodecahedronGeometry(
-                rand(
-                  0.6,
-                  1.8
-                )
-              ),
-
-            palMaterial(
-              THREE,
-              0x797b74
-            )
-          );
-
-        rock.position.set(
-          x,
-          0.7,
-          z
-        );
-
-        world.add(rock);
-      }
-    }
-
-    /* PLAYER */
-
-    const playerModel =
-      createPlayerModel(
-        THREE
-      );
-
-    world.add(
-      playerModel
-    );
-
-    const player = {
-      x:
-        game.x || 0,
-
-      z:
-        game.z || 8,
-
-      yaw: 0,
-      pitch: -0.12,
-
-      hp:
-        game.hp ??
-        100,
-
-      stamina:
-        game.stamina ??
-        100,
-
-      hunger:
-        game.hunger ??
-        100
-    };
-
-    const keys =
-      new Set();
-
-    const creatures = [];
-    const feed = [];
-
-    let target = null;
-    let companion = null;
-
-    /* =====================================================
-       SPAWN ALL SPECIES
-       ===================================================== */
-
-    function spawnCreature(
-      species,
-      index
-    ) {
-      const model =
-        buildPal(
-          THREE,
-          species
-        );
-
-      const angle =
-        index /
-        PALS.length *
-        Math.PI *
-        2;
-
-      const radius =
-        28 +
-        (
-          index % 6
-        ) *
-        11;
-
-      const creature = {
-        species,
-        model,
-
-        x:
-          Math.sin(angle) *
-            radius +
-          rand(
-            -6,
-            6
-          ),
-
-        z:
-          Math.cos(angle) *
-            radius +
-          rand(
-            -6,
-            6
-          ),
-
-        direction:
-          rand(
-            0,
-            Math.PI *
-            2
-          ),
-
-        changeDirectionAt:
-          performance.now() +
-          rand(
-            1000,
-            3000
-          ),
-
-        hp:
-          species.hp,
-
-        maxHp:
-          species.hp,
-
-        level:
-          1 +
-          Math.floor(
-            rand(
-              0,
-              8 +
-              game.level
-            )
-          ),
-
-        alive: true
-      };
-
-      model.position.set(
-        creature.x,
-        0,
-        creature.z
-      );
-
-      model.traverse(
-        object => {
-          if (
-            object.isMesh
-          ) {
-            object.userData.creature =
-              creature;
-          }
-        }
-      );
-
-      world.add(model);
-
-      creatures.push(
-        creature
-      );
-    }
-
-    /* EVERY SPECIES IS GUARANTEED TO SPAWN */
-
-    PALS.forEach(
-      (
-        species,
-        index
-      ) =>
-        spawnCreature(
-          species,
-          index
-        )
-    );
-
-    /* PLUS EXTRA RANDOM WILD CREATURES */
-
-    for (
-      let i = 0;
-      i < 12;
-      i++
-    ) {
-      spawnCreature(
-        pick(PALS),
-        PALS.length +
-        i
-      );
-    }
-
-    /* TARGETING */
-
-    const raycaster =
-      new THREE.Raycaster();
-
-    function findTarget() {
-      raycaster.setFromCamera(
-        new THREE.Vector2(
-          0,
-          0
-        ),
-        camera
-      );
-
-      const meshes = [];
-
-      creatures.forEach(
-        creature => {
-          if (
-            !creature.alive
-          ) {
-            return;
-          }
-
-          creature.model
-            .traverse(
-              object => {
-                if (
-                  object.isMesh
-                ) {
-                  meshes.push(
-                    object
-                  );
-                }
-              }
-            );
-        }
-      );
-
-      const hit =
-        raycaster
-          .intersectObjects(
-            meshes,
-            false
-          )[0];
-
-      target =
-        hit &&
-        hit.distance < 22
-          ? hit.object
-              .userData
-              .creature
-          : null;
-    }
-
-    function captureChance(
-      creature
-    ) {
-      const hpFactor =
-        1 -
-        creature.hp /
-        creature.maxHp;
-
-      return clamp(
-        (
-          0.18 +
-          hpFactor *
-          0.72
-        ) *
-
-        (
-          PALS_ORBS[
-            game.orb
-          ]?.bonus ||
-          1
-        ) /
-
-        (
-          1 +
-          creature.species
-            .rarity *
-          0.2 +
-
-          creature.level *
-          0.018
-        ),
-
-        0.03,
-        0.94
-      );
-    }
-
-    function attackTarget() {
-      if (
-        !target?.alive
-      ) {
-        return;
-      }
-
-      target.hp -=
-        14 +
-        game.level *
-        1.5;
-
-      if (
-        target.hp <= 0
-      ) {
-        target.hp = 0;
-
-        target.alive =
-          false;
-
-        target.model.visible =
-          false;
-
-        addFeed(
-          target.species.name +
-          " defeated"
-        );
-      } else {
-        addFeed(
-          `${target.species.name} HP ${Math.ceil(
-            target.hp
-          )}`
-        );
-      }
-    }
-
-    function captureTarget() {
-      if (
-        !target?.alive
-      ) {
-        return;
-      }
-
-      const orbIndex =
-        game.orb || 0;
-
-      if (
-        (
-          game.inventory
-            .orbs[
-              orbIndex
-            ] ||
-          0
-        ) <= 0
-      ) {
-        addFeed(
-          "No Orbs"
-        );
-
-        return;
-      }
-
-      game.inventory
-        .orbs[
-          orbIndex
-        ]--;
-
-      const creature =
-        target;
-
-      const probability =
-        captureChance(
-          creature
-        );
-
-      if (
-        Math.random() <
-        probability
-      ) {
-        creature.alive =
-          false;
-
-        creature.model.visible =
-          false;
-
-        game.box.push(
-          creature.species.id
-        );
-
-        if (
-          game.party.length <
-          5
-        ) {
-          game.party.push(
-            creature.species.id
-          );
-        }
-
-        game.xp +=
-          35 *
-          creature.species
-            .rarity;
-
-        addFeed(
-          "Captured " +
-          creature.species.name
-        );
-
-        palsSave(game);
-      } else {
-        addFeed(
-          creature.species.name +
-          " escaped"
-        );
-      }
-    }
-
-    function summonPal() {
-      if (companion) {
-        world.remove(
-          companion.model
-        );
-
-        companion = null;
-
-        addFeed(
-          "Companion recalled"
-        );
-
-        return;
-      }
-
-      const id =
-        game.party[0];
-
-      const species =
-        PALS.find(
-          pal =>
-            pal.id === id
-        );
-
-      if (!species) {
-        addFeed(
-          "Capture a Pal first"
-        );
-
-        return;
-      }
-
-      const model =
-        buildPal(
-          THREE,
-          species
-        );
-
-      world.add(model);
-
-      companion = {
-        model,
-        species
-      };
-
-      addFeed(
-        species.name +
-        " summoned"
-      );
-    }
-
-    function addFeed(text) {
-      feed.unshift({
-        text,
-        time:
-          performance.now()
-      });
-
-      feed.splice(5);
-    }
-
-    function updateHUD() {
-      const setBar = (
-        selector,
-        value
-      ) =>
-        $(selector)
-          ?.style
-          .setProperty(
-            "width",
-            clamp(
-              value,
-              0,
-              100
-            ) +
-            "%"
-          );
-
-      setBar(
-        "#palsHP",
-        player.hp
-      );
-
-      setBar(
-        "#palsStamina",
-        player.stamina
-      );
-
-      setBar(
-        "#palsFood",
-        player.hunger
-      );
-
-      if (
-        $("#palsHPText")
-      ) {
-        $("#palsHPText")
-          .textContent =
-          Math.round(
-            player.hp
-          );
-      }
-
-      if (
-        $("#palsStaminaText")
-      ) {
-        $("#palsStaminaText")
-          .textContent =
-          Math.round(
-            player.stamina
-          );
-      }
-
-      if (
-        $("#palsFoodText")
-      ) {
-        $("#palsFoodText")
-          .textContent =
-          Math.round(
-            player.hunger
-          );
-      }
-
-      $("#palsFeed").innerHTML =
-        feed
-          .filter(
-            item =>
-              performance.now() -
-              item.time <
-              5500
-          )
-          .map(
-            item => `
-              <div class="pals-feed-row">
-                ${esc(item.text)}
-              </div>
-            `
-          )
-          .join("");
-
-      $("#palsOrbWheel").innerHTML =
-        PALS_ORBS
-          .map(
-            (
-              orb,
-              index
-            ) => `
-              <div
-                class="
-                  pals-sphere
-                  ${
-                    index ===
-                    game.orb
-                      ? "active"
-                      : ""
-                  }
-                "
-              >
-
-                <b>
-                  ${index + 1}
-                </b>
-
-                <span>
-                  ${orb.name}
-                </span>
-
-                <small>
-                  x${
-                    game.inventory
-                      .orbs[
-                        index
-                      ] ||
-                    0
-                  }
-                </small>
-
-              </div>
-            `
-          )
-          .join("");
-
-      $("#pParty").innerHTML =
-        game.party
-          .slice(0, 5)
-          .map(
-            (
-              id,
-              index
-            ) => {
-              const species =
-                PALS.find(
-                  pal =>
-                    pal.id === id
-                );
-
-              if (!species) {
-                return "";
-              }
-
-              return `
-                <div class="pals-party-row">
-
-                  <div class="pals-party-icon">
-                    ${species.emoji}
-                  </div>
-
-                  <div class="pals-party-copy">
-
-                    <strong>
-                      ${species.name}
-                    </strong>
-
-                    <span>
-                      ${species.form}
-                      •
-                      ${species.element}
-                    </span>
-
-                    <div class="pals-party-hp">
-                      <span></span>
-                    </div>
-
-                  </div>
-
-                </div>
-              `;
-            }
-          )
-          .join("");
-
-      const targetPanel =
-        $("#palsTarget");
-
-      if (
-        target?.alive
-      ) {
-        targetPanel.hidden =
-          false;
-
-        targetPanel.innerHTML = `
-          <div class="pals-target-title">
-
-            <strong>
-              ${target.species.name}
-            </strong>
-
-            <span>
-              LV ${target.level}
-              •
-              ${target.species.form.toUpperCase()}
-            </span>
-
-          </div>
-
-          <div class="pals-target-hp">
-
-            <span
-              style="
-                width:
-                ${
-                  target.hp /
-                  target.maxHp *
-                  100
-                }%
-              "
-            ></span>
-
-          </div>
-
-          <div class="pals-capture-chance">
-
-            <span>
-              Capture chance
-            </span>
-
-            <strong>
-              ${
-                Math.round(
-                  captureChance(
-                    target
-                  ) *
-                  100
-                )
-              }%
-            </strong>
-
-          </div>
-        `;
-      } else {
-        targetPanel.hidden =
-          true;
-      }
-    }
-
-    /* INPUT */
-
-    on3D(
-      canvas,
-      "click",
-      () =>
-        canvas
-          .requestPointerLock
-          ?.()
-    );
-
-    on3D(
-      document,
-      "mousemove",
-      event => {
-        if (
-          document.pointerLockElement !==
-          canvas
-        ) {
-          return;
-        }
-
-        player.yaw -=
-          event.movementX *
-          0.0025;
-
-        player.pitch =
-          clamp(
-            player.pitch -
-            event.movementY *
-            0.0018,
-
-            -0.5,
-            0.3
-          );
-      }
-    );
-
-    on3D(
-      document,
-      "keydown",
-      event => {
-        keys.add(
-          event.code
-        );
-
-        if (
-          /^Digit[1-5]$/
-            .test(
-              event.code
-            )
-        ) {
-          game.orb =
-            Number(
-              event.code
-                .slice(-1)
-            ) -
-            1;
-        }
-
-        if (
-          event.code ===
-          "KeyQ"
-        ) {
-          captureTarget();
-        }
-
-        if (
-          event.code ===
-          "KeyF"
-        ) {
-          summonPal();
-        }
-      }
-    );
-
-    on3D(
-      document,
-      "keyup",
-      event =>
-        keys.delete(
-          event.code
-        )
-    );
-
-    on3D(
-      document,
-      "mousedown",
-      event => {
-        if (
-          event.button === 0 &&
-          document.pointerLockElement ===
-          canvas
-        ) {
-          attackTarget();
-        }
-      }
-    );
-
-    function resize() {
-      renderer.setSize(
-        worldElement.clientWidth,
-        worldElement.clientHeight,
-        false
-      );
-
-      camera.aspect =
-        worldElement.clientWidth /
-        worldElement.clientHeight;
-
-      camera
-        .updateProjectionMatrix();
-    }
-
-    on3D(
-      window,
-      "resize",
-      resize
-    );
-
-    resize();
-
-    let last =
-      performance.now();
-
-    let saveTime =
-      last;
-
-    function loop(now) {
-      if (
-        GameCenter.current !==
-        "pals"
-      ) {
-        return;
-      }
-
-      const dt =
-        clamp(
-          (
-            now -
-            last
-          ) /
-          1000,
-
-          0,
-          0.05
-        );
-
-      last = now;
-
-      const forward =
-        (
-          keys.has(
-            "KeyW"
-          )
-            ? 1
-            : 0
-        ) -
-        (
-          keys.has(
-            "KeyS"
-          )
-            ? 1
-            : 0
-        );
-
-      const right =
-        (
-          keys.has(
-            "KeyD"
-          )
-            ? 1
-            : 0
-        ) -
-        (
-          keys.has(
-            "KeyA"
-          )
-            ? 1
-            : 0
-        );
-
-      const sprint =
-        keys.has(
-          "ShiftLeft"
-        ) &&
-        player.stamina >
-        1;
-
-      const speed =
-        sprint
-          ? 7.4
-          : 4.2;
-
-      const sin =
-        Math.sin(
-          player.yaw
-        );
-
-      const cos =
-        Math.cos(
-          player.yaw
-        );
-
-      player.x +=
-        (
-          -sin *
-            forward +
-          cos *
-            right
-        ) *
-        speed *
-        dt;
-
-      player.z +=
-        (
-          -cos *
-            forward -
-          sin *
-            right
-        ) *
-        speed *
-        dt;
-
-      player.x =
-        clamp(
-          player.x,
-          -160,
-          160
-        );
-
-      player.z =
-        clamp(
-          player.z,
-          -160,
-          160
-        );
-
-      player.stamina =
-        clamp(
-          player.stamina +
-          (
-            sprint &&
-            (
-              forward ||
-              right
-            )
-              ? -18
-              : 13
-          ) *
-          dt,
-
-          0,
-          100
-        );
-
-      player.hunger =
-        clamp(
-          player.hunger -
-          0.18 *
-          dt,
-
-          0,
-          100
-        );
-
-      playerModel.position.set(
-        player.x,
-        0,
-        player.z
-      );
-
-      playerModel.rotation.y =
-        player.yaw;
-
-      const playerData =
-        playerModel.userData;
-
-      playerData.time +=
-        dt;
-
-      playerData.legs
-        .forEach(
-          (
-            leg,
-            index
-          ) => {
-            leg.rotation.x =
-              (
-                forward ||
-                right
-              )
-
-                ? Math.sin(
-                    playerData.time *
-                    (
-                      sprint
-                        ? 12
-                        : 8
-                    ) +
-                    index *
-                    Math.PI
-                  ) *
-                  0.55
-
-                : 0;
-          }
-        );
-
-      /* THIRD PERSON CAMERA */
-
-      camera.position.set(
-        player.x +
-        Math.sin(
-          player.yaw
-        ) *
-        7,
-
-        3.5 +
-        player.pitch *
-        3,
-
-        player.z +
-        Math.cos(
-          player.yaw
-        ) *
-        7
-      );
-
-      camera.lookAt(
-        player.x,
-        1.5,
-        player.z
-      );
-
-      /* CREATURE AI */
-
-      creatures.forEach(
-        creature => {
-          if (
-            !creature.alive
-          ) {
-            return;
-          }
-
-          if (
-            now >
-            creature
-              .changeDirectionAt
-          ) {
-            creature.direction +=
-              rand(
-                -1.4,
-                1.4
-              );
-
-            creature
-              .changeDirectionAt =
-              now +
-              rand(
-                1200,
-                3200
-              );
-          }
-
-          creature.x +=
-            Math.sin(
-              creature.direction
-            ) *
-            creature.species
-              .speed *
-            0.14 *
-            dt;
-
-          creature.z +=
-            Math.cos(
-              creature.direction
-            ) *
-            creature.species
-              .speed *
-            0.14 *
-            dt;
-
-          creature.model
-            .position.x =
-            creature.x;
-
-          creature.model
-            .position.z =
-            creature.z;
-
-          creature.model
-            .rotation.y =
-            creature.direction;
-
-          animatePal(
-            creature,
-            dt,
-            true
-          );
-        }
-      );
-
-      /* FOLLOWING PAL */
-
-      if (companion) {
-        const targetX =
-          player.x +
-          Math.cos(
-            player.yaw
-          ) *
-          2;
-
-        const targetZ =
-          player.z -
-          Math.sin(
-            player.yaw
-          ) *
-          2;
-
-        companion.model
-          .position.x +=
-          (
-            targetX -
-            companion.model
-              .position.x
-          ) *
-          Math.min(
-            1,
-            dt *
-            4
-          );
-
-        companion.model
-          .position.z +=
-          (
-            targetZ -
-            companion.model
-              .position.z
-          ) *
-          Math.min(
-            1,
-            dt *
-            4
-          );
-
-        animatePal(
-          {
-            model:
-              companion.model
-          },
-          dt,
-          true
-        );
-      }
-
-      findTarget();
-
-      updateHUD();
-
-      if (
-        now -
-        saveTime >
-        5000
-      ) {
-        Object.assign(
-          game,
-          {
-            x:
-              player.x,
-
-            z:
-              player.z,
-
-            hp:
-              player.hp,
-
-            stamina:
-              player.stamina,
-
-            hunger:
-              player.hunger
-          }
-        );
-
-        palsSave(game);
-
-        saveTime = now;
-      }
-
-      renderer.render(
-        scene,
-        camera
-      );
-
-      GameCenter.raf =
-        requestAnimationFrame(
-          loop
-        );
-    }
-
-    GameCenter.raf =
-      requestAnimationFrame(
-        loop
-      );
-
-    addFeed(
-      "32 original creature species loaded"
-    );
-
-    addFeed(
-      "Different creature body constructions are active"
-    );
-
-    addFeed(
-      "Weaken a creature then press Q to capture"
-    );
-
-  } catch (error) {
-    console.error(error);
-
-    $("#contentBody").innerHTML = `
-      <div class="pals-card">
-
-        <h3>
-          GALAXY PALS failed to start
-        </h3>
-
-        <p>
-          ${esc(error.message)}
-        </p>
-
-      </div>
-    `;
-  }
-}
-
-/* =========================================================
-   OPEN GAME
-   ========================================================= */
-
-function openGame(id) {
-  cleanup3D();
-
-  const games = {
-    chess:
-      openChess,
-
-    tictactoe:
-      openTTT,
-
-    connect4:
-      openConnect4,
-
-    memory:
-      openMemory,
-
-    arena:
-      openArena,
-
-    snake:
-      openSnake,
-
-    chicken:
-      openChicken,
-
-    pals:
-      openPals
-  };
-
-  (
-    games[id] ||
-    renderGames
-  )();
-}
-
-/* =========================================================
-   GLOBAL CLICK HANDLER
-   ========================================================= */
-
-document.addEventListener(
-  "click",
-  event => {
-    const target =
-      event.target.closest(
-        "button,[data-game-open],[data-view]"
-      );
-
-    if (!target) {
-      return;
-    }
-
-    if (
-      target.dataset.action ===
-      "new-chat"
-    ) {
-      newChat();
-    }
-
-    if (
-      target.dataset.action ===
-      "send"
-    ) {
-      sendMessage();
-    }
-
-    if (
-      target.dataset.action ===
-      "work-send"
-    ) {
-      sendWork();
-    }
-
-    if (
-      target.dataset.view
-    ) {
-      setView(
-        target.dataset.view
-      );
-    }
-
-    if (
-      target.dataset.gameOpen
-    ) {
-      openGame(
-        target.dataset
-          .gameOpen
-      );
-    }
-
-    if (
-      target.hasAttribute(
-        "data-game-back"
-      )
-    ) {
-      renderGames();
-    }
-
-    if (
-      target.dataset.ttt !=
-      null
-    ) {
-      tttMove(
-        Number(
-          target.dataset.ttt
-        )
-      );
-    }
-
-    if (
-      target.hasAttribute(
-        "data-ttt-reset"
-      )
-    ) {
-      openTTT();
-    }
-
-    if (
-      target.dataset.c4 !=
-      null
-    ) {
-      connectMove(
-        Number(
-          target.dataset.c4
-        )
-      );
-    }
-
-    if (
-      target.hasAttribute(
-        "data-c4-reset"
-      )
-    ) {
-      openConnect4();
-    }
-
-    if (
-      target.dataset.memory !=
-      null
-    ) {
-      memoryFlip(
-        Number(
-          target.dataset
-            .memory
-        )
-      );
-    }
-
-    if (
-      target.hasAttribute(
-        "data-memory-reset"
-      )
-    ) {
-      openMemory();
-    }
-
-    if (
-      target.hasAttribute(
-        "data-snake-reset"
-      )
-    ) {
-      openSnake();
-    }
-
-    if (
-      target.hasAttribute(
-        "data-chicken-reset"
-      )
-    ) {
-      openChicken();
-    }
-
-    if (
-      target.dataset.chess
-    ) {
-      const [
-        row,
-        col
-      ] =
-        target.dataset
-          .chess
-          .split(",")
-          .map(Number);
-
-      chessClick(
-        row,
-        col
-      );
-    }
-
-    if (
-      target.hasAttribute(
-        "data-chess-reset"
-      )
-    ) {
-      openChess();
-    }
-
-    if (
-      target.hasAttribute(
-        "data-pals-start"
-      )
-    ) {
-      startPals();
-    }
-
-    if (
-      target.hasAttribute(
-        "data-pals-reset"
-      )
-    ) {
-      localStorage.removeItem(
-        PALS_SAVE
-      );
-
-      GameCenter.pals =
-        palsDefault();
-
-      openPals();
-    }
-  }
+$$("[data-view]").forEach(
+button => {
+
+button.classList.toggle(
+"active",
+button.dataset.view ===
+name
 );
 
-/* =========================================================
-   KEYBOARD
-   ========================================================= */
+}
+);
 
-document.addEventListener(
-  "keydown",
-  event => {
+if (
+name !== "games"
+) {
 
-    if (
-      GameCenter.current ===
-      "snake"
-    ) {
-      const game =
-        GameCenter.snake;
+cleanup3D();
 
-      const move =
-        {
-          ArrowUp:
-            [0, -1],
+}
 
-          KeyW:
-            [0, -1],
+if (
+name === "games"
+) {
 
-          ArrowDown:
-            [0, 1],
+renderGames();
 
-          KeyS:
-            [0, 1],
+} else if (
+name === "projects"
+) {
 
-          ArrowLeft:
-            [-1, 0],
+renderSimplePage(
+"Projects",
+"Your GALAXY projects will appear here."
+);
 
-          KeyA:
-            [-1, 0],
+} else if (
+name === "library"
+) {
 
-          ArrowRight:
-            [1, 0],
+renderSimplePage(
+"Library",
+"Files, images and generated assets."
+);
 
-          KeyD:
-            [1, 0]
-        }[
-          event.code
-        ];
+} else if (
+name === "studio"
+) {
 
-      if (
-        move &&
-        !(
-          move[0] ===
-            -game.direction[0] &&
-          move[1] ===
-            -game.direction[1]
-        )
-      ) {
-        game.nextDirection =
-          move;
-      }
-    }
+renderSimplePage(
+"Create Studio",
+"Image and video creative tools."
+);
 
-    if (
-      GameCenter.current ===
-      "chicken"
-    ) {
-      const move =
-        {
-          ArrowUp:
-            [0, -1],
+}
 
-          KeyW:
-            [0, -1],
+}
 
-          ArrowDown:
-            [0, 1],
 
-          KeyS:
-            [0, 1],
+function renderSimplePage(
+title,
+text
+) {
 
-          ArrowLeft:
-            [-1, 0],
+if (
+$("#contentTitle")
+) {
 
-          KeyA:
-            [-1, 0],
+$("#contentTitle")
+.textContent =
+title;
 
-          ArrowRight:
-            [1, 0],
+}
 
-          KeyD:
-            [1, 0]
-        }[
-          event.code
-        ];
+if (
+$("#contentEyebrow")
+) {
 
-      if (move) {
-        chickenMove(
-          ...move
-        );
-      }
-    }
+$("#contentEyebrow")
+.textContent =
+"GALAXY";
 
-    if (
-      event.code ===
-        "Enter" &&
-      !event.shiftKey &&
-      document.activeElement ===
-        $("#promptInput")
-    ) {
-      event.preventDefault();
+}
 
-      sendMessage();
-    }
+if (
+$("#contentBody")
+) {
 
-    if (
-      event.code ===
-        "Enter" &&
-      !event.shiftKey &&
-      document.activeElement ===
-        $("#workPrompt")
-    ) {
-      event.preventDefault();
+$("#contentBody")
+.innerHTML = `
 
-      sendWork();
-    }
-  }
+<div class="panel">
+
+<h3>
+${escapeHTML(title)}
+</h3>
+
+<p>
+${escapeHTML(text)}
+</p>
+
+</div>
+
+`;
+
+}
+
+}
+
+
+function newChat() {
+
+state.messages = [];
+
+if (
+$("#messages")
+) {
+
+$("#messages")
+.innerHTML =
+"";
+
+}
+
+$("#chatEmpty")
+?.classList
+.remove(
+"hidden"
 );
 
 $("#promptInput")
-  ?.addEventListener(
-    "input",
-    event =>
-      autoResize(
-        event.target
-      )
-  );
+?.focus();
 
-window.GALAXY = {
-  state,
-  GameCenter,
-  setView,
-  newChat,
-  sendMessage,
-  sendWork,
-  renderGames,
-  openPals,
-  startPals
+setView(
+"chat"
+);
+
+}
+
+
+function autoResize(el) {
+
+if (!el) {
+
+return;
+
+}
+
+el.style.height =
+"auto";
+
+el.style.height =
+`${Math.min(
+el.scrollHeight,
+180
+)}px`;
+
+}
+
+
+/* ============================================================
+CHAT
+============================================================ */
+
+function renderMessage(
+role,
+text
+) {
+
+const root =
+$("#messages");
+
+if (!root) {
+
+return;
+
+}
+
+$("#chatEmpty")
+?.classList
+.add(
+"hidden"
+);
+
+const row =
+document.createElement(
+"div"
+);
+
+row.className =
+`message ${role}`;
+
+const bubble =
+document.createElement(
+"div"
+);
+
+bubble.className =
+"bubble";
+
+bubble.textContent =
+text;
+
+row.appendChild(
+bubble
+);
+
+root.appendChild(
+row
+);
+
+row.scrollIntoView({
+
+behavior: "smooth",
+
+block: "end"
+
+});
+
+}
+
+
+function updateSendButtonState() {
+
+const button =
+$("#sendButton");
+
+if (!button) {
+
+return;
+
+}
+
+button.textContent =
+state.generating
+? "■"
+: "↑";
+
+button.classList.toggle(
+"is-stop",
+state.generating
+);
+
+button.setAttribute(
+"aria-label",
+state.generating
+? "Stop"
+: "Send"
+);
+
+}
+
+
+/* ============================================================
+GEMINI
+============================================================ */
+
+async function fetchAIResponse(
+message,
+includeHistory = true
+) {
+
+const creatorContext =
+"You are GALAXY AI. " +
+"GALAXY AI was created and founded by Harshavardhan. " +
+"If asked who created, made, founded, designed or owns GALAXY AI, " +
+"answer: Harshavardhan created GALAXY AI. " +
+"GALAXY uses Gemini through an API for AI responses. " +
+"Be helpful, intelligent, clear and concise.";
+
+const payload = {
+
+message,
+
+prompt:
+message,
+
+mode:
+includeHistory
+? "chat"
+: "work",
+
+system:
+creatorContext,
+
+messages: [
+
+{
+
+role: "system",
+
+content:
+creatorContext
+
+},
+
+...(
+includeHistory
+
+? state.messages
+.slice(
+0,
+-1
+)
+.slice(
+-20
+)
+.map(
+item => ({
+
+role:
+item.role,
+
+content:
+item.text
+
+})
+)
+
+: []
+
+),
+
+{
+
+role: "user",
+
+content:
+message
+
+}
+
+]
+
 };
 
-setView("chat");
+const response =
+await fetch(
+
+"/api/gemini",
+
+{
+
+method:
+"POST",
+
+headers: {
+
+"Content-Type":
+"application/json"
+
+},
+
+body:
+JSON.stringify(
+payload
+)
+
+}
+
+);
+
+const data =
+await response
+.json()
+.catch(
+() => ({})
+);
+
+if (
+!response.ok
+) {
+
+throw new Error(
+
+data.error ||
+
+data.message ||
+
+`Backend error ${response.status}`
+
+);
+
+}
+
+return (
+
+data.text ||
+
+data.reply ||
+
+data.output ||
+
+data.response ||
+
+data.message ||
+
+"GALAXY received your request."
+
+);
+
+}
+
+
+async function sendMessage() {
+
+const input =
+$("#promptInput");
+
+if (
+!input ||
+state.generating
+) {
+
+return;
+
+}
+
+const text =
+input.value.trim();
+
+if (!text) {
+
+return;
+
+}
+
+input.value =
+"";
+
+autoResize(
+input
+);
+
+state.messages.push({
+
+role: "user",
+
+text
+
+});
+
+renderMessage(
+"user",
+text
+);
+
+state.generating =
+true;
+
+updateSendButtonState();
+
+if (
+$("#draftState")
+) {
+
+$("#draftState")
+.textContent =
+"GALAXY is thinking…";
+
+}
+
+try {
+
+const reply =
+await fetchAIResponse(
+text
+);
+
+state.messages.push({
+
+role: "assistant",
+
+text: reply
+
+});
+
+renderMessage(
+"assistant",
+reply
+);
+
+} catch (error) {
+
+renderMessage(
+
+"assistant",
+
+`GALAXY error: ${error.message}`
+
+);
+
+toast(
+error.message,
+"error"
+);
+
+} finally {
+
+state.generating =
+false;
+
+updateSendButtonState();
+
+if (
+$("#draftState")
+) {
+
+$("#draftState")
+.textContent =
+"Ready";
+
+}
+
+}
+
+}
+
+
+async function sendWork() {
+
+const input =
+$("#workPrompt");
+
+const output =
+$("#workOutput");
+
+if (
+!input ||
+!output
+) {
+
+return;
+
+}
+
+const prompt =
+input.value.trim();
+
+if (!prompt) {
+
+return;
+
+}
+
+output.textContent =
+"GALAXY is working…";
+
+try {
+
+output.textContent =
+await fetchAIResponse(
+prompt,
+false
+);
+
+} catch (error) {
+
+output.textContent =
+`GALAXY error: ${error.message}`;
+
+toast(
+error.message,
+"error"
+);
+
+}
+
+}
+
+
+/* ============================================================
+GAMING CENTER
+============================================================ */
+
+function gameCard(
+id,
+icon,
+title,
+subtitle
+) {
+
+return `
+
+<button
+class="game-card"
+data-game-open="${id}"
+>
+
+<div
+class="game-card-visual"
+>
+${icon}
+</div>
+
+<div
+class="game-card-copy"
+>
+
+<strong>
+${title}
+</strong>
+
+<span>
+${subtitle}
+</span>
+
+</div>
+
+</button>
+
+`;
+
+}
+
+
+function renderGames() {
+
+cleanup3D();
+
+clearGameTimers();
+
+GameCenter.current =
+null;
+
+if (
+$("#contentTitle")
+) {
+
+$("#contentTitle")
+.textContent =
+"Gaming Center";
+
+}
+
+if (
+$("#contentEyebrow")
+) {
+
+$("#contentEyebrow")
+.textContent =
+"PLAY WITH GALAXY";
+
+}
+
+const body =
+$("#contentBody");
+
+if (!body) {
+
+return;
+
+}
+
+body.innerHTML = `
+
+<div
+class="games-home"
+>
+
+<div
+class="games-hero"
+>
+
+<div>
+
+<span
+class="eyebrow"
+>
+GALAXY GAMING
+</span>
+
+<h2>
+Choose a game
+</h2>
+
+<p>
+Classic games,
+3D arena combat
+and creature survival.
+</p>
+
+</div>
+
+<div
+class="games-hero-mark"
+>
+✦
+</div>
+
+</div>
+
+<div
+class="games-grid"
+>
+
+${gameCard(
+"chess",
+"♟",
+"Chess",
+"vs GALAXY or Friend • Levels • Review"
+)}
+
+${gameCard(
+"tictactoe",
+"✕○",
+"Tic-Tac-Toe",
+"vs GALAXY or Friend"
+)}
+
+${gameCard(
+"connect4",
+"●●",
+"Connect Four",
+"vs GALAXY or Friend"
+)}
+
+${gameCard(
+"memory",
+"▦",
+"Memory",
+"Match pairs • Score"
+)}
+
+${gameCard(
+"arena",
+"⌖",
+"GALAXY Arena",
+"3D FPS • Bots • FFA • Practice"
+)}
+
+${gameCard(
+"snake",
+"◉",
+"Snake",
+"Single player • Levels • High score"
+)}
+
+${gameCard(
+"chicken",
+"🐔",
+"Chicken Crossing",
+"Road • Safe grass • Levels"
+)}
+
+${gameCard(
+"pals",
+"✦",
+"GALAXY PALS",
+"Full 3D creatures • Capture • Mounts • Bosses"
+)}
+
+</div>
+
+</div>
+
+`;
+
+}
+
+
+function gameTop(
+title,
+message,
+extra = ""
+) {
+
+return `
+
+<div
+class="game-topline"
+>
+
+<button
+class="secondary-btn"
+data-game-back
+>
+← Games
+</button>
+
+<div
+class="game-status"
+>
+${escapeHTML(message)}
+</div>
+
+${extra}
+
+</div>
+
+`;
+
+}
+
+
+function modeSelect(game) {
+
+return `
+
+<div
+class="game-toolbar"
+>
+
+<select
+data-mode
+>
+
+<option
+value="galaxy"
+${
+game.mode ===
+"galaxy"
+? "selected"
+: ""
+}
+>
+You vs GALAXY
+</option>
+
+<option
+value="friend"
+${
+game.mode ===
+"friend"
+? "selected"
+: ""
+}
+>
+You vs Friend
+</option>
+
+</select>
+
+<select
+data-level
+${
+game.mode ===
+"friend"
+? "disabled"
+: ""
+}
+>
+
+${
+GAME_LEVELS
+.map(
+level => `
+
+<option
+${
+level ===
+game.elo
+? "selected"
+: ""
+}
+>
+${level}
+</option>
+
+`
+)
+.join("")
+}
+
+</select>
+
+</div>
+
+`;
+
+}
+
+
+/* ============================================================
+CHESS
+============================================================ */
+
+const CHESS_P = {
+
+r: "♜",
+
+n: "♞",
+
+b: "♝",
+
+q: "♛",
+
+k: "♚",
+
+p: "♟",
+
+R: "♖",
+
+N: "♘",
+
+B: "♗",
+
+Q: "♕",
+
+K: "♔",
+
+P: "♙"
+
+};
+
+
+const CHESS_V = {
+
+p: 1,
+
+n: 3,
+
+b: 3,
+
+r: 5,
+
+q: 9,
+
+k: 100
+
+};
+
+
+function chessBoard() {
+
+return [
+
+"rnbqkbnr"
+.split(""),
+
+"pppppppp"
+.split(""),
+
+...Array.from(
+
+{
+length: 4
+},
+
+() =>
+Array(8)
+.fill("")
+
+),
+
+"PPPPPPPP"
+.split(""),
+
+"RNBQKBNR"
+.split("")
+
+];
+
+}
+
+
+const white =
+piece =>
+piece &&
+piece ===
+piece.toUpperCase();
+
+
+const same =
+(
+a,
+b
+) =>
+a &&
+b &&
+white(a) ===
+white(b);
+
+
+function chessMoves(
+board,
+r,
+c
+) {
+
+const piece =
+board[r][c];
+
+if (!piece) {
+
+return [];
+
+}
+
+const isWhite =
+white(piece);
+
+const type =
+piece.toLowerCase();
+
+const moves =
+[];
+
+const add =
+(
+rr,
+cc
+) => {
+
+if (
+rr < 0 ||
+rr > 7 ||
+cc < 0 ||
+cc > 7
+) {
+
+return false;
+
+}
+
+if (
+!board[rr][cc]
+) {
+
+moves.push([
+rr,
+cc
+]);
+
+return true;
+
+}
+
+if (
+!same(
+piece,
+board[rr][cc]
+)
+) {
+
+moves.push([
+rr,
+cc
+]);
+
+}
+
+return false;
+
+};
+
+
+if (
+type === "p"
+) {
+
+const direction =
+isWhite
+? -1
+: 1;
+
+const start =
+isWhite
+? 6
+: 1;
+
+if (
+
+r + direction >= 0 &&
+
+r + direction < 8 &&
+
+!board[
+r + direction
+][c]
+
+) {
+
+moves.push([
+r + direction,
+c
+]);
+
+if (
+
+r === start &&
+
+!board[
+r +
+2 *
+direction
+][c]
+
+) {
+
+moves.push([
+
+r +
+2 *
+direction,
+
+c
+
+]);
+
+}
+
+}
+
+[-1, 1]
+.forEach(
+dc => {
+
+const rr =
+r +
+direction;
+
+const cc =
+c +
+dc;
+
+if (
+
+rr >= 0 &&
+
+rr < 8 &&
+
+cc >= 0 &&
+
+cc < 8 &&
+
+board[rr][cc] &&
+
+!same(
+piece,
+board[rr][cc]
+)
+
+) {
+
+moves.push([
+rr,
+cc
+]);
+
+}
+
+}
+);
+
+}
+
+
+if (
+type === "n"
+) {
+
+[
+[2, 1],
+[2, -1],
+[-2, 1],
+[-2, -1],
+[1, 2],
+[1, -2],
+[-1, 2],
+[-1, -2]
+]
+.forEach(
+([dr, dc]) =>
+
+add(
+r + dr,
+c + dc
+)
+
+);
+
+}
+
+
+if (
+type === "k"
+) {
+
+for (
+let dr = -1;
+dr <= 1;
+dr++
+) {
+
+for (
+let dc = -1;
+dc <= 1;
+dc++
+) {
+
+if (
+dr ||
+dc
+) {
+
+add(
+r + dr,
+c + dc
+);
+
+}
+
+}
+
+}
+
+}
+
+
+if (
+"rbq"
+.includes(type)
+) {
+
+const directions =
+[];
+
+if (
+"rq"
+.includes(type)
+) {
+
+directions.push(
+
+[1, 0],
+
+[-1, 0],
+
+[0, 1],
+
+[0, -1]
+
+);
+
+}
+
+if (
+"bq"
+.includes(type)
+) {
+
+directions.push(
+
+[1, 1],
+
+[1, -1],
+
+[-1, 1],
+
+[-1, -1]
+
+);
+
+}
+
+directions.forEach(
+([dr, dc]) => {
+
+let rr =
+r + dr;
+
+let cc =
+c + dc;
+
+while (
+
+rr >= 0 &&
+
+rr < 8 &&
+
+cc >= 0 &&
+
+cc < 8
+
+) {
+
+if (
+!add(
+rr,
+cc
+)
+) {
+
+break;
+
+}
+
+rr += dr;
+
+cc += dc;
+
+}
+
+}
+);
+
+}
+
+return moves;
+
+}
+
+
+function allChess(side) {
+
+const game =
+GameCenter.chess;
+
+const result =
+[];
+
+game.board.forEach(
+(
+row,
+r
+) => {
+
+row.forEach(
+(
+piece,
+c
+) => {
+
+if (
+
+piece &&
+
+(
+(
+side ===
+"white"
+) ===
+white(piece)
+)
+
+) {
+
+chessMoves(
+game.board,
+r,
+c
+)
+.forEach(
+to => {
+
+result.push({
+
+from: [
+r,
+c
+],
+
+to,
+
+p:
+piece,
+
+target:
+game.board[
+to[0]
+][
+to[1]
+]
+
+});
+
+}
+);
+
+}
+
+}
+);
+
+}
+);
+
+return result;
+
+}
+
+
+function scoreChess(move) {
+
+return (
+
+(
+move.target
+
+? (
+CHESS_V[
+move.target
+.toLowerCase()
+] ||
+0
+) *
+10
+
+: 0
+)
+
++
+
+Math.max(
+
+0,
+
+7 -
+(
+Math.abs(
+3.5 -
+move.to[0]
+)
++
+Math.abs(
+3.5 -
+move.to[1]
+)
+)
+
+)
+
+);
+
+}
+
+
+function resetChess(
+keep = true
+) {
+
+const old =
+GameCenter.chess ||
+{};
+
+GameCenter.chess = {
+
+board:
+chessBoard(),
+
+turn:
+"white",
+
+selected:
+null,
+
+legal:
+[],
+
+mode:
+keep
+? old.mode ||
+"galaxy"
+: "galaxy",
+
+elo:
+keep
+? old.elo ||
+500
+: 500,
+
+history:
+[],
+
+snapshots:
+[],
+
+finished:
+false,
+
+message:
+"Your turn"
+
+};
+
+renderChess();
+
+}
+
+
+function applyChess(
+move,
+actor
+) {
+
+const game =
+GameCenter.chess;
+
+game.snapshots.push(
+clone({
+
+board:
+game.board,
+
+turn:
+game.turn,
+
+history:
+game.history,
+
+finished:
+game.finished,
+
+message:
+game.message
+
+})
+);
+
+game.board[
+move.to[0]
+][
+move.to[1]
+] =
+move.p;
+
+game.board[
+move.from[0]
+][
+move.from[1]
+] =
+"";
+
+if (
+move.p === "P" &&
+move.to[0] === 0
+) {
+
+game.board[
+move.to[0]
+][
+move.to[1]
+] =
+"Q";
+
+}
+
+if (
+move.p === "p" &&
+move.to[0] === 7
+) {
+
+game.board[
+move.to[0]
+][
+move.to[1]
+] =
+"q";
+
+}
+
+game.history.push(
+`${actor}: ${move.from.join(",")} → ${move.to.join(",")}`
+);
+
+game.selected =
+null;
+
+game.legal =
+[];
+
+game.turn =
+game.turn ===
+"white"
+? "black"
+: "white";
+
+const pieces =
+game.board.flat();
+
+if (
+
+!pieces.includes(
+"K"
+) ||
+
+!pieces.includes(
+"k"
+)
+
+) {
+
+game.finished =
+true;
+
+game.message =
+pieces.includes(
+"K"
+)
+
+? "🏆 You Win!"
+
+: `🏆 ${
+game.mode ===
+"friend"
+? "Friend"
+: "GALAXY"
+} Wins!`;
+
+}
+
+}
+
+
+function clickChess(
+r,
+c
+) {
+
+const game =
+GameCenter.chess;
+
+if (
+
+!game ||
+
+game.finished ||
+
+(
+game.mode ===
+"galaxy" &&
+game.turn !==
+"white"
+)
+
+) {
+
+return;
+
+}
+
+if (
+game.selected
+) {
+
+const allowed =
+game.legal.some(
+position =>
+position[0] === r &&
+position[1] === c
+);
+
+if (allowed) {
+
+const [
+fromR,
+fromC
+] =
+game.selected;
+
+const piece =
+game.board[
+fromR
+][
+fromC
+];
+
+applyChess(
+
+{
+
+from: [
+fromR,
+fromC
+],
+
+to: [
+r,
+c
+],
+
+p:
+piece,
+
+target:
+game.board[r][c]
+
+},
+
+game.mode ===
+"friend"
+
+? (
+game.turn ===
+"white"
+? "Player 1"
+: "Friend"
+)
+
+: "You"
+
+);
+
+game.message =
+
+game.finished
+
+? game.message
+
+: (
+
+game.mode ===
+"friend"
+
+? `${
+game.turn ===
+"white"
+? "Player 1"
+: "Friend"
+} turn`
+
+: "GALAXY is thinking…"
+
+);
+
+renderChess();
+
+if (
+
+game.mode ===
+"galaxy" &&
+
+!game.finished
+
+) {
+
+trackTimer(
+setTimeout(
+galaxyChess,
+250
+)
+);
+
+}
+
+return;
+
+}
+
+}
+
+const piece =
+game.board[r][c];
+
+const side =
+game.mode ===
+"friend"
+? game.turn
+: "white";
+
+if (
+
+piece &&
+
+(
+(
+side === "white"
+) ===
+white(piece)
+)
+
+) {
+
+game.selected = [
+r,
+c
+];
+
+game.legal =
+chessMoves(
+game.board,
+r,
+c
+);
+
+} else {
+
+game.selected =
+null;
+
+game.legal =
+[];
+
+}
+
+renderChess();
+
+}
+
+
+function galaxyChess() {
+
+const game =
+GameCenter.chess;
+
+if (
+!game ||
+game.finished
+) {
+
+return;
+
+}
+
+const moves =
+allChess(
+"black"
+);
+
+if (
+!moves.length
+) {
+
+game.finished =
+true;
+
+game.message =
+"Draw";
+
+renderChess();
+
+return;
+
+}
+
+moves.sort(
+(
+a,
+b
+) =>
+scoreChess(b) -
+scoreChess(a)
+);
+
+const smart =
+Math.random() <
+clamp(
+
+0.25 +
+game.elo /
+1600,
+
+0.25,
+
+0.95
+
+);
+
+const move =
+smart
+
+? pick(
+moves.slice(
+0,
+Math.min(
+4,
+moves.length
+)
+)
+)
+
+: pick(
+moves
+);
+
+applyChess(
+move,
+"GALAXY"
+);
+
+game.message =
+game.finished
+? game.message
+: "Your turn";
+
+renderChess();
+
+}
+
+
+function renderChess() {
+
+const game =
+GameCenter.chess;
+
+if (!game) {
+
+resetChess();
+
+return;
+
+}
+
+GameCenter.current =
+"chess";
+
+const body =
+$("#contentBody");
+
+body.innerHTML = `
+
+<div
+class="game-shell"
+>
+
+${
+gameTop(
+"Chess",
+game.message,
+modeSelect(game)
+)
+}
+
+<div
+class="game-layout"
+>
+
+<div
+class="chess-board-wrap"
+>
+
+<div
+class="chess-board"
+>
+
+${
+game.board
+.map(
+(
+row,
+r
+) =>
+
+row
+.map(
+(
+piece,
+c
+) => {
+
+const selected =
+game.selected?.[0] === r &&
+game.selected?.[1] === c;
+
+const legal =
+game.legal.some(
+position =>
+position[0] === r &&
+position[1] === c
+);
+
+return `
+
+<button
+class="
+chess-square
+${
+(r + c) %
+2
+? "dark"
+: "light"
+}
+${
+selected
+? "selected"
+: ""
+}
+${
+legal
+? "legal"
+: ""
+}
+${
+legal &&
+piece
+? "capture"
+: ""
+}
+"
+data-chess="${r},${c}"
+>
+
+${
+piece
+
+? `
+
+<span
+class="
+chess-piece
+${
+white(
+piece
+)
+? "silver-piece"
+: "gold-piece"
+}
+"
+>
+${CHESS_P[piece]}
+</span>
+
+`
+
+: ""
+
+}
+
+</button>
+
+`;
+
+}
+)
+.join("")
+
+)
+.join("")
+}
+
+</div>
+
+</div>
+
+<div
+class="game-side-panel"
+>
+
+<div
+class="player-card"
+>
+
+<strong>
+You
+</strong>
+
+<span>
+White
+</span>
+
+</div>
+
+<div
+class="player-card"
+>
+
+<strong>
+${
+game.mode ===
+"friend"
+? "Friend"
+: "GALAXY"
+}
+</strong>
+
+<span>
+Black •
+${game.elo} ELO
+</span>
+
+</div>
+
+<div
+class="move-history"
+>
+
+<strong>
+Moves
+</strong>
+
+<div
+class="move-history-list"
+>
+
+${
+game.history
+.map(
+escapeHTML
+)
+.map(
+move =>
+`<div>${move}</div>`
+)
+.join("")
+||
+"No moves yet"
+}
+
+</div>
+
+</div>
+
+<button
+class="secondary-btn"
+data-chess-undo
+>
+Undo
+</button>
+
+<button
+class="primary-btn"
+data-chess-reset
+>
+New Game
+</button>
+
+</div>
+
+</div>
+
+</div>
+
+`;
+
+}
+
+
+/* ============================================================
+TIC TAC TOE
+============================================================ */
+
+const TWIN = [
+
+[0, 1, 2],
+
+[3, 4, 5],
+
+[6, 7, 8],
+
+[0, 3, 6],
+
+[1, 4, 7],
+
+[2, 5, 8],
+
+[0, 4, 8],
+
+[2, 4, 6]
+
+];
+
+
+function tWinner(board) {
+
+for (
+const [
+a,
+b,
+c
+] of TWIN
+) {
+
+if (
+
+board[a] &&
+
+board[a] ===
+board[b] &&
+
+board[a] ===
+board[c]
+
+) {
+
+return board[a];
+
+}
+
+}
+
+return board.every(
+Boolean
+)
+? "draw"
+: null;
+
+}
+
+
+function tBest(
+board,
+symbol
+) {
+
+for (
+let i = 0;
+i < 9;
+i++
+) {
+
+if (
+!board[i]
+) {
+
+const test =
+[...board];
+
+test[i] =
+symbol;
+
+if (
+tWinner(test) ===
+symbol
+) {
+
+return i;
+
+}
+
+}
+
+}
+
+const enemy =
+symbol === "X"
+? "O"
+: "X";
+
+for (
+let i = 0;
+i < 9;
+i++
+) {
+
+if (
+!board[i]
+) {
+
+const test =
+[...board];
+
+test[i] =
+enemy;
+
+if (
+tWinner(test) ===
+enemy
+) {
+
+return i;
+
+}
+
+}
+
+}
+
+if (
+!board[4]
+) {
+
+return 4;
+
+}
+
+return (
+
+pick(
+board
+.map(
+(
+value,
+index
+) =>
+value
+? null
+: index
+)
+.filter(
+value =>
+value !==
+null
+)
+)
+
+??
+
+-1
+
+);
+
+}
+
+
+function resetTTT(
+keep = true
+) {
+
+const old =
+GameCenter.ttt ||
+{};
+
+GameCenter.ttt = {
+
+board:
+Array(9)
+.fill(""),
+
+turn:
+"X",
+
+mode:
+keep
+? old.mode ||
+"galaxy"
+: "galaxy",
+
+elo:
+keep
+? old.elo ||
+500
+: 500,
+
+finished:
+false,
+
+message:
+"Your turn",
+
+snapshots:
+[]
+
+};
+
+renderTTT();
+
+}
+
+
+function tMove(index) {
+
+const game =
+GameCenter.ttt;
+
+if (
+
+!game ||
+
+game.finished ||
+
+game.board[index] ||
+
+(
+game.mode ===
+"galaxy" &&
+game.turn !==
+"X"
+)
+
+) {
+
+return;
+
+}
+
+game.snapshots.push(
+clone(game)
+);
+
+game.board[index] =
+game.turn;
+
+const winner =
+tWinner(
+game.board
+);
+
+if (winner) {
+
+game.finished =
+true;
+
+game.message =
+
+winner === "draw"
+
+? "Draw"
+
+: (
+
+winner === "X"
+
+? "🏆 You Win!"
+
+: `🏆 ${
+game.mode ===
+"friend"
+? "Friend"
+: "GALAXY"
+} Wins!`
+
+);
+
+renderTTT();
+
+return;
+
+}
+
+game.turn =
+game.turn === "X"
+? "O"
+: "X";
+
+if (
+game.mode ===
+"friend"
+) {
+
+game.message =
+`${
+game.turn ===
+"X"
+? "Player 1"
+: "Friend"
+} turn`;
+
+renderTTT();
+
+return;
+
+}
+
+game.message =
+"GALAXY is thinking…";
+
+renderTTT();
+
+trackTimer(
+setTimeout(
+() => {
+
+const move =
+
+Math.random() <
+clamp(
+
+0.25 +
+game.elo /
+1500,
+
+0.25,
+
+0.95
+
+)
+
+? tBest(
+game.board,
+"O"
+)
+
+: pick(
+game.board
+.map(
+(
+value,
+i
+) =>
+value
+? null
+: i
+)
+.filter(
+value =>
+value !==
+null
+)
+);
+
+if (
+move == null
+) {
+
+return;
+
+}
+
+game.board[move] =
+"O";
+
+const result =
+tWinner(
+game.board
+);
+
+if (result) {
+
+game.finished =
+true;
+
+game.message =
+result ===
+"draw"
+? "Draw"
+: "🤖 GALAXY Wins!";
+
+} else {
+
+game.turn =
+"X";
+
+game.message =
+"Your turn";
+
+}
+
+renderTTT();
+
+},
+240
+)
+);
+
+}
+
+
+function renderTTT() {
+
+const game =
+GameCenter.ttt;
+
+if (!game) {
+
+resetTTT();
+
+return;
+
+}
+
+GameCenter.current =
+"tictactoe";
+
+$("#contentBody")
+.innerHTML = `
+
+<div
+class="game-shell"
+>
+
+${
+gameTop(
+"Tic-Tac-Toe",
+game.message,
+modeSelect(game)
+)
+}
+
+<div
+class="game-layout"
+>
+
+<div
+class="ttt-board"
+>
+
+${
+game.board
+.map(
+(
+value,
+index
+) => `
+
+<button
+class="
+ttt-cell
+${
+value
+? `filled ${value.toLowerCase()}`
+: ""
+}
+"
+data-ttt="${index}"
+>
+${value}
+</button>
+
+`
+)
+.join("")
+}
+
+</div>
+
+<div
+class="game-side-panel"
+>
+
+<button
+class="primary-btn"
+data-ttt-reset
+>
+New Game
+</button>
+
+</div>
+
+</div>
+
+</div>
+
+`;
+
+}
+
+
+/* ============================================================
+CONNECT FOUR
+============================================================ */
+
+function newC4() {
+
+return Array.from(
+
+{
+length: 6
+},
+
+() =>
+Array(7)
+.fill("")
+
+);
+
+}
+
+
+function cRow(
+board,
+col
+) {
+
+for (
+let row = 5;
+row >= 0;
+row--
+) {
+
+if (
+!board[row][col]
+) {
+
+return row;
+
+}
+
+}
+
+return -1;
+
+}
+
+
+function cWin(board) {
+
+for (
+let r = 0;
+r < 6;
+r++
+) {
+
+for (
+let c = 0;
+c < 7;
+c++
+) {
+
+const symbol =
+board[r][c];
+
+if (!symbol) {
+
+continue;
+
+}
+
+for (
+const [
+dr,
+dc
+] of
+[
+[0, 1],
+[1, 0],
+[1, 1],
+[1, -1]
+]
+) {
+
+let count =
+1;
+
+for (
+let k = 1;
+k < 4;
+k++
+) {
+
+const rr =
+r +
+dr *
+k;
+
+const cc =
+c +
+dc *
+k;
+
+if (
+
+rr < 0 ||
+
+rr > 5 ||
+
+cc < 0 ||
+
+cc > 6 ||
+
+board[rr][cc] !==
+symbol
+
+) {
+
+break;
+
+}
+
+count++;
+
+}
+
+if (
+count >= 4
+) {
+
+return symbol;
+
+}
+
+}
+
+}
+
+}
+
+return board
+.flat()
+.every(Boolean)
+? "draw"
+: null;
+
+}
+
+
+function cBest(
+board,
+symbol
+) {
+
+for (
+let c = 0;
+c < 7;
+c++
+) {
+
+const row =
+cRow(
+board,
+c
+);
+
+if (
+row < 0
+) {
+
+continue;
+
+}
+
+const test =
+board.map(
+row =>
+[...row]
+);
+
+test[row][c] =
+symbol;
+
+if (
+cWin(test) ===
+symbol
+) {
+
+return c;
+
+}
+
+}
+
+const enemy =
+symbol === "R"
+? "Y"
+: "R";
+
+for (
+let c = 0;
+c < 7;
+c++
+) {
+
+const row =
+cRow(
+board,
+c
+);
+
+if (
+row < 0
+) {
+
+continue;
+
+}
+
+const test =
+board.map(
+row =>
+[...row]
+);
+
+test[row][c] =
+enemy;
+
+if (
+cWin(test) ===
+enemy
+) {
+
+return c;
+
+}
+
+}
+
+return (
+
+[
+3,
+2,
+4,
+1,
+5,
+0,
+6
+]
+.find(
+col =>
+cRow(
+board,
+col
+) >= 0
+)
+
+??
+
+-1
+
+);
+
+}
+
+
+function resetConnect(
+keep = true
+) {
+
+const old =
+GameCenter.connect ||
+{};
+
+GameCenter.connect = {
+
+board:
+newC4(),
+
+turn:
+"R",
+
+mode:
+keep
+? old.mode ||
+"galaxy"
+: "galaxy",
+
+elo:
+keep
+? old.elo ||
+500
+: 500,
+
+finished:
+false,
+
+message:
+"Your turn"
+
+};
+
+renderConnect();
+
+}
+
+
+function cMove(col) {
+
+const game =
+GameCenter.connect;
+
+if (
+
+!game ||
+
+game.finished ||
+
+(
+game.mode ===
+"galaxy" &&
+game.turn !==
+"R"
+)
+
+) {
+
+return;
+
+}
+
+const row =
+cRow(
+game.board,
+col
+);
+
+if (
+row < 0
+) {
+
+toast(
+"Column full"
+);
+
+return;
+
+}
+
+game.board[row][col] =
+game.turn;
+
+let winner =
+cWin(
+game.board
+);
+
+if (winner) {
+
+game.finished =
+true;
+
+game.message =
+
+winner === "draw"
+
+? "Draw"
+
+: (
+
+winner === "R"
+
+? "🏆 You Win!"
+
+: `🏆 ${
+game.mode ===
+"friend"
+? "Friend"
+: "GALAXY"
+} Wins!`
+
+);
+
+renderConnect();
+
+return;
+
+}
+
+game.turn =
+game.turn === "R"
+? "Y"
+: "R";
+
+if (
+game.mode ===
+"friend"
+) {
+
+game.message =
+`${
+game.turn ===
+"R"
+? "Player 1"
+: "Friend"
+} turn`;
+
+renderConnect();
+
+return;
+
+}
+
+game.message =
+"GALAXY is thinking…";
+
+renderConnect();
+
+trackTimer(
+setTimeout(
+() => {
+
+const move =
+
+Math.random() <
+clamp(
+
+0.25 +
+game.elo /
+1500,
+
+0.25,
+
+0.95
+
+)
+
+? cBest(
+game.board,
+"Y"
+)
+
+: pick(
+[
+...Array(7)
+.keys()
+]
+.filter(
+col =>
+cRow(
+game.board,
+col
+) >= 0
+)
+);
+
+const row =
+cRow(
+game.board,
+move
+);
+
+if (
+row >= 0
+) {
+
+game.board[row][move] =
+"Y";
+
+}
+
+winner =
+cWin(
+game.board
+);
+
+if (winner) {
+
+game.finished =
+true;
+
+game.message =
+winner === "draw"
+? "Draw"
+: "🤖 GALAXY Wins!";
+
+} else {
+
+game.turn =
+"R";
+
+game.message =
+"Your turn";
+
+}
+
+renderConnect();
+
+},
+260
+)
+);
+
+}
+
+
+function renderConnect() {
+
+const game =
+GameCenter.connect;
+
+if (!game) {
+
+resetConnect();
+
+return;
+
+}
+
+GameCenter.current =
+"connect4";
+
+$("#contentBody")
+.innerHTML = `
+
+<div
+class="game-shell"
+>
+
+${
+gameTop(
+"Connect Four",
+game.message,
+modeSelect(game)
+)
+}
+
+<div
+class="game-layout"
+>
+
+<div
+class="connect-board"
+>
+
+${
+game.board
+.map(
+row =>
+
+row
+.map(
+(
+value,
+col
+) => `
+
+<button
+class="
+connect-cell
+${
+value ===
+"R"
+? "red"
+: (
+value ===
+"Y"
+? "yellow"
+: ""
+)
+}
+"
+data-c4="${col}"
+aria-label="Column ${col + 1}"
+>
+
+<span></span>
+
+</button>
+
+`
+)
+.join("")
+
+)
+.join("")
+}
+
+</div>
+
+<div
+class="game-side-panel"
+>
+
+<button
+class="primary-btn"
+data-c4-reset
+>
+New Game
+</button>
+
+</div>
+
+</div>
+
+</div>
+
+`;
+
+}
+
+
+/* ============================================================
+MEMORY
+============================================================ */
+
+const MEM_ICONS = [
+
+"✦",
+"☀",
+"☁",
+"☂",
+"★",
+"◆",
+"●",
+"▲"
+
+];
+
+
+function resetMemory() {
+
+const values = [
+
+...MEM_ICONS,
+
+...MEM_ICONS
+
+]
+.sort(
+() =>
+Math.random() -
+0.5
+);
+
+GameCenter.memory = {
+
+cards:
+values.map(
+(
+value,
+index
+) => ({
+
+v: value,
+
+i: index,
+
+open: false,
+
+done: false
+
+})
+),
+
+first:
+null,
+
+locked:
+false,
+
+moves:
+0,
+
+pairs:
+0,
+
+message:
+"Find all pairs"
+
+};
+
+renderMemory();
+
+}
+
+
+function memClick(index) {
+
+const game =
+GameCenter.memory;
+
+const card =
+game.cards[index];
+
+if (
+
+!game ||
+
+game.locked ||
+
+card.open ||
+
+card.done
+
+) {
+
+return;
+
+}
+
+card.open =
+true;
+
+if (
+game.first == null
+) {
+
+game.first =
+index;
+
+renderMemory();
+
+return;
+
+}
+
+game.moves++;
+
+const first =
+game.cards[
+game.first
+];
+
+if (
+first.v ===
+card.v
+) {
+
+first.done =
+true;
+
+card.done =
+true;
+
+game.pairs++;
+
+game.first =
+null;
+
+game.message =
+game.pairs === 8
+
+? `🏆 Completed in ${game.moves} moves`
+
+: "Match!";
+
+renderMemory();
+
+} else {
+
+game.locked =
+true;
+
+renderMemory();
+
+trackTimer(
+setTimeout(
+() => {
+
+first.open =
+false;
+
+card.open =
+false;
+
+game.first =
+null;
+
+game.locked =
+false;
+
+game.message =
+"Try again";
+
+renderMemory();
+
+},
+650
+)
+);
+
+}
+
+}
+
+
+function renderMemory() {
+
+const game =
+GameCenter.memory;
+
+if (!game) {
+
+resetMemory();
+
+return;
+
+}
+
+GameCenter.current =
+"memory";
+
+$("#contentBody")
+.innerHTML = `
+
+<div
+class="game-shell"
+>
+
+${
+gameTop(
+"Memory",
+game.message
+)
+}
+
+<div
+class="game-layout"
+>
+
+<div
+class="memory-board"
+>
+
+${
+game.cards
+.map(
+card => `
+
+<button
+class="
+memory-card
+${
+card.open ||
+card.done
+? "open"
+: ""
+}
+${
+card.done
+? "matched"
+: ""
+}
+"
+data-mem="${card.i}"
+>
+
+${
+card.open ||
+card.done
+? card.v
+: "?"
+}
+
+</button>
+
+`
+)
+.join("")
+}
+
+</div>
+
+<div
+class="game-side-panel"
+>
+
+<div
+class="score-card"
+>
+
+<span>
+Moves
+</span>
+
+<strong>
+${game.moves}
+</strong>
+
+</div>
+
+<div
+class="score-card"
+>
+
+<span>
+Pairs
+</span>
+
+<strong>
+${game.pairs}/8
+</strong>
+
+</div>
+
+<button
+class="primary-btn"
+data-mem-reset
+>
+New Game
+</button>
+
+</div>
+
+</div>
+
+</div>
+
+`;
+
+}
+
+
+/* ============================================================
+SNAKE
+============================================================ */
+
+const SNAKE_KEY =
+"galaxy.snake.high.v2";
+
+
+function resetSnake(
+level =
+GameCenter.snake?.level ||
+3
+) {
+
+clearGameTimers();
+
+GameCenter.snake = {
+
+grid:
+20,
+
+snake: [
+
+[10, 10],
+
+[9, 10],
+
+[8, 10]
+
+],
+
+dir: [
+1,
+0
+],
+
+next: [
+1,
+0
+],
+
+food: [
+15,
+10
+],
+
+score:
+0,
+
+high:
+Number(
+storage.get(
+SNAKE_KEY,
+0
+)
+) ||
+0,
+
+running:
+false,
+
+over:
+false,
+
+level,
+
+message:
+"Press Start"
+
+};
+
+renderSnake();
+
+}
+
+
+function snakeFood(game) {
+
+do {
+
+game.food = [
+
+Math.floor(
+Math.random() *
+game.grid
+),
+
+Math.floor(
+Math.random() *
+game.grid
+)
+
+];
+
+} while (
+
+game.snake.some(
+([x, y]) =>
+x ===
+game.food[0] &&
+y ===
+game.food[1]
+)
+
+);
+
+}
+
+
+function snakeTick() {
+
+const game =
+GameCenter.snake;
+
+if (
+!game?.running ||
+game.over
+) {
+
+return;
+
+}
+
+game.dir =
+game.next;
+
+const head =
+game.snake[0];
+
+const next = [
+
+head[0] +
+game.dir[0],
+
+head[1] +
+game.dir[1]
+
+];
+
+if (
+
+next[0] < 0 ||
+
+next[0] >=
+game.grid ||
+
+next[1] < 0 ||
+
+next[1] >=
+game.grid ||
+
+game.snake.some(
+([x, y]) =>
+x === next[0] &&
+y === next[1]
+)
+
+) {
+
+game.over =
+true;
+
+game.running =
+false;
+
+game.message =
+"Game Over";
+
+renderSnake();
+
+return;
+
+}
+
+game.snake.unshift(
+next
+);
+
+if (
+
+next[0] ===
+game.food[0] &&
+
+next[1] ===
+game.food[1]
+
+) {
+
+game.score +=
+10 *
+game.level;
+
+game.high =
+Math.max(
+game.high,
+game.score
+);
+
+storage.set(
+SNAKE_KEY,
+game.high
+);
+
+snakeFood(
+game
+);
+
+} else {
+
+game.snake.pop();
+
+}
+
+renderSnakeBoard();
+
+}
+
+
+function snakeStart() {
+
+const game =
+GameCenter.snake;
+
+if (
+!game ||
+game.over
+) {
+
+resetSnake();
+
+return;
+
+}
+
+if (
+game.running
+) {
+
+return;
+
+}
+
+game.running =
+true;
+
+game.message =
+"Running";
+
+const speeds = {
+
+1: 260,
+
+2: 210,
+
+3: 165,
+
+4: 125,
+
+5: 90
+
+};
+
+trackTimer(
+setInterval(
+snakeTick,
+speeds[
+game.level
+]
+)
+);
+
+renderSnake();
+
+}
+
+
+function snakeDir(
+dx,
+dy
+) {
+
+const game =
+GameCenter.snake;
+
+if (!game) {
+
+return;
+
+}
+
+if (
+
+game.dir[0] ===
+-dx &&
+
+game.dir[1] ===
+-dy
+
+) {
+
+return;
+
+}
+
+game.next = [
+dx,
+dy
+];
+
+if (
+!game.running
+) {
+
+snakeStart();
+
+}
+
+}
+
+
+function snakeCells() {
+
+const game =
+GameCenter.snake;
+
+let html =
+"";
+
+for (
+let y = 0;
+y <
+game.grid;
+y++
+) {
+
+for (
+let x = 0;
+x <
+game.grid;
+x++
+) {
+
+const index =
+game.snake
+.findIndex(
+point =>
+point[0] === x &&
+point[1] === y
+);
+
+const food =
+game.food[0] === x &&
+game.food[1] === y;
+
+html += `
+
+<span
+class="
+snake-cell
+${
+index === 0
+
+? "snake-head"
+
+: (
+
+index > 0
+
+? "snake-body"
+
+: (
+
+food
+
+? "snake-food"
+
+: ""
+
+)
+
+)
+}
+"
+></span>
+
+`;
+
+}
+
+}
+
+return html;
+
+}
+
+
+function renderSnakeBoard() {
+
+const board =
+$("#snakeBoard");
+
+if (board) {
+
+board.innerHTML =
+snakeCells();
+
+}
+
+if (
+$("#snakeScore")
+) {
+
+$("#snakeScore")
+.textContent =
+GameCenter.snake.score;
+
+}
+
+if (
+$("#snakeHigh")
+) {
+
+$("#snakeHigh")
+.textContent =
+GameCenter.snake.high;
+
+}
+
+}
+
+
+function renderSnake() {
+
+const game =
+GameCenter.snake;
+
+if (!game) {
+
+resetSnake();
+
+return;
+
+}
+
+GameCenter.current =
+"snake";
+
+$("#contentBody")
+.innerHTML = `
+
+<div
+class="
+game-shell
+snake-game
+"
+>
+
+${
+gameTop(
+"Snake",
+game.message
+)
+}
+
+<div
+class="chicken-hud"
+>
+
+<span>
+Score
+
+<strong
+id="snakeScore"
+>
+${game.score}
+</strong>
+
+</span>
+
+<span>
+High
+
+<strong
+id="snakeHigh"
+>
+${game.high}
+</strong>
+
+</span>
+
+<label>
+Level
+
+<select
+data-snake-level
+>
+
+${
+[
+1,
+2,
+3,
+4,
+5
+]
+.map(
+value => `
+
+<option
+${
+value ===
+game.level
+? "selected"
+: ""
+}
+>
+${value}
+</option>
+
+`
+)
+.join("")
+}
+
+</select>
+
+</label>
+
+<button
+class="secondary-btn"
+data-snake-start
+>
+
+${
+game.running
+? "Running"
+: "Start"
+}
+
+</button>
+
+<button
+class="primary-btn"
+data-snake-new
+>
+New Game
+</button>
+
+</div>
+
+<div
+id="snakeBoard"
+class="snake-board"
+style="
+grid-template-columns:
+repeat(20,1fr);
+"
+>
+
+${snakeCells()}
+
+</div>
+
+<div
+class="chicken-controls"
+>
+
+<button
+data-snake-dir="up"
+>
+▲
+</button>
+
+<button
+data-snake-dir="left"
+>
+◀
+</button>
+
+<button
+data-snake-dir="down"
+>
+▼
+</button>
+
+<button
+data-snake-dir="right"
+>
+▶
+</button>
+
+</div>
+
+</div>
+
+`;
+
+}
+
+
+/* ============================================================
+CHICKEN CROSSING
+============================================================ */
+
+const CHICK_Y = [
+
+6,
+
+22,
+
+36.5,
+
+51,
+
+65.5,
+
+80,
+
+94.5
+
+];
+
+
+const CHICK_ROADS =
+new Set([
+1,
+3,
+5
+]);
+
+
+const CHICK_KEY =
+"galaxy.chicken.high.v2";
+
+
+function chickCars(level) {
+
+const cars =
+[];
+
+[1, 3, 5]
+.forEach(
+(
+row,
+roadIndex
+) => {
+
+[-1, 1]
+.forEach(
+(
+direction,
+lane
+) => {
+
+cars.push({
+
+row,
+
+y:
+CHICK_Y[row] +
+(
+lane
+? 3
+: -3
+),
+
+x:
+rand(
+0,
+100
+),
+
+dir:
+roadIndex %
+2
+? direction
+: -direction,
+
+speed:
+0.5 +
+level *
+0.12 +
+roadIndex *
+0.07,
+
+type:
+(
+roadIndex +
+lane
+) %
+3 ===
+0
+
+? "bus"
+
+: (
+
+(
+roadIndex +
+lane
+) %
+3 ===
+1
+
+? "truck"
+
+: "car"
+
+)
+
+});
+
+}
+);
+
+}
+);
+
+return cars;
+
+}
+
+
+function resetChicken(
+level =
+GameCenter.chicken?.level ||
+3
+) {
+
+clearGameTimers();
+
+GameCenter.chicken = {
+
+row:
+6,
+
+x:
+50,
+
+score:
+0,
+
+high:
+Number(
+storage.get(
+CHICK_KEY,
+0
+)
+) ||
+0,
+
+level,
+
+running:
+false,
+
+over:
+false,
+
+message:
+"Ready — cross each road",
+
+cars:
+chickCars(level)
+
+};
+
+renderChicken();
+
+}
+
+
+function chickenCollide(game) {
+
+if (
+!CHICK_ROADS.has(
+game.row
+)
+) {
+
+return false;
+
+}
+
+return game.cars.some(
+car =>
+
+Math.abs(
+car.y -
+CHICK_Y[
+game.row
+]
+) < 5
+
+&&
+
+Math.abs(
+car.x -
+game.x
+) <
+
+(
+car.type ===
+"bus"
+
+? 13
+
+: (
+
+car.type ===
+"truck"
+
+? 11
+
+: 8
+
+)
+)
+
+);
+
+}
+
+
+function chickenTick() {
+
+const game =
+GameCenter.chicken;
+
+if (
+!game?.running ||
+game.over
+) {
+
+return;
+
+}
+
+game.cars.forEach(
+car => {
+
+car.x +=
+car.dir *
+car.speed;
+
+if (
+car.x > 114
+) {
+
+car.x =
+-14;
+
+}
+
+if (
+car.x < -14
+) {
+
+car.x =
+114;
+
+}
+
+}
+);
+
+if (
+chickenCollide(game)
+) {
+
+game.over =
+true;
+
+game.running =
+false;
+
+game.message =
+"Hit! Game Over";
+
+renderChicken();
+
+return;
+
+}
+
+renderChickenStage();
+
+}
+
+
+function chickenStart() {
+
+const game =
+GameCenter.chicken;
+
+if (
+!game ||
+game.over
+) {
+
+resetChicken();
+
+return;
+
+}
+
+if (
+game.running
+) {
+
+return;
+
+}
+
+game.running =
+true;
+
+game.message =
+"Cross the roads";
+
+trackTimer(
+setInterval(
+chickenTick,
+{
+
+1: 80,
+
+2: 65,
+
+3: 50,
+
+4: 38,
+
+5: 28
+
+}[
+game.level
+]
+)
+);
+
+renderChicken();
+
+}
+
+
+function chickenMove(
+dx,
+dr
+) {
+
+const game =
+GameCenter.chicken;
+
+if (
+!game ||
+game.over
+) {
+
+return;
+
+}
+
+if (
+!game.running
+) {
+
+chickenStart();
+
+}
+
+game.x =
+clamp(
+game.x +
+dx,
+4,
+96
+);
+
+game.row =
+clamp(
+game.row +
+dr,
+0,
+6
+);
+
+if (
+chickenCollide(game)
+) {
+
+game.over =
+true;
+
+game.running =
+false;
+
+game.message =
+"Hit! Game Over";
+
+renderChicken();
+
+return;
+
+}
+
+if (
+game.row === 0
+) {
+
+game.score +=
+100 *
+game.level;
+
+game.high =
+Math.max(
+game.high,
+game.score
+);
+
+storage.set(
+CHICK_KEY,
+game.high
+);
+
+game.row =
+6;
+
+game.x =
+50;
+
+game.message =
+"Crossed! Go again";
+
+} else {
+
+game.message =
+CHICK_ROADS.has(
+game.row
+)
+
+? "Cross the road"
+
+: "Safe on grass";
+
+}
+
+renderChickenStage();
+
+}
+
+
+function chickWorld() {
+
+return `
+
+<div
+class="chicken-world"
+>
+
+<div
+class="
+chicken-zone
+chicken-grass
+"
+>
+
+<span
+class="chicken-safe-label"
+>
+FINISH
+</span>
+
+</div>
+
+<div
+class="
+chicken-zone
+chicken-road-section
+"
+></div>
+
+<div
+class="
+chicken-zone
+chicken-grass
+"
+>
+
+<span
+class="chicken-safe-label"
+>
+SAFE GRASS
+</span>
+
+</div>
+
+<div
+class="
+chicken-zone
+chicken-road-section
+"
+></div>
+
+<div
+class="
+chicken-zone
+chicken-grass
+"
+>
+
+<span
+class="chicken-safe-label"
+>
+SAFE GRASS
+</span>
+
+</div>
+
+<div
+class="
+chicken-zone
+chicken-road-section
+"
+></div>
+
+<div
+class="
+chicken-zone
+chicken-grass
+"
+>
+
+<span
+class="chicken-safe-label"
+>
+START
+</span>
+
+</div>
+
+</div>
+
+`;
+
+}
+
+
+function chickCarsHTML(game) {
+
+return game.cars
+.map(
+(
+car,
+index
+) => `
+
+<div
+class="
+chicken-car
+${
+car.type ===
+"bus"
+
+? "chicken-bus"
+
+: (
+
+car.type ===
+"truck"
+
+? "chicken-truck"
+
+: "chicken-small-car"
+
+)
+}
+"
+data-chick-car="${index}"
+style="
+left:${car.x}%;
+top:${car.y}%;
+"
+></div>
+
+`
+)
+.join("");
+
+}
+
+
+function renderChickenStage() {
+
+const game =
+GameCenter.chicken;
+
+const player =
+$("#chickenPlayer");
+
+if (player) {
+
+player.style.left =
+`${game.x}%`;
+
+player.style.top =
+`${CHICK_Y[
+game.row
+]}%`;
+
+}
+
+game.cars.forEach(
+(
+car,
+index
+) => {
+
+const element =
+$(
+`[data-chick-car="${index}"]`
+);
+
+if (element) {
+
+element.style.left =
+`${car.x}%`;
+
+}
+
+}
+);
+
+if (
+$("#chickScore")
+) {
+
+$("#chickScore")
+.textContent =
+game.score;
+
+}
+
+if (
+$("#chickHigh")
+) {
+
+$("#chickHigh")
+.textContent =
+game.high;
+
+}
+
+}
+
+
+function renderChicken() {
+
+const game =
+GameCenter.chicken;
+
+if (!game) {
+
+resetChicken();
+
+return;
+
+}
+
+GameCenter.current =
+"chicken";
+
+$("#contentBody")
+.innerHTML = `
+
+<div
+class="
+game-shell
+chicken-game
+"
+>
+
+${
+gameTop(
+"Chicken Crossing",
+game.message
+)
+}
+
+<div
+class="chicken-hud"
+>
+
+<span>
+Score
+
+<strong
+id="chickScore"
+>
+${game.score}
+</strong>
+
+</span>
+
+<span>
+High
+
+<strong
+id="chickHigh"
+>
+${game.high}
+</strong>
+
+</span>
+
+<label>
+Level
+
+<select
+data-chick-level
+>
+
+${
+[
+1,
+2,
+3,
+4,
+5
+]
+.map(
+value => `
+
+<option
+${
+value ===
+game.level
+? "selected"
+: ""
+}
+>
+${value}
+</option>
+
+`
+)
+.join("")
+}
+
+</select>
+
+</label>
+
+<button
+class="secondary-btn"
+data-chick-start
+>
+
+${
+game.running
+? "Running"
+: "Start"
+}
+
+</button>
+
+<button
+class="primary-btn"
+data-chick-new
+>
+New Game
+</button>
+
+</div>
+
+<div
+class="
+chicken-stage
+retro-game-board
+"
+>
+
+${chickWorld()}
+
+${chickCarsHTML(game)}
+
+<div
+id="chickenPlayer"
+class="chicken-player"
+style="
+left:${game.x}%;
+top:${CHICK_Y[game.row]}%;
+"
+></div>
+
+</div>
+
+<div
+class="chicken-controls"
+>
+
+<button
+data-chick-dir="up"
+>
+▲
+</button>
+
+<button
+data-chick-dir="left"
+>
+◀
+</button>
+
+<button
+data-chick-dir="down"
+>
+▼
+</button>
+
+<button
+data-chick-dir="right"
+>
+▶
+</button>
+
+</div>
+
+</div>
+
+`;
+
+}
+
+
+/* ============================================================
+THREE JS LOADER
+============================================================ */
+
+let THREE_PROMISE =
+null;
+
+
+function loadThree() {
+
+if (
+window.THREE
+) {
+
+return Promise.resolve(
+window.THREE
+);
+
+}
+
+if (
+!THREE_PROMISE
+) {
+
+THREE_PROMISE =
+import(
+"https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js"
+);
+
+}
+
+return THREE_PROMISE;
+
+}
+
+
+const THREE_ACTIVE = {
+
+kind:
+null,
+
+raf:
+0,
+
+renderer:
+null,
+
+scene:
+null,
+
+camera:
+null,
+
+canvas:
+null,
+
+cleanup:
+[]
+
+};
+
+
+function cleanup3D() {
+
+if (
+THREE_ACTIVE.raf
+) {
+
+cancelAnimationFrame(
+THREE_ACTIVE.raf
+);
+
+}
+
+THREE_ACTIVE.raf =
+0;
+
+THREE_ACTIVE.cleanup
+.splice(0)
+.forEach(
+fn => {
+
+try {
+
+fn();
+
+} catch {}
+
+}
+);
+
+try {
+
+THREE_ACTIVE.renderer
+?.dispose();
+
+} catch {}
+
+if (
+document.pointerLockElement
+) {
+
+document
+.exitPointerLock
+?.();
+
+}
+
+Object.assign(
+
+THREE_ACTIVE,
+
+{
+
+kind:
+null,
+
+renderer:
+null,
+
+scene:
+null,
+
+camera:
+null,
+
+canvas:
+null
+
+}
+
+);
+
+}
+
+
+function on3D(
+target,
+type,
+fn,
+options
+) {
+
+target.addEventListener(
+type,
+fn,
+options
+);
+
+THREE_ACTIVE.cleanup.push(
+() =>
+target.removeEventListener(
+type,
+fn,
+options
+)
+);
+
+}
+
+
+/* ============================================================
+GALAXY ARENA
+============================================================ */
+
+const ARENA_WEAPONS = [
+
+{
+
+name:
+"Vortex AR",
+
+damage:
+28,
+
+rate:
+110,
+
+mag:
+30,
+
+reserve:
+120,
+
+spread:
+0.006,
+
+reload:
+1300
+
+},
+
+{
+
+name:
+"Pulse SMG",
+
+damage:
+19,
+
+rate:
+75,
+
+mag:
+36,
+
+reserve:
+144,
+
+spread:
+0.012,
+
+reload:
+1150
+
+},
+
+{
+
+name:
+"Nova Shotgun",
+
+damage:
+13,
+
+rate:
+620,
+
+mag:
+8,
+
+reserve:
+40,
+
+spread:
+0.045,
+
+reload:
+1500,
+
+pellets:
+8
+
+},
+
+{
+
+name:
+"Eclipse Sniper",
+
+damage:
+92,
+
+rate:
+900,
+
+mag:
+5,
+
+reserve:
+25,
+
+spread:
+0.001,
+
+reload:
+1800
+
+}
+
+];
+
+
+const ARENA_MODES = {
+
+ffa: {
+
+name: "Free For All",
+
+bots: 7,
+
+target: 20,
+
+time: 300
+
+},
+
+duel: {
+
+name: "1v1 Duel",
+
+bots: 1,
+
+target: 10,
+
+time: 240
+
+},
+
+gun: {
+
+name: "Gun Game",
+
+bots: 6,
+
+target: 8,
+
+time: 360
+
+},
+
+practice: {
+
+name: "Practice Range",
+
+bots: 6,
+
+target: 999,
+
+time: 9999
+
+}
+
+};
+
+
+const ARENA_PROFILE_KEY =
+"galaxy.arena.profile.v2";
+
+
+function arenaProfile() {
+
+return {
+
+level:
+1,
+
+xp:
+0,
+
+coins:
+0,
+
+kills:
+0,
+
+deaths:
+0,
+
+wins:
+0,
+
+...storage.get(
+ARENA_PROFILE_KEY,
+{}
+)
+
+};
+
+}
+
+
+function openArena() {
+
+cleanup3D();
+
+GameCenter.current =
+"arena";
+
+const profile =
+arenaProfile();
+
+if (
+$("#contentTitle")
+) {
+
+$("#contentTitle")
+.textContent =
+"GALAXY Arena";
+
+}
+
+if (
+$("#contentEyebrow")
+) {
+
+$("#contentEyebrow")
+.textContent =
+"3D FPS";
+
+}
+
+$("#contentBody")
+.innerHTML = `
+
+<div
+class="arena-shell"
+>
+
+<div
+class="arena-home"
+>
+
+<section
+class="arena-hero"
+>
+
+<span
+class="arena-hero-badge"
+>
+FAST 3D FPS
+</span>
+
+<h2>
+GALAXY ARENA
+</h2>
+
+<p>
+Mouse aim,
+WASD,
+sprint,
+jump,
+reload,
+headshots,
+bots and
+instant respawns.
+</p>
+
+<div
+class="arena-hero-actions"
+>
+
+<button
+class="arena-primary"
+data-arena-start
+>
+PLAY
+</button>
+
+<button
+class="arena-secondary"
+data-game-back
+>
+← GAMING CENTER
+</button>
+
+</div>
+
+</section>
+
+<aside
+class="arena-side"
+>
+
+<section
+class="arena-card"
+>
+
+<h3>
+Mode
+</h3>
+
+<div
+class="arena-mode-list"
+>
+
+${
+Object.entries(
+ARENA_MODES
+)
+.map(
+(
+[
+id,
+mode
+]
+) => `
+
+<button
+class="
+arena-mode-button
+${
+id ===
+"ffa"
+? "active"
+: ""
+}
+"
+data-arena-mode="${id}"
+>
+
+<span
+class="arena-mode-icon"
+>
+
+${
+id ===
+"duel"
+
+? "1v1"
+
+: (
+
+id ===
+"gun"
+
+? "↟"
+
+: (
+
+id ===
+"practice"
+
+? "◎"
+
+: "⌖"
+
+)
+
+)
+}
+
+</span>
+
+<span
+class="arena-mode-copy"
+>
+
+<strong>
+${mode.name}
+</strong>
+
+<span>
+${mode.bots} bots
+</span>
+
+</span>
+
+</button>
+
+`
+)
+.join("")
+}
+
+</div>
+
+</section>
+
+<section
+class="arena-card"
+>
+
+<h3>
+Profile
+</h3>
+
+<div
+class="arena-stat-grid"
+>
+
+<div
+class="arena-stat"
+>
+
+<span>
+LEVEL
+</span>
+
+<strong>
+${profile.level}
+</strong>
+
+</div>
+
+<div
+class="arena-stat"
+>
+
+<span>
+COINS
+</span>
+
+<strong>
+${profile.coins}
+</strong>
+
+</div>
+
+<div
+class="arena-stat"
+>
+
+<span>
+KILLS
+</span>
+
+<strong>
+${profile.kills}
+</strong>
+
+</div>
+
+<div
+class="arena-stat"
+>
+
+<span>
+WINS
+</span>
+
+<strong>
+${profile.wins}
+</strong>
+
+</div>
+
+</div>
+
+</section>
+
+</aside>
+
+</div>
+
+</div>
+
+`;
+
+GameCenter.arena = {
+
+mode: "ffa"
+
+};
+
+}
+
+
+async function startArena() {
+
+cleanup3D();
+
+const mode =
+GameCenter.arena?.mode ||
+"ffa";
+
+const config =
+ARENA_MODES[mode];
+
+const body =
+$("#contentBody");
+
+body.innerHTML = `
+
+<div
+class="arena-shell"
+>
+
+<div
+class="arena-game"
+id="arenaGame"
+>
+
+<canvas
+id="arenaCanvas"
+class="arena-canvas"
+></canvas>
+
+<div
+class="arena-vignette"
+></div>
+
+<div
+class="arena-crosshair"
+></div>
+
+<div
+class="arena-hud-top"
+>
+
+<div
+class="arena-score-pill"
+>
+KILLS
+
+<strong
+id="aKills"
+>
+0
+</strong>
+
+</div>
+
+<div
+class="arena-timer"
+id="aTimer"
+>
+05:00
+</div>
+
+<div
+class="arena-score-pill"
+>
+HP
+
+<strong
+id="aHp"
+>
+100
+</strong>
+
+</div>
+
+</div>
+
+<div
+class="arena-hud-bottom-right"
+>
+
+<div
+class="arena-weapon-name"
+id="aWeapon"
+>
+Vortex AR
+</div>
+
+<div
+class="arena-ammo"
+>
+
+<strong
+id="aAmmo"
+>
+30
+</strong>
+
+<span
+id="aReserve"
+>
+/120
+</span>
+
+</div>
+
+</div>
+
+<div
+class="arena-center-message"
+id="aMsg"
+>
+
+<strong>
+CLICK TO DEPLOY
+</strong>
+
+<span>
+WASD • Mouse •
+LMB fire •
+R reload •
+Shift sprint •
+Space jump
+</span>
+
+</div>
+
+</div>
+
+</div>
+
+`;
+
+try {
+
+const THREE =
+await loadThree();
+
+const canvas =
+$("#arenaCanvas");
+
+const scene =
+new THREE.Scene();
+
+const camera =
+new THREE.PerspectiveCamera(
+75,
+1,
+0.05,
+120
+);
+
+const renderer =
+new THREE.WebGLRenderer({
+
+canvas,
+
+antialias:
+true
+
+});
+
+Object.assign(
+
+THREE_ACTIVE,
+
+{
+
+kind:
+"arena",
+
+renderer,
+
+scene,
+
+camera,
+
+canvas
+
+}
+
+);
+
+scene.background =
+new THREE.Color(
+0x0b1018
+);
+
+scene.fog =
+new THREE.Fog(
+0x0b1018,
+25,
+70
+);
+
+scene.add(
+
+new THREE
+.HemisphereLight(
+0xbad8ff,
+0x25311f,
+1.8
+)
+
+);
+
+const directional =
+new THREE
+.DirectionalLight(
+0xffffff,
+1.4
+);
+
+directional.position.set(
+10,
+20,
+8
+);
+
+scene.add(
+directional
+);
+
+const floor =
+new THREE.Mesh(
+
+new THREE
+.PlaneGeometry(
+60,
+60
+),
+
+new THREE
+.MeshStandardMaterial({
+
+color:
+0x293239,
+
+roughness:
+0.95
+
+})
+
+);
+
+floor.rotation.x =
+-Math.PI /
+2;
+
+scene.add(
+floor
+);
+
+scene.add(
+
+new THREE.GridHelper(
+60,
+30,
+0x52606a,
+0x39444b
+)
+
+);
+
+const obstacles = [
+
+[-10, -8, 7, 2, 3],
+
+[10, 8, 7, 2, 3],
+
+[0, 0, 5, 5, 3],
+
+[-16, 8, 3, 7, 4],
+
+[16, -8, 3, 7, 4],
+
+[0, 15, 10, 2, 2],
+
+[0, -15, 10, 2, 2]
+
+];
+
+const walls =
+[];
+
+for (
+const [
+x,
+z,
+w,
+d,
+h
+] of obstacles
+) {
+
+const mesh =
+new THREE.Mesh(
+
+new THREE
+.BoxGeometry(
+w,
+h,
+d
+),
+
+new THREE
+.MeshStandardMaterial({
+
+color:
+0x58636d,
+
+roughness:
+0.85
+
+})
+
+);
+
+mesh.position.set(
+x,
+h / 2,
+z
+);
+
+mesh.userData.wall =
+true;
+
+scene.add(
+mesh
+);
+
+walls.push(
+mesh
+);
+
+}
+
+for (
+const [
+x,
+z,
+w,
+d
+] of
+[
+
+[0, -30, 60, 1],
+
+[0, 30, 60, 1],
+
+[-30, 0, 1, 60],
+
+[30, 0, 1, 60]
+
+]
+) {
+
+const mesh =
+new THREE.Mesh(
+
+new THREE
+.BoxGeometry(
+w,
+4,
+d
+),
+
+new THREE
+.MeshStandardMaterial({
+
+color:
+0x353e45
+
+})
+
+);
+
+mesh.position.set(
+x,
+2,
+z
+);
+
+scene.add(
+mesh
+);
+
+walls.push(
+mesh
+);
+
+}
+
+const player = {
+
+x:
+0,
+
+z:
+12,
+
+yaw:
+Math.PI,
+
+pitch:
+0,
+
+hp:
+100,
+
+kills:
+0,
+
+deaths:
+0,
+
+alive:
+true,
+
+weapon:
+0,
+
+ammo:
+ARENA_WEAPONS
+.map(
+weapon => ({
+
+mag:
+weapon.mag,
+
+res:
+weapon.reserve
+
+})
+),
+
+last:
+0,
+
+reloading:
+false,
+
+jump:
+0,
+
+ground:
+true
+
+};
+
+const keys =
+new Set();
+
+const ray =
+new THREE
+.Raycaster();
+
+const bots =
+[];
+
+camera.position.set(
+player.x,
+1.7,
+player.z
+);
+
+scene.add(
+camera
+);
+
+const weaponGroup =
+new THREE.Group();
+
+const gun =
+new THREE.Mesh(
+
+new THREE
+.BoxGeometry(
+0.18,
+0.16,
+0.7
+),
+
+new THREE
+.MeshStandardMaterial({
+
+color:
+0x303842,
+
+metalness:
+0.3
+
+})
+
+);
+
+gun.position.set(
+0.28,
+-0.24,
+-0.7
+);
+
+weaponGroup.add(
+gun
+);
+
+camera.add(
+weaponGroup
+);
+
+function blocked(
+x,
+z,
+radius = 0.42
+) {
+
+if (
+
+Math.abs(x) > 28 ||
+
+Math.abs(z) > 28
+
+) {
+
+return true;
+
+}
+
+return obstacles.some(
+(
+[
+ox,
+oz,
+w,
+d
+]
+) =>
+
+x + radius >
+ox -
+w / 2
+
+&&
+
+x - radius <
+ox +
+w / 2
+
+&&
+
+z + radius >
+oz -
+d / 2
+
+&&
+
+z - radius <
+oz +
+d / 2
+
+);
+
+}
+
+
+function moveEntity(
+entity,
+dx,
+dz,
+radius = 0.42
+) {
+
+if (
+!blocked(
+entity.x +
+dx,
+entity.z,
+radius
+)
+) {
+
+entity.x +=
+dx;
+
+}
+
+if (
+!blocked(
+entity.x,
+entity.z +
+dz,
+radius
+)
+) {
+
+entity.z +=
+dz;
+
+}
+
+}
+
+
+function botMesh(index) {
+
+const group =
+new THREE.Group();
+
+const body =
+new THREE.Mesh(
+
+new THREE
+.CapsuleGeometry(
+0.38,
+0.65,
+4,
+8
+),
+
+new THREE
+.MeshStandardMaterial({
+
+color:
+index %
+2
+? 0x8d5965
+: 0x6172aa
+
+})
+
+);
+
+const head =
+new THREE.Mesh(
+
+new THREE
+.SphereGeometry(
+0.23,
+12,
+10
+),
+
+new THREE
+.MeshStandardMaterial({
+
+color:
+0xcba98e
+
+})
+
+);
+
+body.position.y =
+0.95;
+
+head.position.y =
+1.68;
+
+group.add(
+body,
+head
+);
+
+return {
+
+group,
+
+body,
+
+head
+
+};
+
+}
+
+
+const spawns = [
+
+[0, -12],
+
+[14, 14],
+
+[-14, -14],
+
+[14, -14],
+
+[-14, 14],
+
+[20, 8],
+
+[-20, -8]
+
+];
+
+
+for (
+let i = 0;
+i <
+config.bots;
+i++
+) {
+
+const model =
+botMesh(i);
+
+const [
+x,
+z
+] =
+spawns[
+i %
+spawns.length
+];
+
+const bot = {
+
+name:
+`BOT ${i + 1}`,
+
+x,
+
+z,
+
+hp:
+100,
+
+alive:
+true,
+
+respawn:
+0,
+
+next:
+performance.now() +
+rand(
+700,
+1400
+),
+
+kills:
+0,
+
+group:
+model.group,
+
+body:
+model.body,
+
+head:
+model.head
+
+};
+
+bot.body.userData = {
+
+bot,
+
+part:
+"body"
+
+};
+
+bot.head.userData = {
+
+bot,
+
+part:
+"head"
+
+};
+
+bot.group.position.set(
+x,
+0,
+z
+);
+
+scene.add(
+bot.group
+);
+
+bots.push(
+bot
+);
+
+}
+
+const profile =
+arenaProfile();
+
+const end =
+Date.now() +
+config.time *
+1000;
+
+let running =
+true;
+
+let last =
+performance.now();
+
+
+function hud() {
+
+const weapon =
+ARENA_WEAPONS[
+player.weapon
+];
+
+const ammo =
+player.ammo[
+player.weapon
+];
+
+if (
+$("#aKills")
+) {
+
+$("#aKills")
+.textContent =
+player.kills;
+
+}
+
+if (
+$("#aHp")
+) {
+
+$("#aHp")
+.textContent =
+Math.max(
+0,
+Math.ceil(
+player.hp
+)
+);
+
+}
+
+if (
+$("#aWeapon")
+) {
+
+$("#aWeapon")
+.textContent =
+weapon.name;
+
+}
+
+if (
+$("#aAmmo")
+) {
+
+$("#aAmmo")
+.textContent =
+ammo.mag;
+
+}
+
+if (
+$("#aReserve")
+) {
+
+$("#aReserve")
+.textContent =
+`/${ammo.res}`;
+
+}
+
+}
+
+
+function reload() {
+
+const weapon =
+ARENA_WEAPONS[
+player.weapon
+];
+
+const ammo =
+player.ammo[
+player.weapon
+];
+
+if (
+
+player.reloading ||
+
+ammo.mag >=
+weapon.mag ||
+
+!ammo.res
+
+) {
+
+return;
+
+}
+
+player.reloading =
+true;
+
+setTimeout(
+() => {
+
+if (
+THREE_ACTIVE.kind !==
+"arena"
+) {
+
+return;
+
+}
+
+const amount =
+Math.min(
+
+weapon.mag -
+ammo.mag,
+
+ammo.res
+
+);
+
+ammo.mag +=
+amount;
+
+ammo.res -=
+amount;
+
+player.reloading =
+false;
+
+hud();
+
+},
+weapon.reload
+);
+
+}
+
+
+function respawnPlayer() {
+
+player.x =
+0;
+
+player.z =
+12;
+
+player.hp =
+100;
+
+player.alive =
+true;
+
+hud();
+
+}
+
+
+function shoot() {
+
+if (
+
+!running ||
+
+!player.alive ||
+
+player.reloading
+
+) {
+
+return;
+
+}
+
+const weapon =
+ARENA_WEAPONS[
+player.weapon
+];
+
+const ammo =
+player.ammo[
+player.weapon
+];
+
+const now =
+performance.now();
+
+if (
+
+now -
+player.last <
+weapon.rate
+
+) {
+
+return;
+
+}
+
+if (
+ammo.mag <= 0
+) {
+
+reload();
+
+return;
+
+}
+
+player.last =
+now;
+
+ammo.mag--;
+
+const targets = [
+
+...walls,
+
+...bots.flatMap(
+bot =>
+bot.alive
+
+? [
+bot.body,
+bot.head
+]
+
+: []
+)
+
+];
+
+for (
+let pellet = 0;
+pellet <
+(
+weapon.pellets ||
+1
+);
+pellet++
+) {
+
+ray.setFromCamera(
+
+new THREE.Vector2(
+
+rand(
+-weapon.spread,
+weapon.spread
+),
+
+rand(
+-weapon.spread,
+weapon.spread
+)
+
+),
+
+camera
+
+);
+
+const hit =
+ray.intersectObjects(
+targets,
+false
+)[0];
+
+const bot =
+hit
+?.object
+?.userData
+?.bot;
+
+if (
+bot &&
+bot.alive
+) {
+
+bot.hp -=
+
+weapon.damage
+
+*
+
+(
+hit.object.userData
+.part ===
+"head"
+? 1.75
+: 1
+);
+
+if (
+bot.hp <= 0
+) {
+
+bot.alive =
+false;
+
+bot.group.visible =
+false;
+
+bot.respawn =
+performance.now() +
+1800;
+
+player.kills++;
+
+profile.kills++;
+
+profile.xp +=
+20;
+
+profile.coins +=
+5;
+
+if (
+mode ===
+"gun"
+) {
+
+player.weapon =
+(
+player.weapon +
+1
+) %
+ARENA_WEAPONS.length;
+
+}
+
+if (
+
+player.kills >=
+config.target &&
+
+mode !==
+"practice"
+
+) {
+
+running =
+false;
+
+profile.wins++;
+
+profile.coins +=
+50;
+
+$("#aMsg")
+.innerHTML = `
+
+<strong>
+VICTORY
+</strong>
+
+<span>
+${player.kills}
+kills
+</span>
+
+<button
+class="arena-primary"
+data-arena-home
+>
+ARENA HOME
+</button>
+
+`;
+
+}
+
+storage.set(
+ARENA_PROFILE_KEY,
+profile
+);
+
+}
+
+}
+
+}
+
+hud();
+
+}
+
+
+on3D(
+canvas,
+"click",
+() =>
+canvas
+.requestPointerLock
+?.()
+);
+
+
+on3D(
+document,
+"mousemove",
+event => {
+
+if (
+
+document.pointerLockElement !==
+canvas ||
+
+!player.alive
+
+) {
+
+return;
+
+}
+
+player.yaw -=
+event.movementX *
+0.0022;
+
+player.pitch =
+clamp(
+
+player.pitch -
+event.movementY *
+0.0022,
+
+-1.25,
+
+1.25
+
+);
+
+}
+);
+
+
+on3D(
+document,
+"mousedown",
+event => {
+
+if (
+THREE_ACTIVE.kind !==
+"arena"
+) {
+
+return;
+
+}
+
+if (
+event.button === 0
+) {
+
+shoot();
+
+}
+
+}
+);
+
+
+on3D(
+document,
+"keydown",
+event => {
+
+if (
+THREE_ACTIVE.kind !==
+"arena"
+) {
+
+return;
+
+}
+
+keys.add(
+event.code
+);
+
+if (
+event.code ===
+"KeyR"
+) {
+
+reload();
+
+}
+
+if (
+/^Digit[1-4]$/
+.test(
+event.code
+)
+) {
+
+player.weapon =
+Number(
+event.code
+.slice(-1)
+) -
+1;
+
+hud();
+
+}
+
+}
+);
+
+
+on3D(
+document,
+"keyup",
+event =>
+keys.delete(
+event.code
+)
+);
+
+
+on3D(
+window,
+"resize",
+resize
+);
+
+
+function resize() {
+
+const width =
+canvas
+.parentElement
+.clientWidth ||
+800;
+
+const height =
+canvas
+.parentElement
+.clientHeight ||
+600;
+
+renderer.setSize(
+width,
+height,
+false
+);
+
+camera.aspect =
+width /
+height;
+
+camera
+.updateProjectionMatrix();
+
+}
+
+
+resize();
+
+hud();
+
+
+function loop(now) {
+
+if (
+THREE_ACTIVE.kind !==
+"arena"
+) {
+
+return;
+
+}
+
+const dt =
+clamp(
+
+(
+now -
+last
+) /
+1000,
+
+0,
+
+0.05
+
+);
+
+last =
+now;
+
+if (running) {
+
+const forward =
+
+(
+keys.has(
+"KeyW"
+)
+? 1
+: 0
+)
+
+-
+
+(
+keys.has(
+"KeyS"
+)
+? 1
+: 0
+);
+
+const right =
+
+(
+keys.has(
+"KeyD"
+)
+? 1
+: 0
+)
+
+-
+
+(
+keys.has(
+"KeyA"
+)
+? 1
+: 0
+);
+
+const speed =
+keys.has(
+"ShiftLeft"
+)
+? 8
+: 5.2;
+
+const sin =
+Math.sin(
+player.yaw
+);
+
+const cos =
+Math.cos(
+player.yaw
+);
+
+moveEntity(
+
+player,
+
+(
+-sin *
+forward
++
+cos *
+right
+) *
+speed *
+dt,
+
+(
+-cos *
+forward
+-
+sin *
+right
+) *
+speed *
+dt
+
+);
+
+if (
+
+keys.has(
+"Space"
+) &&
+
+player.ground
+
+) {
+
+player.jump =
+5.8;
+
+player.ground =
+false;
+
+}
+
+let cameraHeight =
+1.7;
+
+if (
+!player.ground
+) {
+
+player.jump -=
+15 *
+dt;
+
+cameraHeight +=
+player.jump *
+dt;
+
+if (
+cameraHeight <=
+1.7
+) {
+
+cameraHeight =
+1.7;
+
+player.ground =
+true;
+
+player.jump =
+0;
+
+}
+
+}
+
+camera.position.set(
+player.x,
+cameraHeight,
+player.z
+);
+
+camera.rotation.order =
+"YXZ";
+
+camera.rotation.y =
+player.yaw;
+
+camera.rotation.x =
+player.pitch;
+
+
+for (
+const bot of
+bots
+) {
+
+if (
+!bot.alive
+) {
+
+if (
+now >=
+bot.respawn
+) {
+
+bot.hp =
+100;
+
+bot.alive =
+true;
+
+bot.group.visible =
+true;
+
+const spawn =
+pick(
+spawns
+);
+
+bot.x =
+spawn[0];
+
+bot.z =
+spawn[1];
+
+bot.group.position.set(
+bot.x,
+0,
+bot.z
+);
+
+}
+
+continue;
+
+}
+
+const dx =
+player.x -
+bot.x;
+
+const dz =
+player.z -
+bot.z;
+
+const distance =
+Math.hypot(
+dx,
+dz
+) ||
+1;
+
+moveEntity(
+
+bot,
+
+dx /
+distance *
+2.2 *
+dt,
+
+dz /
+distance *
+2.2 *
+dt,
+
+0.4
+
+);
+
+bot.group.position.set(
+bot.x,
+0,
+bot.z
+);
+
+bot.group.rotation.y =
+Math.atan2(
+dx,
+dz
+) +
+Math.PI;
+
+if (
+
+mode !==
+"practice" &&
+
+player.alive &&
+
+distance < 18 &&
+
+now >
+bot.next
+
+) {
+
+if (
+Math.random() <
+0.42
+) {
+
+player.hp -=
+rand(
+6,
+12
+);
+
+if (
+player.hp <= 0
+) {
+
+player.deaths++;
+
+profile.deaths++;
+
+player.alive =
+false;
+
+setTimeout(
+respawnPlayer,
+1800
+);
+
+}
+
+}
+
+bot.next =
+now +
+rand(
+600,
+1100
+);
+
+hud();
+
+}
+
+}
+
+
+if (
+mode !==
+"practice"
+) {
+
+const remaining =
+end -
+Date.now();
+
+if (
+$("#aTimer")
+) {
+
+$("#aTimer")
+.textContent =
+
+`${String(
+Math.max(
+0,
+Math.floor(
+remaining /
+60000
+)
+)
+).padStart(
+2,
+"0"
+)}`
+
++
+
+":"
+
++
+
+`${String(
+Math.max(
+0,
+Math.floor(
+remaining /
+1000
+) %
+60
+)
+).padStart(
+2,
+"0"
+)}`;
+
+}
+
+if (
+remaining <= 0
+) {
+
+running =
+false;
+
+$("#aMsg")
+.innerHTML = `
+
+<strong>
+MATCH OVER
+</strong>
+
+<span>
+${player.kills}
+kills
+</span>
+
+<button
+class="arena-primary"
+data-arena-home
+>
+ARENA HOME
+</button>
+
+`;
+
+}
+
+}
+
+}
+
+renderer.render(
+scene,
+camera
+);
+
+THREE_ACTIVE.raf =
+requestAnimationFrame(
+loop
+);
+
+}
+
+
+THREE_ACTIVE.raf =
+requestAnimationFrame(
+loop
+);
+
+
+} catch (error) {
+
+console.error(
+error
+);
+
+body.innerHTML = `
+
+<div
+class="arena-card"
+>
+
+<h3>
+Arena could not start
+</h3>
+
+<p>
+${escapeHTML(
+error.message
+)}
+</p>
+
+<button
+class="arena-primary"
+data-arena-home
+>
+Back
+</button>
+
+</div>
+
+`;
+
+}
+
+}
+
+
+/* ============================================================
+GALAXY PALS BRIDGE
+============================================================ */
+
+const PALS_SAVE =
+"galaxy.pals.real3d.v1";
+
+
+function palsDefault() {
+
+return {};
+
+}
+
+
+function openPals() {
+
+if (
+window.GALAXY_PALS_3D?.openPals
+) {
+
+return window.GALAXY_PALS_3D.openPals();
+
+}
+
+toast(
+"GALAXY PALS 3D is loading…"
+);
+
+}
+
+
+function startPals() {
+
+if (
+window.GALAXY_PALS_3D?.startPals
+) {
+
+return window.GALAXY_PALS_3D.startPals();
+
+}
+
+}
+
+
+/* ============================================================
+GLOBAL EVENTS
+============================================================ */
+
+document.addEventListener(
+"click",
+event => {
+
+const target =
+event.target instanceof
+Element
+? event.target
+: null;
+
+if (!target) {
+
+return;
+
+}
+
+const action =
+target.closest(
+"[data-action]"
+);
+
+if (action) {
+
+const type =
+action.dataset.action;
+
+if (
+type === "send"
+) {
+
+sendMessage();
+
+return;
+
+}
+
+if (
+type ===
+"new-chat"
+) {
+
+newChat();
+
+return;
+
+}
+
+if (
+type ===
+"work-send"
+) {
+
+sendWork();
+
+return;
+
+}
+
+}
+
+const view =
+target.closest(
+"[data-view]"
+);
+
+if (view) {
+
+setView(
+view.dataset.view
+);
+
+return;
+
+}
+
+if (
+target.closest(
+"[data-game-back]"
+)
+) {
+
+renderGames();
+
+return;
+
+}
+
+const open =
+target.closest(
+"[data-game-open]"
+);
+
+if (open) {
+
+const id =
+open.dataset.gameOpen;
+
+if (
+id === "chess"
+) {
+
+resetChess();
+
+return;
+
+}
+
+if (
+id === "tictactoe"
+) {
+
+resetTTT();
+
+return;
+
+}
+
+if (
+id === "connect4"
+) {
+
+resetConnect();
+
+return;
+
+}
+
+if (
+id === "memory"
+) {
+
+resetMemory();
+
+return;
+
+}
+
+if (
+id === "snake"
+) {
+
+resetSnake();
+
+return;
+
+}
+
+if (
+id === "chicken"
+) {
+
+resetChicken();
+
+return;
+
+}
+
+if (
+id === "arena"
+) {
+
+openArena();
+
+return;
+
+}
+
+if (
+id === "pals"
+) {
+
+openPals();
+
+return;
+
+}
+
+}
+
+const chess =
+target.closest(
+"[data-chess]"
+);
+
+if (chess) {
+
+const [
+r,
+c
+] =
+chess.dataset
+.chess
+.split(",")
+.map(Number);
+
+clickChess(
+r,
+c
+);
+
+return;
+
+}
+
+if (
+target.closest(
+"[data-chess-reset]"
+)
+) {
+
+resetChess();
+
+return;
+
+}
+
+if (
+target.closest(
+"[data-chess-undo]"
+)
+) {
+
+const game =
+GameCenter.chess;
+
+if (
+game
+?.snapshots
+.length
+) {
+
+Object.assign(
+
+game,
+
+game.snapshots.pop(),
+
+{
+
+selected: null,
+
+legal: []
+
+}
+
+);
+
+renderChess();
+
+}
+
+return;
+
+}
+
+const ttt =
+target.closest(
+"[data-ttt]"
+);
+
+if (ttt) {
+
+tMove(
+Number(
+ttt.dataset.ttt
+)
+);
+
+return;
+
+}
+
+if (
+target.closest(
+"[data-ttt-reset]"
+)
+) {
+
+resetTTT();
+
+return;
+
+}
+
+const connect =
+target.closest(
+"[data-c4]"
+);
+
+if (connect) {
+
+cMove(
+Number(
+connect.dataset.c4
+)
+);
+
+return;
+
+}
+
+if (
+target.closest(
+"[data-c4-reset]"
+)
+) {
+
+resetConnect();
+
+return;
+
+}
+
+const memory =
+target.closest(
+"[data-mem]"
+);
+
+if (memory) {
+
+memClick(
+Number(
+memory.dataset.mem
+)
+);
+
+return;
+
+}
+
+if (
+target.closest(
+"[data-mem-reset]"
+)
+) {
+
+resetMemory();
+
+return;
+
+}
+
+if (
+target.closest(
+"[data-snake-start]"
+)
+) {
+
+snakeStart();
+
+return;
+
+}
+
+if (
+target.closest(
+"[data-snake-new]"
+)
+) {
+
+resetSnake();
+
+return;
+
+}
+
+const snakeDirection =
+target.closest(
+"[data-snake-dir]"
+);
+
+if (snakeDirection) {
+
+const direction = {
+
+up: [
+0,
+-1
+],
+
+down: [
+0,
+1
+],
+
+left: [
+-1,
+0
+],
+
+right: [
+1,
+0
+]
+
+}[
+snakeDirection
+.dataset
+.snakeDir
+];
+
+snakeDir(
+...direction
+);
+
+return;
+
+}
+
+if (
+target.closest(
+"[data-chick-start]"
+)
+) {
+
+chickenStart();
+
+return;
+
+}
+
+if (
+target.closest(
+"[data-chick-new]"
+)
+) {
+
+resetChicken();
+
+return;
+
+}
+
+const chickenDirection =
+target.closest(
+"[data-chick-dir]"
+);
+
+if (
+chickenDirection
+) {
+
+const direction = {
+
+up: [
+0,
+-1
+],
+
+down: [
+0,
+1
+],
+
+left: [
+-8,
+0
+],
+
+right: [
+8,
+0
+]
+
+}[
+chickenDirection
+.dataset
+.chickDir
+];
+
+chickenMove(
+...direction
+);
+
+return;
+
+}
+
+const arenaMode =
+target.closest(
+"[data-arena-mode]"
+);
+
+if (arenaMode) {
+
+GameCenter.arena.mode =
+arenaMode
+.dataset
+.arenaMode;
+
+$$(
+"[data-arena-mode]"
+)
+.forEach(
+button => {
+
+button.classList.toggle(
+"active",
+button ===
+arenaMode
+);
+
+}
+);
+
+return;
+
+}
+
+if (
+target.closest(
+"[data-arena-start]"
+)
+) {
+
+startArena();
+
+return;
+
+}
+
+if (
+target.closest(
+"[data-arena-home]"
+)
+) {
+
+openArena();
+
+return;
+
+}
+
+}
+);
+
+
+/* ============================================================
+SELECT CHANGES
+============================================================ */
+
+document.addEventListener(
+"change",
+event => {
+
+const target =
+event.target;
+
+if (
+!(
+target instanceof
+HTMLSelectElement
+)
+) {
+
+return;
+
+}
+
+if (
+target.matches(
+"[data-mode]"
+)
+) {
+
+const game = {
+
+chess:
+GameCenter.chess,
+
+tictactoe:
+GameCenter.ttt,
+
+connect4:
+GameCenter.connect
+
+}[
+GameCenter.current
+];
+
+if (game) {
+
+game.mode =
+target.value;
+
+if (
+GameCenter.current ===
+"chess"
+) {
+
+resetChess();
+
+}
+
+if (
+GameCenter.current ===
+"tictactoe"
+) {
+
+resetTTT();
+
+}
+
+if (
+GameCenter.current ===
+"connect4"
+) {
+
+resetConnect();
+
+}
+
+}
+
+}
+
+if (
+target.matches(
+"[data-level]"
+)
+) {
+
+const game = {
+
+chess:
+GameCenter.chess,
+
+tictactoe:
+GameCenter.ttt,
+
+connect4:
+GameCenter.connect
+
+}[
+GameCenter.current
+];
+
+if (game) {
+
+game.elo =
+Number(
+target.value
+);
+
+}
+
+}
+
+if (
+target.matches(
+"[data-snake-level]"
+)
+) {
+
+resetSnake(
+Number(
+target.value
+)
+);
+
+}
+
+if (
+target.matches(
+"[data-chick-level]"
+)
+) {
+
+resetChicken(
+Number(
+target.value
+)
+);
+
+}
+
+}
+);
+
+
+/* ============================================================
+KEYBOARD
+============================================================ */
+
+document.addEventListener(
+"keydown",
+event => {
+
+if (
+GameCenter.current ===
+"snake"
+) {
+
+const direction = {
+
+ArrowUp: [
+0,
+-1
+],
+
+KeyW: [
+0,
+-1
+],
+
+ArrowDown: [
+0,
+1
+],
+
+KeyS: [
+0,
+1
+],
+
+ArrowLeft: [
+-1,
+0
+],
+
+KeyA: [
+-1,
+0
+],
+
+ArrowRight: [
+1,
+0
+],
+
+KeyD: [
+1,
+0
+]
+
+}[
+event.code
+];
+
+if (direction) {
+
+event.preventDefault();
+
+snakeDir(
+...direction
+);
+
+}
+
+}
+
+if (
+GameCenter.current ===
+"chicken"
+) {
+
+const direction = {
+
+ArrowUp: [
+0,
+-1
+],
+
+KeyW: [
+0,
+-1
+],
+
+ArrowDown: [
+0,
+1
+],
+
+KeyS: [
+0,
+1
+],
+
+ArrowLeft: [
+-8,
+0
+],
+
+KeyA: [
+-8,
+0
+],
+
+ArrowRight: [
+8,
+0
+],
+
+KeyD: [
+8,
+0
+]
+
+}[
+event.code
+];
+
+if (direction) {
+
+event.preventDefault();
+
+chickenMove(
+...direction
+);
+
+}
+
+}
+
+}
+);
+
+
+/* ============================================================
+INITIALIZE
+============================================================ */
+
+function initializeGalaxy() {
+
+const input =
+$("#promptInput");
+
+if (input) {
+
+input.addEventListener(
+"input",
+() =>
+autoResize(
+input
+)
+);
+
+input.addEventListener(
+"keydown",
+event => {
+
+if (
+
+event.key ===
+"Enter" &&
+
+!event.shiftKey
+
+) {
+
+event.preventDefault();
+
+sendMessage();
+
+}
+
+}
+);
+
+autoResize(
+input
+);
+
+}
+
+$("#sendButton")
+?.addEventListener(
+"click",
+event => {
+
+event.preventDefault();
+
+sendMessage();
+
+}
+);
+
+$("#workPrompt")
+?.addEventListener(
+"keydown",
+event => {
+
+if (
+
+event.key ===
+"Enter" &&
+
+(
+event.ctrlKey ||
+event.metaKey
+)
+
+) {
+
+event.preventDefault();
+
+sendWork();
+
+}
+
+}
+);
+
+const provider =
+$("#aiProvider");
+
+if (provider) {
+
+provider.value =
+"gemini";
+
+provider.disabled =
+true;
+
+}
+
+updateSendButtonState();
+
+console.log(
+"GALAXY AI initialized — Games + Arena + GALAXY PALS"
+);
+
+}
+
+
+if (
+document.readyState ===
+"loading"
+) {
+
+document.addEventListener(
+"DOMContentLoaded",
+initializeGalaxy
+);
+
+} else {
+
+initializeGalaxy();
+
+}
+
+
+/* ============================================================
+GLOBAL API
+============================================================ */
+
+window.GALAXY = {
+
+state,
+
+games:
+GameCenter,
+
+newChat,
+
+sendMessage,
+
+sendWork,
+
+openGames:
+renderGames,
+
+openArena,
+
+openPals
+
+};
+
+
+/* ============================================================
+GALAXY PALS — FULL REAL 3D SYSTEM
+============================================================ */
+
+(() => {
+
+"use strict";
+
+
+const q =
+(s, r = document) =>
+r.querySelector(s);
+
+
+const clamp3 =
+(n, a, b) =>
+Math.max(
+a,
+Math.min(
+b,
+n
+)
+);
+
+
+const rand3 =
+(a, b) =>
+a +
+Math.random() *
+(b - a);
+
+
+const pick3 =
+a =>
+a[
+Math.floor(
+Math.random() *
+a.length
+)
+];
+
+
+const safe =
+(v = "") =>
+String(v).replace(
+/[&<>"']/g,
+m => ({
+
+"&": "&amp;",
+
+"<": "&lt;",
+
+">": "&gt;",
+
+'"': "&quot;",
+
+"'": "&#39;"
+
+})[m]
+);
+
+
+const SAVE_KEY =
+"galaxy.pals.real3d.v1";
+
+
+/* ============================================================
+ORIGINAL GALAXY PAL ROSTER
+============================================================ */
+
+const PAL_DEFS = [
+
+{
+
+id: "emberfox",
+
+name: "Emberfox",
+
+element: "Fire",
+
+model:
+"/assets/pals/emberfox.glb",
+
+scale: 1.05,
+
+hp: 110,
+
+speed: 3.5,
+
+rarity: 1,
+
+mount: "ground"
+
+},
+
+{
+
+id: "frostwolf",
+
+name: "Frostwolf",
+
+element: "Ice",
+
+model:
+"/assets/pals/frostwolf.glb",
+
+scale: 1.18,
+
+hp: 145,
+
+speed: 4.0,
+
+rarity: 2,
+
+mount: "ground"
+
+},
+
+{
+
+id: "voltlynx",
+
+name: "Voltlynx",
+
+element: "Electric",
+
+model:
+"/assets/pals/voltlynx.glb",
+
+scale: 1.0,
+
+hp: 120,
+
+speed: 4.3,
+
+rarity: 2,
+
+mount: "ground"
+
+},
+
+{
+
+id: "aquafin",
+
+name: "Aquafin",
+
+element: "Water",
+
+model:
+"/assets/pals/aquafin.glb",
+
+scale: 1.25,
+
+hp: 160,
+
+speed: 3.2,
+
+rarity: 2,
+
+mount: "swim"
+
+},
+
+{
+
+id: "stonehorn",
+
+name: "Stonehorn",
+
+element: "Ground",
+
+model:
+"/assets/pals/stonehorn.glb",
+
+scale: 1.35,
+
+hp: 210,
+
+speed: 2.5,
+
+rarity: 2,
+
+mount: "ground"
+
+},
+
+{
+
+id: "stormgryph",
+
+name: "Stormgryph",
+
+element: "Electric",
+
+model:
+"/assets/pals/stormgryph.glb",
+
+scale: 1.35,
+
+hp: 180,
+
+speed: 4.8,
+
+rarity: 4,
+
+mount: "flying"
+
+},
+
+{
+
+id: "cinderdrake",
+
+name: "Cinderdrake",
+
+element: "Fire",
+
+model:
+"/assets/pals/cinderdrake.glb",
+
+scale: 1.55,
+
+hp: 250,
+
+speed: 4.1,
+
+rarity: 4,
+
+mount: "flying"
+
+},
+
+{
+
+id: "glacierox",
+
+name: "Glacierox",
+
+element: "Ice",
+
+model:
+"/assets/pals/glacierox.glb",
+
+scale: 1.5,
+
+hp: 280,
+
+speed: 2.4,
+
+rarity: 4,
+
+mount: "ground"
+
+},
+
+{
+
+id: "voidlion",
+
+name: "Voidlion",
+
+element: "Dark",
+
+model:
+"/assets/pals/voidlion.glb",
+
+scale: 1.3,
+
+hp: 230,
+
+speed: 4.4,
+
+rarity: 5,
+
+mount: "ground"
+
+},
+
+{
+
+id: "bloomdeer",
+
+name: "Bloomdeer",
+
+element: "Grass",
+
+model:
+"/assets/pals/bloomdeer.glb",
+
+scale: 1.1,
+
+hp: 135,
+
+speed: 3.8,
+
+rarity: 2,
+
+mount: "ground"
+
+},
+
+{
+
+id: "moonowl",
+
+name: "Moonowl",
+
+element: "Dark",
+
+model:
+"/assets/pals/moonowl.glb",
+
+scale: 1.05,
+
+hp: 125,
+
+speed: 4.2,
+
+rarity: 3,
+
+mount: "flying"
+
+},
+
+{
+
+id: "starwyrm",
+
+name: "Starwyrm",
+
+element: "Dragon",
+
+model:
+"/assets/pals/starwyrm.glb",
+
+scale: 2.15,
+
+hp: 650,
+
+speed: 4.0,
+
+rarity: 5,
+
+mount: "flying",
+
+boss: true
+
+}
+
+];
+
+
+/* ============================================================
+CAPTURE ORBS
+============================================================ */
+
+const ORBS = [
+
+{
+
+name:
+"Basic Orb",
+
+bonus:
+1.0,
+
+color:
+0x4ea8ff
+
+},
+
+{
+
+name:
+"Mega Orb",
+
+bonus:
+1.35,
+
+color:
+0x56d879
+
+},
+
+{
+
+name:
+"Giga Orb",
+
+bonus:
+1.75,
+
+color:
+0xe1c447
+
+},
+
+{
+
+name:
+"Hyper Orb",
+
+bonus:
+2.2,
+
+color:
+0xa06ae9
+
+},
+
+{
+
+name:
+"Ultra Orb",
+
+bonus:
+2.8,
+
+color:
+0xffb44d
+
+}
+
+];
+
+
+const RUNTIME = {
+
+running: false,
+
+raf: 0,
+
+cleanups: [],
+
+mixers: [],
+
+creatures: [],
+
+projectiles: [],
+
+companion: null,
+
+mounted: false,
+
+target: null,
+
+heldOrb: null,
+
+orbCharging: false,
+
+chargeStarted: 0
+
+};
+
+
+/* ============================================================
+SAVE
+============================================================ */
+
+function defaultSave() {
+
+return {
+
+level: 1,
+
+xp: 0,
+
+hp: 100,
+
+stamina: 100,
+
+hunger: 100,
+
+x: 0,
+
+y: 0,
+
+z: 8,
+
+selectedOrb: 0,
+
+orbs: [
+18,
+6,
+2,
+1,
+0
+],
+
+party: [],
+
+box: []
+
+};
+
+}
+
+
+function loadSave() {
+
+try {
+
+return {
+
+...defaultSave(),
+
+...(
+JSON.parse(
+localStorage.getItem(
+SAVE_KEY
+)
+) ||
+{}
+)
+
+};
+
+} catch {
+
+return defaultSave();
+
+}
+
+}
+
+
+function saveGame(game) {
+
+try {
+
+localStorage.setItem(
+SAVE_KEY,
+JSON.stringify(game)
+);
+
+} catch {}
+
+}
+
+
+/* ============================================================
+RUNTIME CLEANUP
+============================================================ */
+
+function addListener(
+el,
+type,
+fn,
+options
+) {
+
+el.addEventListener(
+type,
+fn,
+options
+);
+
+RUNTIME.cleanups.push(
+() =>
+el.removeEventListener(
+type,
+fn,
+options
+)
+);
+
+}
+
+
+function stopPals3D() {
+
+RUNTIME.running =
+false;
+
+cancelAnimationFrame(
+RUNTIME.raf
+);
+
+RUNTIME.cleanups
+.splice(0)
+.forEach(
+fn => {
+
+try {
+
+fn();
+
+} catch {}
+
+}
+);
+
+RUNTIME.mixers.length =
+0;
+
+RUNTIME.creatures.length =
+0;
+
+RUNTIME.projectiles.length =
+0;
+
+RUNTIME.companion =
+null;
+
+RUNTIME.target =
+null;
+
+RUNTIME.heldOrb =
+null;
+
+RUNTIME.orbCharging =
+false;
+
+try {
+
+if (
+document.pointerLockElement
+) {
+
+document.exitPointerLock();
+
+}
+
+} catch {}
+
+}
+
+
+/* ============================================================
+LOAD THREE + GLTF
+============================================================ */
+
+async function load3DModules() {
+
+const THREE =
+await import(
+"https://cdn.jsdelivr.net/npm/three@0.160.0/+esm"
+);
+
+const {
+GLTFLoader
+} =
+await import(
+"https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/loaders/GLTFLoader.js/+esm"
+);
+
+const SkeletonUtils =
+await import(
+"https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/utils/SkeletonUtils.js/+esm"
+);
+
+return {
+
+THREE,
+
+GLTFLoader,
+
+cloneSkinned:
+SkeletonUtils.clone
+
+};
+
+}
+
+
+/* ============================================================
+ANIMATION SYSTEM
+============================================================ */
+
+function findClip(
+clips,
+names
+) {
+
+const lower =
+clips.map(
+c => ({
+
+clip: c,
+
+name:
+c.name.toLowerCase()
+
+})
+);
+
+for (
+const wanted of
+names
+) {
+
+const found =
+lower.find(
+x =>
+x.name.includes(
+wanted
+)
+);
+
+if (found) {
+
+return found.clip;
+
+}
+
+}
+
+return clips[0] ||
+null;
+
+}
+
+
+function playAction(
+entity,
+state
+) {
+
+if (
+!entity.mixer ||
+!entity.clips?.length
+) {
+
+return;
+
+}
+
+if (
+entity.animState ===
+state
+) {
+
+return;
+
+}
+
+entity.animState =
+state;
+
+const map = {
+
+idle: [
+"idle",
+"breath",
+"stand"
+],
+
+walk: [
+"walk",
+"move"
+],
+
+run: [
+"run",
+"sprint",
+"gallop"
+],
+
+fly: [
+"fly",
+"flight"
+],
+
+attack: [
+"attack",
+"bite",
+"skill",
+"hit"
+],
+
+hurt: [
+"hurt",
+"damage"
+],
+
+sleep: [
+"sleep"
+]
+
+};
+
+const clip =
+findClip(
+entity.clips,
+map[state] ||
+[state]
+);
+
+if (!clip) {
+
+return;
+
+}
+
+const next =
+entity.mixer.clipAction(
+clip
+);
+
+if (
+
+entity.currentAction &&
+
+entity.currentAction !==
+next
+
+) {
+
+entity.currentAction.fadeOut(
+0.15
+);
+
+}
+
+next
+.reset()
+.fadeIn(
+0.15
+)
+.play();
+
+entity.currentAction =
+next;
+
+}
+
+
+/* ============================================================
+3D PLAYER FALLBACK
+============================================================ */
+
+function createFallbackPlayer(THREE) {
+
+const g =
+new THREE.Group();
+
+const mat =
+new THREE
+.MeshStandardMaterial({
+
+color:
+0x334b6a,
+
+roughness:
+0.75
+
+});
+
+const skin =
+new THREE
+.MeshStandardMaterial({
+
+color:
+0xd6ad8a,
+
+roughness:
+0.8
+
+});
+
+const body =
+new THREE.Mesh(
+
+new THREE
+.CapsuleGeometry(
+0.32,
+0.9,
+6,
+10
+),
+
+mat
+
+);
+
+body.position.y =
+1.1;
+
+const head =
+new THREE.Mesh(
+
+new THREE
+.SphereGeometry(
+0.24,
+18,
+14
+),
+
+skin
+
+);
+
+head.position.y =
+1.92;
+
+g.add(
+body,
+head
+);
+
+g.traverse(
+o => {
+
+if (
+o.isMesh
+) {
+
+o.castShadow =
+true;
+
+}
+
+}
+);
+
+return g;
+
+}
+
+
+/* ============================================================
+3D CAPTURE ORB
+============================================================ */
+
+function createOrb(
+THREE,
+tier
+) {
+
+const def =
+ORBS[tier];
+
+const group =
+new THREE.Group();
+
+const shell =
+new THREE.Mesh(
+
+new THREE
+.SphereGeometry(
+0.18,
+20,
+16
+),
+
+new THREE
+.MeshStandardMaterial({
+
+color:
+def.color,
+
+metalness:
+0.35,
+
+roughness:
+0.22,
+
+emissive:
+def.color,
+
+emissiveIntensity:
+0.18
+
+})
+
+);
+
+const ring =
+new THREE.Mesh(
+
+new THREE
+.TorusGeometry(
+0.185,
+0.022,
+8,
+26
+),
+
+new THREE
+.MeshStandardMaterial({
+
+color:
+0xffffff,
+
+metalness:
+0.55,
+
+roughness:
+0.25
+
+})
+
+);
+
+ring.rotation.x =
+Math.PI /
+2;
+
+group.add(
+shell,
+ring
+);
+
+group.traverse(
+o => {
+
+if (
+o.isMesh
+) {
+
+o.castShadow =
+true;
+
+}
+
+}
+);
+
+return group;
+
+}
+
+
+/* ============================================================
+PALS HOME
+============================================================ */
+
+function openPalsHome() {
+
+stopPals3D();
+
+if (
+typeof GameCenter !==
+"undefined"
+) {
+
+GameCenter.current =
+"pals";
+
+}
+
+if (
+$("#contentTitle")
+) {
+
+$("#contentTitle")
+.textContent =
+"GALAXY PALS";
+
+}
+
+if (
+$("#contentEyebrow")
+) {
+
+$("#contentEyebrow")
+.textContent =
+"FULL 3D CREATURE SURVIVAL";
+
+}
+
+const game =
+loadSave();
+
+const body =
+q(
+"#contentBody"
+);
+
+if (!body) {
+
+return;
+
+}
+
+body.innerHTML = `
+
+<div class="gp3d-home">
+
+<section class="gp3d-hero">
+
+<span class="gp3d-kicker">
+GALAXY PALS • FULL 3D
+</span>
+
+<h2>
+Creature Survival World
+</h2>
+
+<p>
+Real GLB creature models,
+third-person movement,
+physical capture Orbs,
+mounts,
+flying Pals
+and bosses.
+</p>
+
+<div class="gp3d-actions">
+
+<button
+class="gp3d-primary"
+data-gp3d-start
+>
+PLAY 3D WORLD
+</button>
+
+<button
+class="gp3d-secondary"
+data-gp3d-reset
+>
+RESET SAVE
+</button>
+
+</div>
+
+</section>
+
+<aside class="gp3d-summary">
+
+<div>
+
+<strong>
+${game.box.length}
+</strong>
+
+<span>
+Captured
+</span>
+
+</div>
+
+<div>
+
+<strong>
+${game.party.length}/5
+</strong>
+
+<span>
+Party
+</span>
+
+</div>
+
+<div>
+
+<strong>
+LV ${game.level}
+</strong>
+
+<span>
+Player
+</span>
+
+</div>
+
+</aside>
+
+</div>
+
+`;
+
+}
+
+
+/* ============================================================
+START FULL 3D WORLD
+============================================================ */
+
+async function startPals3D() {
+
+stopPals3D();
+
+if (
+typeof GameCenter !==
+"undefined"
+) {
+
+GameCenter.current =
+"pals";
+
+}
+
+const body =
+q(
+"#contentBody"
+);
+
+if (!body) {
+
+return;
+
+}
+
+body.innerHTML = `
+
+<div
+class="gp3d-world"
+id="gp3dWorld"
+>
+
+<canvas
+id="gp3dCanvas"
+></canvas>
+
+<div
+class="gp3d-vignette"
+></div>
+
+<div
+class="gp3d-top"
+>
+
+<div
+class="gp3d-pill"
+id="gp3dZone"
+>
+Verdant Wilds
+</div>
+
+<div
+class="gp3d-pill"
+id="gp3dClock"
+>
+DAY 1 • 08:00
+</div>
+
+<div
+class="gp3d-pill"
+id="gp3dLevel"
+>
+LV 1
+</div>
+
+</div>
+
+<div
+class="gp3d-crosshair"
+></div>
+
+<div
+class="gp3d-target"
+id="gp3dTarget"
+hidden
+></div>
+
+<div
+class="gp3d-feed"
+id="gp3dFeed"
+></div>
+
+<div
+class="gp3d-party"
+id="gp3dParty"
+></div>
+
+<div
+class="gp3d-bars"
+>
+
+<div>
+
+<span>
+HP
+</span>
+
+<i>
+<b
+id="gp3dHP"
+></b>
+</i>
+
+<strong
+id="gp3dHPText"
+>
+100
+</strong>
+
+</div>
+
+<div>
+
+<span>
+STAMINA
+</span>
+
+<i>
+<b
+id="gp3dSTA"
+></b>
+</i>
+
+<strong
+id="gp3dSTAText"
+>
+100
+</strong>
+
+</div>
+
+<div>
+
+<span>
+FOOD
+</span>
+
+<i>
+<b
+id="gp3dFood"
+></b>
+</i>
+
+<strong
+id="gp3dFoodText"
+>
+100
+</strong>
+
+</div>
+
+</div>
+
+<div
+class="gp3d-orbs"
+id="gp3dOrbs"
+></div>
+
+<div
+class="gp3d-help"
+>
+Click world • WASD move • Shift sprint • Left click attack • Hold Q aim Orb • Release Q throw • F summon • E mount • 1–5 Orb
+</div>
+
+<div
+class="gp3d-loading"
+id="gp3dLoading"
+>
+Loading 3D world…
+</div>
+
+</div>
+
+`;
+
+const game =
+loadSave();
+
+const {
+
+THREE,
+
+GLTFLoader,
+
+cloneSkinned
+
+} =
+await load3DModules();
+
+const canvas =
+q(
+"#gp3dCanvas"
+);
+
+const host =
+q(
+"#gp3dWorld"
+);
+
+const loader =
+new GLTFLoader();
+
+
+/* ============================================================
+SCENE
+============================================================ */
+
+const scene =
+new THREE.Scene();
+
+scene.background =
+new THREE.Color(
+0x92cdeb
+);
+
+scene.fog =
+new THREE
+.FogExp2(
+0xa5d1df,
+0.0058
+);
+
+const camera =
+new THREE
+.PerspectiveCamera(
+66,
+1,
+0.1,
+420
+);
+
+const renderer =
+new THREE
+.WebGLRenderer({
+
+canvas,
+
+antialias:
+true,
+
+alpha:
+false
+
+});
+
+renderer.shadowMap.enabled =
+true;
+
+renderer.shadowMap.type =
+THREE.PCFSoftShadowMap;
+
+renderer.outputColorSpace =
+THREE.SRGBColorSpace;
+
+renderer.toneMapping =
+THREE.ACESFilmicToneMapping;
+
+renderer.toneMappingExposure =
+1.05;
+
+
+const hemi =
+new THREE
+.HemisphereLight(
+0xe8f7ff,
+0x405337,
+1.5
+);
+
+scene.add(
+hemi
+);
+
+
+const sun =
+new THREE
+.DirectionalLight(
+0xffefd0,
+2.2
+);
+
+sun.position.set(
+45,
+65,
+25
+);
+
+sun.castShadow =
+true;
+
+sun.shadow.mapSize.set(
+2048,
+2048
+);
+
+scene.add(
+sun
+);
+
+
+const world =
+new THREE.Group();
+
+scene.add(
+world
+);
+
+
+/* ============================================================
+3D GROUND
+============================================================ */
+
+const ground =
+new THREE.Mesh(
+
+new THREE
+.PlaneGeometry(
+360,
+360,
+1,
+1
+),
+
+new THREE
+.MeshStandardMaterial({
+
+color:
+0x5b844a,
+
+roughness:
+0.96
+
+})
+
+);
+
+ground.rotation.x =
+-Math.PI /
+2;
+
+ground.receiveShadow =
+true;
+
+world.add(
+ground
+);
+
+
+/* ============================================================
+3D WATER
+============================================================ */
+
+const water =
+new THREE.Mesh(
+
+new THREE
+.CircleGeometry(
+26,
+64
+),
+
+new THREE
+.MeshPhysicalMaterial({
+
+color:
+0x4d9bc7,
+
+transparent:
+true,
+
+opacity:
+0.72,
+
+roughness:
+0.12,
+
+metalness:
+0.02,
+
+clearcoat:
+0.6
+
+})
+
+);
+
+water.rotation.x =
+-Math.PI /
+2;
+
+water.position.set(
+55,
+0.05,
+-45
+);
+
+world.add(
+water
+);
+
+
+/* ============================================================
+3D TREES AND ROCKS
+============================================================ */
+
+for (
+let i = 0;
+i < 120;
+i++
+) {
+
+const x =
+rand3(
+-165,
+165
+);
+
+const z =
+rand3(
+-165,
+165
+);
+
+if (
+Math.hypot(
+x,
+z
+) < 14
+) {
+
+continue;
+
+}
+
+if (
+Math.random() <
+0.68
+) {
+
+const tree =
+new THREE.Group();
+
+const h =
+rand3(
+3.5,
+7.5
+);
+
+const trunk =
+new THREE.Mesh(
+
+new THREE
+.CylinderGeometry(
+0.28,
+0.52,
+h,
+10
+),
+
+new THREE
+.MeshStandardMaterial({
+
+color:
+0x6b482e,
+
+roughness:
+1
+
+})
+
+);
+
+trunk.position.y =
+h /
+2;
+
+trunk.castShadow =
+true;
+
+tree.add(
+trunk
+);
+
+for (
+let j = 0;
+j < 3;
+j++
+) {
+
+const crown =
+new THREE.Mesh(
+
+new THREE
+.IcosahedronGeometry(
+rand3(
+1.15,
+2.15
+),
+1
+),
+
+new THREE
+.MeshStandardMaterial({
+
+color:
+pick3([
+0x3f7139,
+0x4c8142,
+0x5a8f49
+]),
+
+roughness:
+0.95
+
+})
+
+);
+
+crown.position.set(
+
+rand3(
+-0.45,
+0.45
+),
+
+h *
+0.72 +
+j *
+0.55,
+
+rand3(
+-0.45,
+0.45
+)
+
+);
+
+crown.castShadow =
+true;
+
+tree.add(
+crown
+);
+
+}
+
+tree.position.set(
+x,
+0,
+z
+);
+
+world.add(
+tree
+);
+
+} else {
+
+const rock =
+new THREE.Mesh(
+
+new THREE
+.DodecahedronGeometry(
+rand3(
+0.6,
+2
+)
+),
+
+new THREE
+.MeshStandardMaterial({
+
+color:
+0x777b74,
+
+roughness:
+0.96
+
+})
+
+);
+
+rock.position.set(
+
+x,
+
+rand3(
+0.4,
+1
+),
+
+z
+
+);
+
+rock.rotation.set(
+
+rand3(
+0,
+2
+),
+
+rand3(
+0,
+2
+),
+
+rand3(
+0,
+2
+)
+
+);
+
+rock.castShadow =
+true;
+
+rock.receiveShadow =
+true;
+
+world.add(
+rock
+);
+
+}
+
+}
+
+
+/* ============================================================
+PLAYER
+============================================================ */
+
+const player = {
+
+x:
+game.x ||
+0,
+
+y:
+game.y ||
+0,
+
+z:
+game.z ||
+8,
+
+yaw:
+0,
+
+pitch:
+-0.12,
+
+hp:
+game.hp ??
+100,
+
+stamina:
+game.stamina ??
+100,
+
+hunger:
+game.hunger ??
+100,
+
+model:
+null,
+
+mixer:
+null,
+
+clips: [],
+
+currentAction:
+null,
+
+animState:
+"",
+
+speed:
+4.7
+
+};
+
+
+try {
+
+const gltf =
+await loader.loadAsync(
+"/assets/player/player.glb"
+);
+
+player.model =
+gltf.scene;
+
+player.clips =
+gltf.animations ||
+[];
+
+player.mixer =
+new THREE.AnimationMixer(
+player.model
+);
+
+RUNTIME.mixers.push(
+player.mixer
+);
+
+player.model.scale.setScalar(
+1
+);
+
+player.model.traverse(
+o => {
+
+if (
+o.isMesh
+) {
+
+o.castShadow =
+true;
+
+o.receiveShadow =
+true;
+
+}
+
+}
+);
+
+playAction(
+player,
+"idle"
+);
+
+} catch {
+
+player.model =
+createFallbackPlayer(
+THREE
+);
+
+}
+
+world.add(
+player.model
+);
+
+
+/* ============================================================
+LOAD EVERY PAL MODEL
+============================================================ */
+
+const palCache =
+new Map();
+
+const failedModels =
+[];
+
+
+for (
+const def of
+PAL_DEFS
+) {
+
+try {
+
+const gltf =
+await loader.loadAsync(
+def.model
+);
+
+gltf.scene.traverse(
+o => {
+
+if (
+o.isMesh
+) {
+
+o.castShadow =
+true;
+
+o.receiveShadow =
+true;
+
+if (
+o.material?.map
+) {
+
+o.material.map.colorSpace =
+THREE.SRGBColorSpace;
+
+}
+
+}
+
+}
+);
+
+palCache.set(
+def.id,
+{
+
+scene:
+gltf.scene,
+
+clips:
+gltf.animations ||
+[]
+
+}
+);
+
+} catch {
+
+failedModels.push(
+def.model
+);
+
+}
+
+}
+
+
+/* ============================================================
+DO NOT CREATE COLORED BALL FALLBACK PALS
+============================================================ */
+
+if (
+!palCache.size
+) {
+
+q(
+"#gp3dLoading"
+).innerHTML = `
+
+<strong>
+3D PAL MODELS ARE MISSING
+</strong>
+
+<br><br>
+
+Add your original GLB files inside:
+
+<br>
+
+<code>
+/assets/pals/
+</code>
+
+<br><br>
+
+and add:
+
+<br>
+
+<code>
+/assets/player/player.glb
+</code>
+
+<br><br>
+
+GALAXY intentionally does not replace missing Pals with colored balls.
+
+`;
+
+return;
+
+}
+
+
+q(
+"#gp3dLoading"
+)?.remove();
+
+
+const creatures =
+RUNTIME.creatures;
+
+
+/* ============================================================
+SPAWN 3D PAL
+============================================================ */
+
+function spawnCreature(
+def,
+x,
+z,
+level = 1
+) {
+
+const cached =
+palCache.get(
+def.id
+);
+
+if (!cached) {
+
+return null;
+
+}
+
+const model =
+cloneSkinned(
+cached.scene
+);
+
+model.scale.setScalar(
+
+def.scale *
+
+(
+def.boss
+? 1.35
+: 1
+)
+
+);
+
+model.position.set(
+x,
+0,
+z
+);
+
+world.add(
+model
+);
+
+const creature = {
+
+def,
+
+model,
+
+clips:
+cached.clips,
+
+mixer:
+cached.clips.length
+
+? new THREE
+.AnimationMixer(
+model
+)
+
+: null,
+
+currentAction:
+null,
+
+animState:
+"",
+
+x,
+
+y:
+0,
+
+z,
+
+hp:
+def.hp *
+(
+def.boss
+? 2.2
+: 1
+),
+
+maxHp:
+def.hp *
+(
+def.boss
+? 2.2
+: 1
+),
+
+level,
+
+direction:
+rand3(
+0,
+Math.PI *
+2
+),
+
+changeAt:
+performance.now() +
+rand3(
+1200,
+3200
+),
+
+alive:
+true,
+
+aggressive:
+false,
+
+boss:
+!!def.boss
+
+};
+
+if (
+creature.mixer
+) {
+
+RUNTIME.mixers.push(
+creature.mixer
+);
+
+}
+
+model.traverse(
+o => {
+
+if (
+o.isMesh
+) {
+
+o.userData.gpCreature =
+creature;
+
+}
+
+}
+);
+
+playAction(
+
+creature,
+
+def.mount ===
+"flying"
+? "fly"
+: "idle"
+
+);
+
+creatures.push(
+creature
+);
+
+return creature;
+
+}
+
+
+/* ============================================================
+SPAWN EACH DIFFERENT SPECIES
+============================================================ */
+
+const availableDefs =
+PAL_DEFS.filter(
+d =>
+palCache.has(
+d.id
+)
+);
+
+
+availableDefs.forEach(
+(
+def,
+index
+) => {
+
+const a =
+index /
+availableDefs.length *
+Math.PI *
+2;
+
+const r =
+def.boss
+? 110
+: 35 +
+(index % 5) *
+15;
+
+spawnCreature(
+
+def,
+
+Math.sin(a) *
+r +
+rand3(
+-5,
+5
+),
+
+Math.cos(a) *
+r +
+rand3(
+-5,
+5
+),
+
+def.boss
+
+? 25
+
+: Math.floor(
+rand3(
+2,
+12
+)
+)
+
+);
+
+}
+);
+
+
+/* EXTRA WILD PALS */
+
+for (
+let i = 0;
+i < 12;
+i++
+) {
+
+const def =
+pick3(
+availableDefs.filter(
+d =>
+!d.boss
+)
+);
+
+if (def) {
+
+spawnCreature(
+
+def,
+
+rand3(
+-120,
+120
+),
+
+rand3(
+-120,
+120
+),
+
+Math.floor(
+rand3(
+2,
+15
+)
+)
+
+);
+
+}
+
+}
+
+
+/* ============================================================
+INPUT / TARGETING
+============================================================ */
+
+const keys =
+new Set();
+
+const raycaster =
+new THREE.Raycaster();
+
+const feed =
+[];
+
+let lastSave =
+performance.now();
+
+let worldTime =
+8;
+
+
+function feedMsg(text) {
+
+feed.unshift({
+
+text,
+
+t:
+performance.now()
+
+});
+
+feed.splice(
+5
+);
+
+}
+
+
+function getCaptureChance(c) {
+
+const weaken =
+1 -
+c.hp /
+c.maxHp;
+
+const orb =
+ORBS[
+game.selectedOrb
+] ||
+ORBS[0];
+
+return clamp3(
+
+(
+0.16 +
+weaken *
+0.72
+)
+
+*
+
+orb.bonus
+
+/
+
+(
+1 +
+c.def.rarity *
+0.22 +
+c.level *
+0.015
+),
+
+0.03,
+
+0.95
+
+);
+
+}
+
+
+function findTarget() {
+
+raycaster.setFromCamera(
+
+new THREE.Vector2(
+0,
+0
+),
+
+camera
+
+);
+
+const meshes =
+[];
+
+creatures.forEach(
+c => {
+
+if (
+!c.alive
+) {
+
+return;
+
+}
+
+c.model.traverse(
+o => {
+
+if (
+o.isMesh
+) {
+
+meshes.push(
+o
+);
+
+}
+
+}
+);
+
+}
+);
+
+const hit =
+raycaster.intersectObjects(
+meshes,
+false
+)[0];
+
+RUNTIME.target =
+
+hit &&
+hit.distance < 30
+
+? hit.object
+.userData
+.gpCreature ||
+null
+
+: null;
+
+}
+
+
+/* ============================================================
+COMBAT
+============================================================ */
+
+function attackTarget() {
+
+const c =
+RUNTIME.target;
+
+if (
+!c?.alive
+) {
+
+return;
+
+}
+
+c.hp =
+Math.max(
+
+0,
+
+c.hp -
+(
+18 +
+game.level *
+1.5
+)
+
+);
+
+c.aggressive =
+true;
+
+playAction(
+c,
+"hurt"
+);
+
+feedMsg(
+`${c.def.name} HP ${Math.ceil(c.hp)}`
+);
+
+if (
+c.hp <= 0
+) {
+
+c.alive =
+false;
+
+c.model.visible =
+false;
+
+feedMsg(
+`${c.def.name} defeated`
+);
+
+} else {
+
+setTimeout(
+() => {
+
+if (
+c.alive
+) {
+
+playAction(
+
+c,
+
+c.def.mount ===
+"flying"
+? "fly"
+: "run"
+
+);
+
+}
+
+},
+350
+);
+
+}
+
+}
+
+
+/* ============================================================
+HOLD Q — SHOW 3D ORB
+============================================================ */
+
+function beginOrbCharge() {
+
+if (
+RUNTIME.orbCharging ||
+RUNTIME.mounted
+) {
+
+return;
+
+}
+
+const tier =
+game.selectedOrb ||
+0;
+
+if (
+(
+game.orbs[tier] ||
+0
+) <= 0
+) {
+
+feedMsg(
+"No capture Orbs"
+);
+
+return;
+
+}
+
+RUNTIME.orbCharging =
+true;
+
+RUNTIME.chargeStarted =
+performance.now();
+
+const orb =
+createOrb(
+THREE,
+tier
+);
+
+RUNTIME.heldOrb =
+orb;
+
+scene.add(
+orb
+);
+
+}
+
+
+/* ============================================================
+ORB IN PLAYER HAND
+============================================================ */
+
+function updateHeldOrb() {
+
+if (
+!RUNTIME.heldOrb
+) {
+
+return;
+
+}
+
+const dir =
+new THREE.Vector3();
+
+camera.getWorldDirection(
+dir
+);
+
+const right =
+new THREE.Vector3()
+.crossVectors(
+dir,
+camera.up
+)
+.normalize();
+
+RUNTIME.heldOrb.position
+.copy(
+camera.position
+)
+.add(
+dir.clone()
+.multiplyScalar(
+1.15
+)
+)
+.add(
+right.multiplyScalar(
+0.42
+)
+)
+.add(
+new THREE.Vector3(
+0,
+-0.35,
+0
+)
+);
+
+RUNTIME.heldOrb.rotation.y +=
+0.05;
+
+}
+
+
+/* ============================================================
+RELEASE Q — PHYSICALLY THROW ORB
+============================================================ */
+
+function releaseOrb() {
+
+if (
+
+!RUNTIME.orbCharging ||
+
+!RUNTIME.heldOrb
+
+) {
+
+return;
+
+}
+
+const tier =
+game.selectedOrb ||
+0;
+
+if (
+(
+game.orbs[tier] ||
+0
+) <= 0
+) {
+
+return;
+
+}
+
+game.orbs[tier]--;
+
+const charge =
+clamp3(
+
+(
+performance.now() -
+RUNTIME.chargeStarted
+) /
+900,
+
+0.25,
+
+1
+
+);
+
+const dir =
+new THREE.Vector3();
+
+camera.getWorldDirection(
+dir
+);
+
+const orb =
+RUNTIME.heldOrb;
+
+RUNTIME.heldOrb =
+null;
+
+RUNTIME.orbCharging =
+false;
+
+RUNTIME.projectiles.push({
+
+mesh:
+orb,
+
+velocity:
+dir
+.multiplyScalar(
+13 +
+13 *
+charge
+)
+.add(
+new THREE.Vector3(
+0,
+3.2 +
+2 *
+charge,
+0
+)
+),
+
+life:
+5,
+
+tier
+
+});
+
+feedMsg(
+`${ORBS[tier].name} thrown`
+);
+
+}
+
+
+/* ============================================================
+CAPTURE RESULT
+============================================================ */
+
+function resolveCapture(
+c,
+projectile
+) {
+
+projectile.dead =
+true;
+
+projectile.mesh.visible =
+false;
+
+const chance =
+getCaptureChance(
+c
+);
+
+c.model.visible =
+false;
+
+feedMsg(
+`Capturing ${c.def.name}… ${Math.round(
+chance *
+100
+)}%`
+);
+
+setTimeout(
+() => {
+
+if (
+Math.random() <
+chance
+) {
+
+c.alive =
+false;
+
+game.box.push(
+c.def.id
+);
+
+if (
+game.party.length <
+5
+) {
+
+game.party.push(
+c.def.id
+);
+
+}
+
+game.xp +=
+40 *
+c.def.rarity;
+
+feedMsg(
+`${c.def.name} captured!`
+);
+
+saveGame(
+game
+);
+
+} else {
+
+c.model.visible =
+true;
+
+c.aggressive =
+true;
+
+playAction(
+
+c,
+
+c.def.mount ===
+"flying"
+? "fly"
+: "run"
+
+);
+
+feedMsg(
+`${c.def.name} escaped!`
+);
+
+}
+
+},
+950
+);
+
+}
+
+
+/* ============================================================
+UPDATE 3D ORB PROJECTILES
+============================================================ */
+
+function updateProjectiles(dt) {
+
+for (
+const p of
+RUNTIME.projectiles
+) {
+
+if (
+p.dead
+) {
+
+continue;
+
+}
+
+p.velocity.y -=
+9.8 *
+dt;
+
+p.mesh.position
+.addScaledVector(
+p.velocity,
+dt
+);
+
+p.mesh.rotation.x +=
+dt *
+8;
+
+p.mesh.rotation.z +=
+dt *
+5;
+
+p.life -=
+dt;
+
+let hit =
+null;
+
+for (
+const c of
+creatures
+) {
+
+if (
+!c.alive ||
+!c.model.visible
+) {
+
+continue;
+
+}
+
+if (
+
+p.mesh.position
+.distanceTo(
+c.model.position
+) <
+
+(
+c.boss
+? 2.2
+: 1.35
+)
+
+) {
+
+hit =
+c;
+
+break;
+
+}
+
+}
+
+if (hit) {
+
+resolveCapture(
+hit,
+p
+);
+
+continue;
+
+}
+
+if (
+
+p.life <= 0 ||
+
+p.mesh.position.y <
+0.12
+
+) {
+
+p.dead =
+true;
+
+}
+
+}
+
+RUNTIME.projectiles =
+RUNTIME.projectiles.filter(
+p => {
+
+if (
+p.dead
+) {
+
+scene.remove(
+p.mesh
+);
+
+return false;
+
+}
+
+return true;
+
+}
+);
+
+}
+
+
+/* ============================================================
+SUMMON COMPANION
+============================================================ */
+
+function summonCompanion() {
+
+if (
+RUNTIME.mounted
+) {
+
+return;
+
+}
+
+if (
+RUNTIME.companion
+) {
+
+world.remove(
+RUNTIME.companion.model
+);
+
+RUNTIME.companion =
+null;
+
+feedMsg(
+"Companion recalled"
+);
+
+return;
+
+}
+
+const id =
+game.party[0];
+
+const def =
+PAL_DEFS.find(
+d =>
+d.id === id
+);
+
+const cached =
+def
+? palCache.get(
+def.id
+)
+: null;
+
+if (
+!def ||
+!cached
+) {
+
+feedMsg(
+"Capture a Pal first"
+);
+
+return;
+
+}
+
+const model =
+cloneSkinned(
+cached.scene
+);
+
+model.scale.setScalar(
+def.scale
+);
+
+model.position.set(
+
+player.x +
+2,
+
+player.y,
+
+player.z +
+2
+
+);
+
+world.add(
+model
+);
+
+const companion = {
+
+def,
+
+model,
+
+clips:
+cached.clips,
+
+mixer:
+cached.clips.length
+
+? new THREE
+.AnimationMixer(
+model
+)
+
+: null,
+
+currentAction:
+null,
+
+animState:
+"",
+
+alive:
+true
+
+};
+
+if (
+companion.mixer
+) {
+
+RUNTIME.mixers.push(
+companion.mixer
+);
+
+}
+
+playAction(
+
+companion,
+
+def.mount ===
+"flying"
+? "fly"
+: "idle"
+
+);
+
+RUNTIME.companion =
+companion;
+
+feedMsg(
+`${def.name} summoned`
+);
+
+}
+
+
+/* ============================================================
+MOUNT PAL
+============================================================ */
+
+function toggleMount() {
+
+const c =
+RUNTIME.companion;
+
+if (
+!c ||
+!c.def.mount
+) {
+
+feedMsg(
+"Summon a mountable Pal first"
+);
+
+return;
+
+}
+
+if (
+
+!RUNTIME.mounted &&
+
+c.model.position
+.distanceTo(
+player.model.position
+) > 5
+
+) {
+
+feedMsg(
+"Move closer to your Pal"
+);
+
+return;
+
+}
+
+RUNTIME.mounted =
+!RUNTIME.mounted;
+
+player.model.visible =
+!RUNTIME.mounted;
+
+feedMsg(
+
+RUNTIME.mounted
+
+? `Mounted ${c.def.name}`
+
+: `Dismounted ${c.def.name}`
+
+);
+
+}
+
+
+/* ============================================================
+COMPANION / MOUNT MOVEMENT
+============================================================ */
+
+function updateCompanion(
+dt,
+moveForward,
+moveRight,
+sprint
+) {
+
+const c =
+RUNTIME.companion;
+
+if (!c) {
+
+return;
+
+}
+
+if (
+RUNTIME.mounted
+) {
+
+const speed =
+
+c.def.mount ===
+"flying"
+
+? 11
+
+: sprint
+? 10
+: 7;
+
+const sin =
+Math.sin(
+player.yaw
+);
+
+const cos =
+Math.cos(
+player.yaw
+);
+
+c.model.position.x +=
+
+(
+-sin *
+moveForward
+
++
+
+cos *
+moveRight
+)
+
+*
+
+speed
+
+*
+
+dt;
+
+c.model.position.z +=
+
+(
+-cos *
+moveForward
+
+-
+
+sin *
+moveRight
+)
+
+*
+
+speed
+
+*
+
+dt;
+
+if (
+c.def.mount ===
+"flying"
+) {
+
+if (
+keys.has(
+"Space"
+)
+) {
+
+c.model.position.y +=
+6 *
+dt;
+
+}
+
+if (
+keys.has(
+"ControlLeft"
+)
+) {
+
+c.model.position.y -=
+6 *
+dt;
+
+}
+
+c.model.position.y =
+clamp3(
+c.model.position.y,
+0.2,
+35
+);
+
+playAction(
+c,
+"fly"
+);
+
+} else {
+
+c.model.position.y =
+0;
+
+playAction(
+
+c,
+
+(
+moveForward ||
+moveRight
+)
+
+? (
+sprint
+? "run"
+: "walk"
+)
+
+: "idle"
+
+);
+
+}
+
+c.model.rotation.y =
+player.yaw;
+
+player.x =
+c.model.position.x;
+
+player.y =
+c.model.position.y;
+
+player.z =
+c.model.position.z;
+
+return;
+
+}
+
+
+const tx =
+player.x +
+Math.cos(
+player.yaw
+) *
+2.5;
+
+const tz =
+player.z -
+Math.sin(
+player.yaw
+) *
+2.5;
+
+const dx =
+tx -
+c.model.position.x;
+
+const dz =
+tz -
+c.model.position.z;
+
+const d =
+Math.hypot(
+dx,
+dz
+);
+
+if (
+d > 1.5
+) {
+
+c.model.position.x +=
+dx *
+Math.min(
+1,
+dt *
+3.2
+);
+
+c.model.position.z +=
+dz *
+Math.min(
+1,
+dt *
+3.2
+);
+
+c.model.rotation.y =
+Math.atan2(
+dx,
+dz
+);
+
+playAction(
+
+c,
+
+c.def.mount ===
+"flying"
+? "fly"
+: "run"
+
+);
+
+} else {
+
+playAction(
+
+c,
+
+c.def.mount ===
+"flying"
+? "fly"
+: "idle"
+
+);
+
+}
+
+if (
+c.def.mount ===
+"flying"
+) {
+
+c.model.position.y =
+
+1.8 +
+
+Math.sin(
+performance.now() *
+0.002
+) *
+0.25;
+
+}
+
+}
+
+
+/* ============================================================
+WILD PAL AI
+============================================================ */
+
+function updateWild(
+dt,
+now
+) {
+
+creatures.forEach(
+c => {
+
+if (
+!c.alive ||
+!c.model.visible
+) {
+
+return;
+
+}
+
+const dx =
+player.x -
+c.x;
+
+const dz =
+player.z -
+c.z;
+
+const dist =
+Math.hypot(
+dx,
+dz
+);
+
+if (
+c.aggressive &&
+dist < 28
+) {
+
+c.direction =
+Math.atan2(
+dx,
+dz
+);
+
+const s =
+c.def.speed *
+(
+c.boss
+? 1.05
+: 0.85
+);
+
+c.x +=
+Math.sin(
+c.direction
+) *
+s *
+dt;
+
+c.z +=
+Math.cos(
+c.direction
+) *
+s *
+dt;
+
+playAction(
+
+c,
+
+c.def.mount ===
+"flying"
+? "fly"
+: "run"
+
+);
+
+if (
+
+dist < 2.5 &&
+
+Math.random() <
+dt *
+0.65
+
+) {
+
+player.hp =
+Math.max(
+
+0,
+
+player.hp -
+(
+c.boss
+? 16
+: 6
+)
+
+);
+
+playAction(
+c,
+"attack"
+);
+
+feedMsg(
+`${c.def.name} hit you`
+);
+
+}
+
+} else {
+
+if (
+now >
+c.changeAt
+) {
+
+c.direction +=
+rand3(
+-1.3,
+1.3
+);
+
+c.changeAt =
+now +
+rand3(
+1600,
+3800
+);
+
+}
+
+const s =
+c.def.speed *
+0.16;
+
+c.x +=
+Math.sin(
+c.direction
+) *
+s *
+dt;
+
+c.z +=
+Math.cos(
+c.direction
+) *
+s *
+dt;
+
+playAction(
+
+c,
+
+c.def.mount ===
+"flying"
+? "fly"
+: "walk"
+
+);
+
+}
+
+c.model.position.x =
+c.x;
+
+c.model.position.z =
+c.z;
+
+c.model.rotation.y =
+c.direction;
+
+if (
+c.def.mount ===
+"flying"
+) {
+
+c.model.position.y =
+
+c.boss
+
+? 7
+
+: 2.2 +
+Math.sin(
+now *
+0.0015 +
+c.x
+) *
+0.4;
+
+}
+
+}
+);
+
+}
+
+
+/* ============================================================
+HUD
+============================================================ */
+
+function renderHUD() {
+
+const bar =
+(
+id,
+value
+) => {
+
+const el =
+q(id);
+
+if (el) {
+
+el.style.width =
+`${clamp3(
+value,
+0,
+100
+)}%`;
+
+}
+
+};
+
+bar(
+"#gp3dHP",
+player.hp
+);
+
+bar(
+"#gp3dSTA",
+player.stamina
+);
+
+bar(
+"#gp3dFood",
+player.hunger
+);
+
+
+if (
+q(
+"#gp3dHPText"
+)
+) {
+
+q(
+"#gp3dHPText"
+).textContent =
+Math.round(
+player.hp
+);
+
+}
+
+if (
+q(
+"#gp3dSTAText"
+)
+) {
+
+q(
+"#gp3dSTAText"
+).textContent =
+Math.round(
+player.stamina
+);
+
+}
+
+if (
+q(
+"#gp3dFoodText"
+)
+) {
+
+q(
+"#gp3dFoodText"
+).textContent =
+Math.round(
+player.hunger
+);
+
+}
+
+if (
+q(
+"#gp3dLevel"
+)
+) {
+
+q(
+"#gp3dLevel"
+).textContent =
+`LV ${game.level}`;
+
+}
+
+
+const target =
+RUNTIME.target;
+
+const targetEl =
+q(
+"#gp3dTarget"
+);
+
+if (
+target?.alive
+) {
+
+targetEl.hidden =
+false;
+
+targetEl.innerHTML = `
+
+<div>
+
+<strong>
+${safe(
+target.def.name
+)}
+${
+target.boss
+? " • BOSS"
+: ""
+}
+</strong>
+
+<span>
+LV ${target.level}
+•
+${safe(
+target.def.element
+)}
+</span>
+
+</div>
+
+<i>
+
+<b
+style="
+width:
+${
+100 *
+target.hp /
+target.maxHp
+}%
+"
+></b>
+
+</i>
+
+<small>
+Capture ${
+Math.round(
+getCaptureChance(
+target
+) *
+100
+)
+}%
+</small>
+
+`;
+
+} else {
+
+targetEl.hidden =
+true;
+
+}
+
+
+q(
+"#gp3dFeed"
+).innerHTML =
+feed
+.filter(
+x =>
+performance.now() -
+x.t <
+5500
+)
+.map(
+x =>
+`<div>${safe(
+x.text
+)}</div>`
+)
+.join("");
+
+
+q(
+"#gp3dOrbs"
+).innerHTML =
+ORBS.map(
+(
+o,
+i
+) => `
+
+<div
+class="
+${
+i ===
+game.selectedOrb
+? "active"
+: ""
+}
+"
+>
+
+<strong>
+${i + 1}
+</strong>
+
+<span>
+${safe(
+o.name
+)}
+</span>
+
+<small>
+x${
+game.orbs[i] ||
+0
+}
+</small>
+
+</div>
+
+`
+)
+.join("");
+
+
+q(
+"#gp3dParty"
+).innerHTML =
+game.party
+.slice(
+0,
+5
+)
+.map(
+id => {
+
+const def =
+PAL_DEFS.find(
+d =>
+d.id === id
+);
+
+return def
+
+? `
+
+<div>
+
+<strong>
+${safe(
+def.name
+)}
+</strong>
+
+<span>
+${safe(
+def.element
+)}
+•
+${safe(
+def.mount ||
+"companion"
+)}
+</span>
+
+</div>
+
+`
+
+: "";
+
+}
+)
+.join("");
+
+}
+
+
+/* ============================================================
+RESIZE
+============================================================ */
+
+function resize() {
+
+if (
+!host?.isConnected
+) {
+
+return;
+
+}
+
+renderer.setSize(
+
+host.clientWidth,
+
+host.clientHeight,
+
+false
+
+);
+
+camera.aspect =
+host.clientWidth /
+host.clientHeight;
+
+camera
+.updateProjectionMatrix();
+
+}
+
+
+/* ============================================================
+INPUT
+============================================================ */
+
+addListener(
+canvas,
+"click",
+() =>
+canvas
+.requestPointerLock
+?.()
+);
+
+
+addListener(
+document,
+"mousemove",
+e => {
+
+if (
+document.pointerLockElement !==
+canvas
+) {
+
+return;
+
+}
+
+player.yaw -=
+e.movementX *
+0.0024;
+
+player.pitch =
+clamp3(
+
+player.pitch -
+e.movementY *
+0.0017,
+
+-0.5,
+
+0.28
+
+);
+
+}
+);
+
+
+addListener(
+document,
+"keydown",
+e => {
+
+if (
+!host?.isConnected
+) {
+
+return;
+
+}
+
+keys.add(
+e.code
+);
+
+if (
+/^Digit[1-5]$/
+.test(
+e.code
+)
+) {
+
+game.selectedOrb =
+Number(
+e.code.slice(-1)
+) -
+1;
+
+}
+
+if (
+e.code ===
+"KeyQ" &&
+!e.repeat
+) {
+
+beginOrbCharge();
+
+}
+
+if (
+e.code ===
+"KeyF" &&
+!e.repeat
+) {
+
+summonCompanion();
+
+}
+
+if (
+e.code ===
+"KeyE" &&
+!e.repeat
+) {
+
+toggleMount();
+
+}
+
+}
+);
+
+
+addListener(
+document,
+"keyup",
+e => {
+
+keys.delete(
+e.code
+);
+
+if (
+e.code ===
+"KeyQ"
+) {
+
+releaseOrb();
+
+}
+
+}
+);
+
+
+addListener(
+document,
+"mousedown",
+e => {
+
+if (
+
+e.button === 0 &&
+
+document.pointerLockElement ===
+canvas &&
+
+!RUNTIME.orbCharging
+
+) {
+
+attackTarget();
+
+}
+
+}
+);
+
+
+addListener(
+window,
+"resize",
+resize
+);
+
+
+resize();
+
+
+/* ============================================================
+MAIN 3D LOOP
+============================================================ */
+
+RUNTIME.running =
+true;
+
+let last =
+performance.now();
+
+
+function loop(now) {
+
+if (
+
+!RUNTIME.running ||
+
+!canvas.isConnected
+
+) {
+
+stopPals3D();
+
+return;
+
+}
+
+const dt =
+clamp3(
+
+(
+now -
+last
+) /
+1000,
+
+0,
+
+0.05
+
+);
+
+last =
+now;
+
+
+const forward =
+
+(
+keys.has(
+"KeyW"
+)
+? 1
+: 0
+)
+
+-
+
+(
+keys.has(
+"KeyS"
+)
+? 1
+: 0
+);
+
+
+const right =
+
+(
+keys.has(
+"KeyD"
+)
+? 1
+: 0
+)
+
+-
+
+(
+keys.has(
+"KeyA"
+)
+? 1
+: 0
+);
+
+
+const sprint =
+
+keys.has(
+"ShiftLeft"
+)
+
+&&
+
+player.stamina >
+2;
+
+
+/* PLAYER WALKING */
+
+if (
+!RUNTIME.mounted
+) {
+
+const speed =
+sprint
+? 7.5
+: player.speed;
+
+const sin =
+Math.sin(
+player.yaw
+);
+
+const cos =
+Math.cos(
+player.yaw
+);
+
+player.x +=
+
+(
+-sin *
+forward
+
++
+
+cos *
+right
+)
+
+*
+
+speed
+
+*
+
+dt;
+
+player.z +=
+
+(
+-cos *
+forward
+
+-
+
+sin *
+right
+)
+
+*
+
+speed
+
+*
+
+dt;
+
+player.x =
+clamp3(
+player.x,
+-170,
+170
+);
+
+player.z =
+clamp3(
+player.z,
+-170,
+170
+);
+
+player.y =
+0;
+
+player.model.position.set(
+player.x,
+player.y,
+player.z
+);
+
+player.model.rotation.y =
+player.yaw;
+
+playAction(
+
+player,
+
+(
+forward ||
+right
+)
+
+? (
+sprint
+? "run"
+: "walk"
+)
+
+: "idle"
+
+);
+
+}
+
+
+/* SURVIVAL */
+
+player.stamina =
+clamp3(
+
+player.stamina +
+
+(
+sprint &&
+(
+forward ||
+right
+)
+
+? -18
+
+: 13
+)
+
+*
+
+dt,
+
+0,
+
+100
+
+);
+
+
+player.hunger =
+clamp3(
+
+player.hunger -
+0.12 *
+dt,
+
+0,
+
+100
+
+);
+
+
+if (
+player.hunger <
+8
+) {
+
+player.hp =
+Math.max(
+
+0,
+
+player.hp -
+0.45 *
+dt
+
+);
+
+}
+
+
+/* WORLD */
+
+updateCompanion(
+dt,
+forward,
+right,
+sprint
+);
+
+updateWild(
+dt,
+now
+);
+
+updateProjectiles(
+dt
+);
+
+findTarget();
+
+updateHeldOrb();
+
+
+RUNTIME.mixers.forEach(
+m => {
+
+try {
+
+m.update(dt);
+
+} catch {}
+
+}
+);
+
+
+/* THIRD-PERSON CAMERA */
+
+const camTargetY =
+
+RUNTIME.mounted &&
+RUNTIME.companion
+
+? RUNTIME.companion
+.model
+.position.y +
+1.8
+
+: 1.55;
+
+
+const camDistance =
+RUNTIME.mounted
+? 9.5
+: 6.7;
+
+
+camera.position.set(
+
+player.x +
+Math.sin(
+player.yaw
+) *
+camDistance,
+
+player.y +
+3.4 +
+player.pitch *
+3.2,
+
+player.z +
+Math.cos(
+player.yaw
+) *
+camDistance
+
+);
+
+
+camera.lookAt(
+player.x,
+camTargetY,
+player.z
+);
+
+
+/* DAY / NIGHT */
+
+worldTime +=
+dt *
+0.12;
+
+if (
+worldTime >=
+24
+) {
+
+worldTime -=
+24;
+
+}
+
+const daylight =
+clamp3(
+
+Math.sin(
+(
+worldTime -
+6
+) /
+24 *
+Math.PI *
+2
+) *
+0.5 +
+0.55,
+
+0.14,
+
+1
+
+);
+
+
+sun.intensity =
+0.35 +
+daylight *
+2;
+
+
+hemi.intensity =
+0.28 +
+daylight *
+1.2;
+
+
+sun.position.set(
+
+Math.sin(
+worldTime /
+24 *
+Math.PI *
+2
+) *
+70,
+
+18 +
+daylight *
+60,
+
+Math.cos(
+worldTime /
+24 *
+Math.PI *
+2
+) *
+70
+
+);
+
+
+if (
+q(
+"#gp3dClock"
+)
+) {
+
+q(
+"#gp3dClock"
+).textContent =
+
+`DAY 1 • ${
+String(
+Math.floor(
+worldTime
+)
+)
+.padStart(
+2,
+"0"
+)
+}:${
+String(
+Math.floor(
+(
+worldTime %
+1
+) *
+60
+)
+)
+.padStart(
+2,
+"0"
+)
+}`;
+
+}
+
+
+renderHUD();
+
+
+renderer.render(
+scene,
+camera
+);
+
+
+/* AUTO SAVE */
+
+if (
+now -
+lastSave >
+5000
+) {
+
+Object.assign(
+
+game,
+
+{
+
+x:
+player.x,
+
+y:
+player.y,
+
+z:
+player.z,
+
+hp:
+player.hp,
+
+stamina:
+player.stamina,
+
+hunger:
+player.hunger
+
+}
+
+);
+
+saveGame(
+game
+);
+
+lastSave =
+now;
+
+}
+
+
+RUNTIME.raf =
+requestAnimationFrame(
+loop
+);
+
+}
+
+
+feedMsg(
+"Full 3D GALAXY PALS world loaded"
+);
+
+
+if (
+failedModels.length
+) {
+
+feedMsg(
+`${failedModels.length} Pal model file(s) missing`
+);
+
+}
+
+
+RUNTIME.raf =
+requestAnimationFrame(
+loop
+);
+
+}
+
+
+/* ============================================================
+EXPOSE 3D PALS
+============================================================ */
+
+window.openPals =
+openPalsHome;
+
+window.startPals =
+startPals3D;
+
+
+window.GALAXY_PALS_3D = {
+
+openPals:
+openPalsHome,
+
+startPals:
+startPals3D,
+
+stop:
+stopPals3D,
+
+PAL_DEFS
+
+};
+
+
+/* ============================================================
+PALS BUTTON EVENTS
+============================================================ */
+
+document.addEventListener(
+"click",
+e => {
+
+const b =
+e.target.closest(
+"[data-gp3d-start],[data-gp3d-reset]"
+);
+
+if (!b) {
+
+return;
+
+}
+
+if (
+b.hasAttribute(
+"data-gp3d-start"
+)
+) {
+
+startPals3D();
+
+}
+
+if (
+b.hasAttribute(
+"data-gp3d-reset"
+)
+) {
+
+localStorage.removeItem(
+SAVE_KEY
+);
+
+openPalsHome();
+
+}
+
+}
+);
+
+
+})();
