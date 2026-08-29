@@ -1,16 +1,22 @@
 "use strict";
 
 /* =========================================================
-   GALAXY AI
-   Created by Harshavardhan
-   Main Application + Gaming Center
+   GALAXY AI — COMPLETE SCRIPT.JS
+   PART 1 OF 2
+   GEMINI ONLY
    ========================================================= */
 
-const $ = (selector, root = document) => root.querySelector(selector);
-const $$ = (selector, root = document) =>
-  Array.from(root.querySelectorAll(selector));
+const $ = (s, root = document) => root.querySelector(s);
+const $$ = (s, root = document) => [...root.querySelectorAll(s)];
 
-const GALAXY_LEVELS = [
+const state = {
+  messages: [],
+  generating: false,
+  attachments: [],
+  activeView: "chat"
+};
+
+const GAME_LEVELS = [
   { name: "Casual", elo: 100 },
   { name: "Normal", elo: 200 },
   { name: "Fun", elo: 500 },
@@ -19,106 +25,30 @@ const GALAXY_LEVELS = [
   { name: "Player", elo: 1200 }
 ];
 
-const App = {
-  currentView: "chat",
-  generating: false,
-  controller: null,
-  messages: [],
-  attachments: [],
-  searchEnabled: false
-};
-
-const Games = {
+const GameCenter = {
   current: null,
-
-  chess: {
-    mode: "galaxy",
-    elo: 500,
-    board: [],
-    turn: "w",
-    selected: null,
-    legal: [],
-    history: [],
-    snapshots: [],
-    finished: false,
-    winner: null,
-    hints: 0,
-    reviewOpen: false
-  },
-
-  ttt: {
-    mode: "galaxy",
-    elo: 500,
-    board: Array(9).fill(""),
-    turn: "X",
-    history: [],
-    finished: false,
-    winner: null,
-    hints: 0,
-    reviewOpen: false
-  },
-
-  connect: {
-    mode: "galaxy",
-    elo: 500,
-    board: Array.from({ length: 6 }, () => Array(7).fill("")),
-    turn: "P",
-    history: [],
-    finished: false,
-    winner: null,
-    hints: 0,
-    reviewOpen: false
-  },
-
-  memory: {
-    mode: "galaxy",
-    elo: 500,
-    cards: [],
-    revealed: [],
-    matched: new Set(),
-    turn: "player",
-    playerScore: 0,
-    opponentScore: 0,
-    history: [],
-    known: {},
-    busy: false,
-    finished: false,
-    hints: 0,
-    reviewOpen: false,
-    playerAttempts: 0,
-    playerMatches: 0
-  },
-
-  shooter: {
-    mode: "galaxy",
-    elo: 500,
-    running: false,
-    finished: false,
-    time: 30,
-    playerScore: 0,
-    opponentScore: 0,
-    shots: 0,
-    hits: 0,
-    misses: 0,
-    streak: 0,
-    bestStreak: 0,
-    target: null,
-    timer: null,
-    galaxyTimer: null,
-    friendTurn: 1,
-    friendScores: [0, 0],
-    friendStats: [
-      { shots: 0, hits: 0, misses: 0, bestStreak: 0 },
-      { shots: 0, hits: 0, misses: 0, bestStreak: 0 }
-    ],
-    reviewOpen: false
-  }
+  chess: null,
+  ttt: null,
+  connect: null,
+  memory: null,
+  shooter: null,
+  shooterTimer: null,
+  shooterGalaxyTimer: null
 };
-
 
 /* =========================================================
    BASIC UI
    ========================================================= */
+
+function escapeHTML(v = "") {
+  return String(v).replace(/[&<>"']/g, m => ({
+    "&": "&amp;",
+    "<": "&lt;",
+    ">": "&gt;",
+    '"': "&quot;",
+    "'": "&#39;"
+  }[m]));
+}
 
 function toast(message, type = "") {
   let root = $("#toastRoot");
@@ -130,179 +60,132 @@ function toast(message, type = "") {
     document.body.appendChild(root);
   }
 
-  const item = document.createElement("div");
-  item.className = `toast ${type}`.trim();
-  item.textContent = message;
+  const el = document.createElement("div");
 
-  root.appendChild(item);
+  el.className = `toast ${type}`.trim();
+  el.textContent = message;
 
-  setTimeout(() => {
-    item.remove();
-  }, 2800);
+  root.appendChild(el);
+
+  setTimeout(() => el.remove(), 2600);
 }
 
-function escapeHTML(value = "") {
-  return String(value)
-    .replaceAll("&", "&amp;")
-    .replaceAll("<", "&lt;")
-    .replaceAll(">", "&gt;")
-    .replaceAll('"', "&quot;")
-    .replaceAll("'", "&#039;");
-}
+function setView(name) {
+  state.activeView = name;
 
-function delay(ms) {
-  return new Promise(resolve => setTimeout(resolve, ms));
-}
+  $$(".view").forEach(v => {
+    v.classList.remove("active-view");
+  });
 
-function randomItem(array) {
-  return array[Math.floor(Math.random() * array.length)];
-}
+  const map = {
+    chat: "#chatView",
+    work: "#workView",
+    games: "#contentView",
+    projects: "#contentView",
+    library: "#contentView",
+    studio: "#contentView"
+  };
 
-function clone(value) {
-  return JSON.parse(JSON.stringify(value));
-}
+  const target = $(map[name] || "#chatView");
 
-function levelOptions(selected) {
-  return GALAXY_LEVELS.map(level => {
-    const isSelected = Number(selected) === level.elo ? "selected" : "";
-
-    return `
-      <option value="${level.elo}" ${isSelected}>
-        ${level.name} — ${level.elo} ELO
-      </option>
-    `;
-  }).join("");
-}
-
-function modeOptions(selected) {
-  return `
-    <option value="galaxy" ${selected === "galaxy" ? "selected" : ""}>
-      You vs GALAXY
-    </option>
-
-    <option value="friend" ${selected === "friend" ? "selected" : ""}>
-      You vs Friend
-    </option>
-  `;
-}
-
-function opponentName(mode) {
-  return mode === "galaxy" ? "GALAXY" : "Friend";
-}
-
-function setContent(title, eyebrow, html) {
-  const contentView = $("#contentView");
-  const titleEl = $("#contentTitle");
-  const eyebrowEl = $("#contentEyebrow");
-  const body = $("#contentBody");
-
-  if (!contentView || !body) return;
-
-  if (titleEl) titleEl.textContent = title;
-  if (eyebrowEl) eyebrowEl.textContent = eyebrow;
-  body.innerHTML = html;
-}
-
-function switchView(view) {
-  App.currentView = view;
-
-  $$(".view").forEach(el => el.classList.remove("active-view"));
-
-  const chat = $("#chatView");
-  const work = $("#workView");
-  const content = $("#contentView");
-
-  if (view === "chat" && chat) {
-    chat.classList.add("active-view");
-  } else if (view === "work" && work) {
-    work.classList.add("active-view");
-  } else if (content) {
-    content.classList.add("active-view");
-  }
+  target?.classList.add("active-view");
 
   $$("[data-view]").forEach(button => {
     button.classList.toggle(
       "active",
-      button.dataset.view === view
+      button.dataset.view === name
     );
   });
 
-  if (view === "games") {
-    renderGamesHome();
+  if (name === "games") {
+    renderGames();
   }
 
-  if (view === "projects") {
+  if (name === "projects") {
     renderSimplePage(
       "Projects",
-      "GALAXY PROJECTS",
-      "Create and manage your GALAXY AI projects."
+      "Your GALAXY projects will appear here."
     );
   }
 
-  if (view === "library") {
+  if (name === "library") {
     renderSimplePage(
       "Library",
-      "GALAXY LIBRARY",
-      "Your images, videos, files and generated assets."
+      "Files, images and generated assets."
     );
   }
 
-  if (view === "studio") {
+  if (name === "studio") {
     renderSimplePage(
       "Create Studio",
-      "GALAXY CREATIVE",
-      "Image generation, video generation and creative tools."
+      "Image and video creative tools."
     );
   }
 }
 
-function renderSimplePage(title, eyebrow, description) {
-  setContent(
-    title,
-    eyebrow,
-    `
+function renderSimplePage(title, text) {
+  if ($("#contentTitle")) {
+    $("#contentTitle").textContent = title;
+  }
+
+  if ($("#contentEyebrow")) {
+    $("#contentEyebrow").textContent = "GALAXY";
+  }
+
+  if ($("#contentBody")) {
+    $("#contentBody").innerHTML = `
       <div class="panel">
         <h3>${escapeHTML(title)}</h3>
-        <p>${escapeHTML(description)}</p>
+        <p>${escapeHTML(text)}</p>
       </div>
-    `
-  );
+    `;
+  }
 }
 
+function newChat() {
+  state.messages = [];
+
+  if ($("#messages")) {
+    $("#messages").innerHTML = "";
+  }
+
+  $("#chatEmpty")?.classList.remove("hidden");
+  $("#promptInput")?.focus();
+
+  setView("chat");
+}
+
+function autoResize(el) {
+  if (!el) return;
+
+  el.style.height = "auto";
+  el.style.height = `${Math.min(el.scrollHeight, 180)}px`;
+}
 
 /* =========================================================
    CHAT
    ========================================================= */
 
-function updateEmptyState() {
-  const empty = $("#chatEmpty");
+function renderMessage(role, text) {
+  const root = $("#messages");
 
-  if (!empty) return;
+  if (!root) return;
 
-  empty.style.display =
-    App.messages.length === 0 ? "" : "none";
-}
+  $("#chatEmpty")?.classList.add("hidden");
 
-function renderMessages() {
-  const container = $("#messages");
+  const row = document.createElement("div");
+  row.className = `message ${role}`;
 
-  if (!container) return;
+  const bubble = document.createElement("div");
+  bubble.className = "bubble";
+  bubble.textContent = text;
 
-  container.innerHTML = App.messages.map(message => `
-    <div class="message ${message.role}">
-      <div class="bubble">${escapeHTML(message.content)}</div>
-    </div>
-  `).join("");
+  row.appendChild(bubble);
+  root.appendChild(row);
 
-  updateEmptyState();
-
-  container.scrollTop = container.scrollHeight;
-
-  window.requestAnimationFrame(() => {
-    window.scrollTo({
-      top: document.body.scrollHeight,
-      behavior: "smooth"
-    });
+  row.scrollIntoView({
+    behavior: "smooth",
+    block: "end"
   });
 }
 
@@ -311,961 +194,1119 @@ function updateSendButtonState() {
 
   if (!button) return;
 
-  button.textContent = App.generating ? "■" : "↑";
-  button.classList.toggle("is-stop", App.generating);
+  button.textContent = state.generating ? "■" : "↑";
+
+  button.classList.toggle(
+    "is-stop",
+    state.generating
+  );
 
   button.setAttribute(
     "aria-label",
-    App.generating ? "Stop generating" : "Send"
+    state.generating ? "Stop" : "Send"
   );
 }
 
-function autoResizePrompt() {
-  const input = $("#promptInput");
+/* =========================================================
+   GEMINI AI
+   ========================================================= */
 
-  if (!input) return;
+async function fetchAIResponse(message) {
+  const creatorContext =
+    "You are GALAXY AI. " +
+    "GALAXY AI was created and founded by Harshavardhan. " +
+    "If asked who created, made, founded, designed or owns GALAXY AI, " +
+    "answer: Harshavardhan created GALAXY AI. " +
+    "GALAXY uses Gemini through an API for AI responses. " +
+    "Be helpful, intelligent, clear and concise.";
 
-  input.style.height = "auto";
-  input.style.height =
-    `${Math.min(input.scrollHeight, 180)}px`;
-}
+  const payload = {
+    message,
+    prompt: message,
+    system: creatorContext,
 
-function addRecentChat(text) {
-  const root = $("#recentChats");
+    messages: [
+      {
+        role: "system",
+        content: creatorContext
+      },
 
-  if (!root || !text.trim()) return;
+      ...state.messages
+        .slice(-20)
+        .map(item => ({
+          role: item.role,
+          content: item.text
+        })),
 
-  const button = document.createElement("button");
-  button.className = "recent-item";
-  button.textContent =
-    text.length > 32 ? `${text.slice(0, 32)}…` : text;
+      {
+        role: "user",
+        content: message
+      }
+    ]
+  };
 
-  root.prepend(button);
-
-  while (root.children.length > 8) {
-    root.lastElementChild.remove();
-  }
-}
-
-async function fetchAIResponse(messageText) {
-  const provider = $("#aiProvider")?.value || "gemini";
-
-  const endpoint =
-    provider === "openai"
-      ? "/api/chat"
-      : "/api/gemini";
-
-  App.controller = new AbortController();
-
-  const response = await fetch(endpoint, {
+  const response = await fetch("/api/gemini", {
     method: "POST",
 
     headers: {
       "Content-Type": "application/json"
     },
 
-    signal: App.controller.signal,
-
-    body: JSON.stringify({
-      message: messageText,
-      messages: App.messages.map(message => ({
-        role: message.role,
-        content: message.content
-      }))
-    })
+    body: JSON.stringify(payload)
   });
 
-  let data = {};
-
-  try {
-    data = await response.json();
-  } catch {
-    data = {};
-  }
+  const data = await response
+    .json()
+    .catch(() => ({}));
 
   if (!response.ok) {
     throw new Error(
       data.error ||
       data.message ||
-      `GALAXY backend returned ${response.status}`
+      `Backend error ${response.status}`
     );
   }
 
   return (
-    data.reply ||
     data.text ||
+    data.reply ||
     data.output ||
+    data.response ||
     data.message ||
-    "GALAXY did not return a response."
+    "GALAXY received your request."
   );
 }
 
 async function sendMessage() {
-  if (App.generating) {
-    if (App.controller) {
-      App.controller.abort();
-    }
-
-    App.generating = false;
-    updateSendButtonState();
-    return;
-  }
-
   const input = $("#promptInput");
 
-  if (!input) {
-    toast("Prompt input was not found.", "error");
+  if (!input || state.generating) {
     return;
   }
 
-  const messageText = input.value.trim();
+  const text = input.value.trim();
 
-  if (!messageText && App.attachments.length === 0) {
+  if (!text) {
     return;
-  }
-
-  const firstMessage = App.messages.length === 0;
-
-  App.messages.push({
-    role: "user",
-    content: messageText || "Uploaded files"
-  });
-
-  if (firstMessage) {
-    addRecentChat(messageText || "Uploaded files");
   }
 
   input.value = "";
-  autoResizePrompt();
-  renderMessages();
+  autoResize(input);
 
-  App.generating = true;
+  state.messages.push({
+    role: "user",
+    text
+  });
+
+  renderMessage(
+    "user",
+    text
+  );
+
+  state.generating = true;
+
   updateSendButtonState();
 
-  const draftState = $("#draftState");
-
-  if (draftState) {
-    draftState.textContent = "GALAXY is thinking…";
+  if ($("#draftState")) {
+    $("#draftState").textContent =
+      "GALAXY is thinking…";
   }
 
   try {
-    const reply = await fetchAIResponse(messageText);
+    const reply = await fetchAIResponse(text);
 
-    App.messages.push({
+    state.messages.push({
       role: "assistant",
-      content: reply
+      text: reply
     });
-  } catch (error) {
-    if (error.name !== "AbortError") {
-      App.messages.push({
-        role: "assistant",
-        content:
-          `GALAXY backend error: ${error.message}`
-      });
 
-      toast(error.message, "error");
-    }
+    renderMessage(
+      "assistant",
+      reply
+    );
+
+  } catch (error) {
+    const message =
+      `GALAXY error: ${error.message}`;
+
+    renderMessage(
+      "assistant",
+      message
+    );
+
+    toast(
+      error.message,
+      "error"
+    );
+
   } finally {
-    App.generating = false;
-    App.controller = null;
+    state.generating = false;
 
     updateSendButtonState();
-    renderMessages();
 
-    if (draftState) {
-      draftState.textContent = "Ready";
+    if ($("#draftState")) {
+      $("#draftState").textContent =
+        "Ready";
     }
   }
 }
-
-function newChat() {
-  if (App.generating && App.controller) {
-    App.controller.abort();
-  }
-
-  App.messages = [];
-  App.attachments = [];
-  App.generating = false;
-  App.controller = null;
-
-  const input = $("#promptInput");
-
-  if (input) {
-    input.value = "";
-    autoResizePrompt();
-  }
-
-  const tray = $("#attachmentTray");
-
-  if (tray) tray.innerHTML = "";
-
-  renderMessages();
-  updateSendButtonState();
-  switchView("chat");
-}
-
-function handleFiles(files) {
-  const list = Array.from(files || []);
-
-  if (!list.length) return;
-
-  App.attachments.push(...list);
-
-  const tray = $("#attachmentTray");
-
-  if (!tray) return;
-
-  tray.innerHTML = App.attachments.map(file => `
-    <div class="attachment-chip">
-      ${escapeHTML(file.name)}
-    </div>
-  `).join("");
-
-  toast(`${list.length} file(s) added`, "success");
-}
-
 
 /* =========================================================
    GAMING CENTER HOME
    ========================================================= */
 
-function renderGamesHome() {
-  Games.current = null;
+function renderGames() {
+  if ($("#contentTitle")) {
+    $("#contentTitle").textContent =
+      "Gaming Center";
+  }
 
-  setContent(
-    "Gaming Center",
-    "GALAXY GAMES",
-    `
-      <div class="games-home">
+  if ($("#contentEyebrow")) {
+    $("#contentEyebrow").textContent =
+      "PLAY WITH GALAXY";
+  }
 
-        <div class="games-hero">
-          <div>
-            <span class="eyebrow">PLAY WITH GALAXY OR A FRIEND</span>
-            <h2>GALAXY Gaming Center</h2>
+  const body = $("#contentBody");
 
-            <p>
-              Choose a game, challenge GALAXY,
-              or play locally with a friend.
-            </p>
-          </div>
+  if (!body) return;
 
-          <div class="games-hero-mark">♛</div>
+  body.innerHTML = `
+    <div class="games-home">
+
+      <div class="games-hero">
+
+        <div>
+          <span class="eyebrow">
+            GALAXY GAMING
+          </span>
+
+          <h2>
+            Choose a game
+          </h2>
+
+          <p>
+            Play against GALAXY or play with a friend.
+          </p>
         </div>
 
-        <div class="games-grid">
-
-          ${gameCard(
-            "chess",
-            "♟",
-            "Chess",
-            "Play against GALAXY or a friend."
-          )}
-
-          ${gameCard(
-            "tictactoe",
-            "✕○",
-            "Tic-Tac-Toe",
-            "Quick strategy against GALAXY or a friend."
-          )}
-
-          ${gameCard(
-            "connect4",
-            "●●",
-            "Connect Four",
-            "Connect four before your opponent."
-          )}
-
-          ${gameCard(
-            "memory",
-            "✦?",
-            "Memory",
-            "Find more matching pairs than your opponent."
-          )}
-
-          ${gameCard(
-            "shooter",
-            "◎",
-            "GALAXY Shooting",
-            "Arcade target challenge against GALAXY or a friend."
-          )}
-
+        <div class="games-hero-mark">
+          ✦
         </div>
+
       </div>
-    `
-  );
+
+      <div class="games-grid">
+
+        ${gameCard(
+          "chess",
+          "♟",
+          "Chess",
+          "vs GALAXY or Friend • Levels • Review"
+        )}
+
+        ${gameCard(
+          "tictactoe",
+          "✕○",
+          "Tic-Tac-Toe",
+          "vs GALAXY or Friend • Levels • Review"
+        )}
+
+        ${gameCard(
+          "connect4",
+          "●●",
+          "Connect Four",
+          "vs GALAXY or Friend • Levels • Review"
+        )}
+
+        ${gameCard(
+          "memory",
+          "▦",
+          "Memory",
+          "vs GALAXY or Friend • Levels • Review"
+        )}
+
+        ${gameCard(
+          "shooter",
+          "◎",
+          "GALAXY Shooting",
+          "Arcade target battle • GALAXY or Friend"
+        )}
+
+      </div>
+
+    </div>
+  `;
 }
 
-function gameCard(id, icon, title, description) {
+function gameCard(id, icon, title, subtitle) {
   return `
     <button
       class="game-card"
       data-game-open="${id}"
-      type="button"
     >
-      <div class="game-card-visual">${icon}</div>
+
+      <div class="game-card-visual">
+        ${icon}
+      </div>
 
       <div class="game-card-copy">
-        <strong>${escapeHTML(title)}</strong>
-        <span>${escapeHTML(description)}</span>
+
+        <strong>
+          ${title}
+        </strong>
+
+        <span>
+          ${subtitle}
+        </span>
+
       </div>
+
     </button>
   `;
 }
 
-function gameHeader(title, status, toolbar) {
+function modeOptions(mode = "galaxy") {
   return `
-    <div class="game-topline">
+    <select data-game-mode>
+
+      <option
+        value="galaxy"
+        ${mode === "galaxy" ? "selected" : ""}
+      >
+        You vs GALAXY
+      </option>
+
+      <option
+        value="friend"
+        ${mode === "friend" ? "selected" : ""}
+      >
+        You vs Friend
+      </option>
+
+    </select>
+  `;
+}
+
+function levelOptions(elo = 500) {
+  return `
+    <select data-game-level>
+
+      ${GAME_LEVELS.map(level => `
+        <option
+          value="${level.elo}"
+          ${level.elo === elo ? "selected" : ""}
+        >
+          ${level.name} — ${level.elo} ELO
+        </option>
+      `).join("")}
+
+    </select>
+  `;
+}
+
+function commonToolbar(game, mode, elo) {
+  return `
+    <div class="game-toolbar">
+
+      ${modeOptions(mode)}
+
+      ${levelOptions(elo)}
 
       <button
         class="secondary-btn"
-        data-game-back
-        type="button"
+        data-${game}-hint
       >
-        ← Games
+        Hint
       </button>
 
-      <div class="game-status">
-        ${escapeHTML(status)}
-      </div>
+      <button
+        class="secondary-btn"
+        data-${game}-undo
+      >
+        Undo
+      </button>
 
-      <div class="game-toolbar">
-        ${toolbar}
-      </div>
+      <button
+        class="secondary-btn"
+        data-${game}-resign
+      >
+        Resign / End
+      </button>
+
+      <button
+        class="secondary-btn"
+        data-${game}-review
+      >
+        Game Review
+      </button>
+
+      <button
+        class="primary-btn"
+        data-${game}-reset
+      >
+        New Game
+      </button>
 
     </div>
-
-    <h2>${escapeHTML(title)}</h2>
   `;
 }
 
-function gameModeSelector(game) {
+function reviewHTML(title, items, note = "") {
   return `
-    <select
-      data-game-mode="${game}"
-      aria-label="Game mode"
-    >
-      ${modeOptions(Games[game].mode)}
-    </select>
+    <div class="review-card">
+
+      <h3>
+        ${escapeHTML(title)}
+      </h3>
+
+      <div class="review-grid">
+
+        ${items.map(([key, value]) => `
+          <div class="review-metric">
+
+            <span>
+              ${escapeHTML(key)}
+            </span>
+
+            <strong>
+              ${escapeHTML(value)}
+            </strong>
+
+          </div>
+        `).join("")}
+
+      </div>
+
+      ${
+        note
+          ? `
+            <p style="color:var(--muted);font-size:11px">
+              ${escapeHTML(note)}
+            </p>
+          `
+          : ""
+      }
+
+    </div>
   `;
 }
 
-function gameLevelSelector(game) {
-  if (Games[game].mode !== "galaxy") {
-    return "";
-  }
-
-  return `
-    <select
-      data-game-level="${game}"
-      aria-label="GALAXY difficulty"
-    >
-      ${levelOptions(Games[game].elo)}
-    </select>
-  `;
+function opponentName(mode) {
+  return mode === "friend"
+    ? "Friend"
+    : "GALAXY";
 }
 
-function commonGameButtons(game, options = {}) {
-  const {
-    hint = true,
-    undo = true,
-    resign = true,
-    review = true
-  } = options;
-
-  return `
-    ${hint ? `
-      <button
-        class="secondary-btn"
-        data-game-command="${game}:hint"
-        type="button"
-      >Hint</button>
-    ` : ""}
-
-    ${undo ? `
-      <button
-        class="secondary-btn"
-        data-game-command="${game}:undo"
-        type="button"
-      >Undo</button>
-    ` : ""}
-
-    ${resign ? `
-      <button
-        class="secondary-btn"
-        data-game-command="${game}:resign"
-        type="button"
-      >Resign</button>
-    ` : ""}
-
-    ${review ? `
-      <button
-        class="secondary-btn"
-        data-game-command="${game}:review"
-        type="button"
-      >Review</button>
-    ` : ""}
-
-    <button
-      class="primary-btn"
-      data-game-command="${game}:reset"
-      type="button"
-    >
-      New Game
-    </button>
-  `;
+function difficultyChance(elo) {
+  return Math.min(
+    0.98,
+    0.30 + (elo / 1200) * 0.65
+  );
 }
 
-
-/* =========================================================
-   OPEN GAME
-   ========================================================= */
-
-function openGame(name) {
-  Games.current = name;
-
-  if (name === "chess") {
-    resetChess(false);
-    return;
-  }
-
-  if (name === "tictactoe") {
-    resetTTT(false);
-    return;
-  }
-
-  if (name === "connect4") {
-    resetConnect(false);
-    return;
-  }
-
-  if (name === "memory") {
-    resetMemory(false);
-    return;
-  }
-
-  if (name === "shooter") {
-    resetShooter(false);
-  }
-}
 /* =========================================================
    CHESS
    ========================================================= */
 
-const CHESS_START = [
-  ["r","n","b","q","k","b","n","r"],
-  ["p","p","p","p","p","p","p","p"],
-  ["","","","","","","",""],
-  ["","","","","","","",""],
-  ["","","","","","","",""],
-  ["","","","","","","",""],
-  ["P","P","P","P","P","P","P","P"],
-  ["R","N","B","Q","K","B","N","R"]
-];
+const CHESS = {
+  pieces: {
+    r: "♜",
+    n: "♞",
+    b: "♝",
+    q: "♛",
+    k: "♚",
+    p: "♟",
 
-const CHESS_ICONS = {
-  K: "♔",
-  Q: "♕",
-  R: "♖",
-  B: "♗",
-  N: "♘",
-  P: "♙",
-  k: "♚",
-  q: "♛",
-  r: "♜",
-  b: "♝",
-  n: "♞",
-  p: "♟"
+    R: "♖",
+    N: "♘",
+    B: "♗",
+    Q: "♕",
+    K: "♔",
+    P: "♙"
+  },
+
+  values: {
+    p: 1,
+    n: 3,
+    b: 3,
+    q: 9,
+    r: 5,
+    k: 100
+  }
 };
 
-const CHESS_VALUES = {
-  p: 1,
-  n: 3,
-  b: 3,
-  r: 5,
-  q: 9,
-  k: 100
-};
+function chessInitialBoard() {
+  return [
+    "rnbqkbnr".split(""),
+    "pppppppp".split(""),
 
-function resetChess(render = true) {
-  const game = Games.chess;
+    ...Array.from(
+      { length: 4 },
+      () => Array(8).fill("")
+    ),
 
-  game.board = clone(CHESS_START);
-  game.turn = "w";
-  game.selected = null;
-  game.legal = [];
-  game.history = [];
-  game.snapshots = [];
-  game.finished = false;
-  game.winner = null;
-  game.hints = 0;
-  game.reviewOpen = false;
-
-  if (render) renderChess();
-  else renderChess();
+    "PPPPPPPP".split(""),
+    "RNBQKBNR".split("")
+  ];
 }
 
-function chessColor(piece) {
-  if (!piece) return null;
-  return piece === piece.toUpperCase() ? "w" : "b";
+function resetChess(keepSettings = true) {
+  const old = GameCenter.chess || {};
+
+  GameCenter.chess = {
+    board: chessInitialBoard(),
+
+    turn: "white",
+
+    selected: null,
+
+    legal: [],
+
+    mode:
+      keepSettings
+        ? old.mode || "galaxy"
+        : "galaxy",
+
+    elo:
+      keepSettings
+        ? old.elo || 500
+        : 500,
+
+    history: [],
+
+    snapshots: [],
+
+    review: {
+      best: 0,
+      good: 0,
+      mistakes: 0,
+      blunders: 0,
+      hints: 0
+    },
+
+    finished: false,
+
+    message: "Your turn"
+  };
+
+  renderChess();
 }
 
-function chessOpponent(color) {
-  return color === "w" ? "b" : "w";
+function isWhitePiece(piece) {
+  return (
+    piece &&
+    piece === piece.toUpperCase()
+  );
 }
 
-function chessInside(row, col) {
-  return row >= 0 && row < 8 && col >= 0 && col < 8;
+function sameColor(a, b) {
+  return (
+    a &&
+    b &&
+    isWhitePiece(a) === isWhitePiece(b)
+  );
 }
 
-function chessPathMoves(row, col, directions, color) {
-  const game = Games.chess;
-  const moves = [];
+function chessMoves(board, r, c) {
+  const piece = board[r][c];
 
-  for (const [dr, dc] of directions) {
-    let r = row + dr;
-    let c = col + dc;
-
-    while (chessInside(r, c)) {
-      const target = game.board[r][c];
-
-      if (!target) {
-        moves.push({ row: r, col: c });
-      } else {
-        if (chessColor(target) !== color) {
-          moves.push({
-            row: r,
-            col: c,
-            capture: true
-          });
-        }
-
-        break;
-      }
-
-      r += dr;
-      c += dc;
-    }
+  if (!piece) {
+    return [];
   }
 
-  return moves;
-}
+  const white =
+    isWhitePiece(piece);
 
-function chessPseudoMoves(row, col) {
-  const game = Games.chess;
-  const piece = game.board[row][col];
-
-  if (!piece) return [];
-
-  const color = chessColor(piece);
-  const lower = piece.toLowerCase();
+  const type =
+    piece.toLowerCase();
 
   const moves = [];
 
-  if (lower === "p") {
-    const direction = color === "w" ? -1 : 1;
-    const startRow = color === "w" ? 6 : 1;
+  const add = (rr, cc) => {
+    if (
+      rr < 0 ||
+      rr > 7 ||
+      cc < 0 ||
+      cc > 7
+    ) {
+      return false;
+    }
 
-    const one = row + direction;
+    if (!board[rr][cc]) {
+      moves.push([
+        rr,
+        cc
+      ]);
+
+      return true;
+    }
 
     if (
-      chessInside(one, col) &&
-      !game.board[one][col]
+      !sameColor(
+        piece,
+        board[rr][cc]
+      )
     ) {
-      moves.push({
-        row: one,
-        col
-      });
+      moves.push([
+        rr,
+        cc
+      ]);
+    }
 
-      const two = row + direction * 2;
+    return false;
+  };
+
+  if (type === "p") {
+    const direction =
+      white ? -1 : 1;
+
+    const start =
+      white ? 6 : 1;
+
+    if (
+      r + direction >= 0 &&
+      r + direction < 8 &&
+      !board[r + direction][c]
+    ) {
+      moves.push([
+        r + direction,
+        c
+      ]);
 
       if (
-        row === startRow &&
-        chessInside(two, col) &&
-        !game.board[two][col]
+        r === start &&
+        !board[r + 2 * direction][c]
       ) {
-        moves.push({
-          row: two,
-          col
-        });
+        moves.push([
+          r + 2 * direction,
+          c
+        ]);
       }
     }
 
-    for (const dc of [-1, 1]) {
-      const r = row + direction;
-      const c = col + dc;
+    [-1, 1].forEach(dc => {
+      const rr =
+        r + direction;
+
+      const cc =
+        c + dc;
 
       if (
-        chessInside(r, c) &&
-        game.board[r][c] &&
-        chessColor(game.board[r][c]) !== color
+        rr >= 0 &&
+        rr < 8 &&
+        cc >= 0 &&
+        cc < 8 &&
+        board[rr][cc] &&
+        !sameColor(
+          piece,
+          board[rr][cc]
+        )
       ) {
-        moves.push({
-          row: r,
-          col: c,
-          capture: true
-        });
+        moves.push([
+          rr,
+          cc
+        ]);
       }
-    }
+    });
   }
 
-  if (lower === "n") {
-    const jumps = [
-      [-2,-1],[-2,1],
-      [-1,-2],[-1,2],
-      [1,-2],[1,2],
-      [2,-1],[2,1]
-    ];
-
-    for (const [dr, dc] of jumps) {
-      const r = row + dr;
-      const c = col + dc;
-
-      if (!chessInside(r, c)) continue;
-
-      const target = game.board[r][c];
-
-      if (!target) {
-        moves.push({ row: r, col: c });
-      } else if (chessColor(target) !== color) {
-        moves.push({
-          row: r,
-          col: c,
-          capture: true
-        });
-      }
-    }
+  if (type === "n") {
+    [
+      [2, 1],
+      [2, -1],
+      [-2, 1],
+      [-2, -1],
+      [1, 2],
+      [1, -2],
+      [-1, 2],
+      [-1, -2]
+    ].forEach(([dr, dc]) => {
+      add(
+        r + dr,
+        c + dc
+      );
+    });
   }
 
-  if (lower === "b") {
-    return chessPathMoves(
-      row,
-      col,
-      [[1,1],[1,-1],[-1,1],[-1,-1]],
-      color
-    );
-  }
-
-  if (lower === "r") {
-    return chessPathMoves(
-      row,
-      col,
-      [[1,0],[-1,0],[0,1],[0,-1]],
-      color
-    );
-  }
-
-  if (lower === "q") {
-    return chessPathMoves(
-      row,
-      col,
-      [
-        [1,1],[1,-1],[-1,1],[-1,-1],
-        [1,0],[-1,0],[0,1],[0,-1]
-      ],
-      color
-    );
-  }
-
-  if (lower === "k") {
-    for (let dr = -1; dr <= 1; dr++) {
-      for (let dc = -1; dc <= 1; dc++) {
-        if (dr === 0 && dc === 0) continue;
-
-        const r = row + dr;
-        const c = col + dc;
-
-        if (!chessInside(r, c)) continue;
-
-        const target = game.board[r][c];
-
-        if (!target) {
-          moves.push({ row: r, col: c });
-        } else if (chessColor(target) !== color) {
-          moves.push({
-            row: r,
-            col: c,
-            capture: true
-          });
+  if (type === "k") {
+    for (
+      let dr = -1;
+      dr <= 1;
+      dr++
+    ) {
+      for (
+        let dc = -1;
+        dc <= 1;
+        dc++
+      ) {
+        if (dr || dc) {
+          add(
+            r + dr,
+            c + dc
+          );
         }
       }
     }
+  }
+
+  if (
+    "rbq".includes(type)
+  ) {
+    const directions = [];
+
+    if (
+      "rq".includes(type)
+    ) {
+      directions.push(
+        [1, 0],
+        [-1, 0],
+        [0, 1],
+        [0, -1]
+      );
+    }
+
+    if (
+      "bq".includes(type)
+    ) {
+      directions.push(
+        [1, 1],
+        [1, -1],
+        [-1, 1],
+        [-1, -1]
+      );
+    }
+
+    directions.forEach(([dr, dc]) => {
+      let rr =
+        r + dr;
+
+      let cc =
+        c + dc;
+
+      while (
+        rr >= 0 &&
+        rr < 8 &&
+        cc >= 0 &&
+        cc < 8
+      ) {
+        if (!add(rr, cc)) {
+          break;
+        }
+
+        rr += dr;
+        cc += dc;
+      }
+    });
   }
 
   return moves;
 }
 
-function chessAllMoves(color) {
-  const game = Games.chess;
-  const all = [];
+function allChessMoves(side) {
+  const game = GameCenter.chess;
+  const result = [];
 
-  for (let row = 0; row < 8; row++) {
-    for (let col = 0; col < 8; col++) {
-      const piece = game.board[row][col];
-
+  game.board.forEach((row, r) => {
+    row.forEach((piece, c) => {
       if (
         piece &&
-        chessColor(piece) === color
+        (
+          side === "white"
+            ? isWhitePiece(piece)
+            : !isWhitePiece(piece)
+        )
       ) {
-        const moves = chessPseudoMoves(row, col);
-
-        for (const move of moves) {
-          all.push({
-            from: { row, col },
-            to: move,
-            piece
+        chessMoves(
+          game.board,
+          r,
+          c
+        ).forEach(([rr, cc]) => {
+          result.push({
+            from: [r, c],
+            to: [rr, cc],
+            piece,
+            target:
+              game.board[rr][cc]
           });
-        }
+        });
       }
-    }
-  }
+    });
+  });
 
-  return all;
+  return result;
 }
 
-function chessSquareName(row, col) {
-  const file = "abcdefgh"[col];
-  const rank = 8 - row;
+function chessNotation(move) {
+  const files =
+    "abcdefgh";
 
-  return `${file}${rank}`;
+  return (
+    `${move.piece}` +
+    `${files[move.from[1]]}` +
+    `${8 - move.from[0]}` +
+    `-` +
+    `${files[move.to[1]]}` +
+    `${8 - move.to[0]}`
+  );
 }
 
-function chessMoveText(move, captured = "") {
-  const pieceName =
-    move.piece.toLowerCase() === "p"
-      ? ""
-      : move.piece.toUpperCase();
-
-  const capture = captured ? "x" : "";
-
-  return `${pieceName}${chessSquareName(
-    move.from.row,
-    move.from.col
-  )}${capture}${chessSquareName(
-    move.to.row,
-    move.to.col
-  )}`;
-}
-
-function chessSnapshot() {
-  const game = Games.chess;
-
-  return {
-    board: clone(game.board),
-    turn: game.turn,
-    history: clone(game.history),
-    finished: game.finished,
-    winner: game.winner
-  };
-}
-
-function chessRestore(snapshot) {
-  const game = Games.chess;
-
-  game.board = clone(snapshot.board);
-  game.turn = snapshot.turn;
-  game.history = clone(snapshot.history);
-  game.finished = snapshot.finished;
-  game.winner = snapshot.winner;
-  game.selected = null;
-  game.legal = [];
-}
-
-function chessMoveScore(move) {
-  const game = Games.chess;
-  const target =
-    game.board[move.to.row][move.to.col];
-
+function scoreChessMove(move) {
   let score = 0;
 
-  if (target) {
+  if (move.target) {
     score +=
-      CHESS_VALUES[target.toLowerCase()] * 10;
+      (
+        CHESS.values[
+          move.target.toLowerCase()
+        ] || 0
+      ) * 10;
   }
 
-  const centerDistance =
-    Math.abs(3.5 - move.to.row) +
-    Math.abs(3.5 - move.to.col);
+  const center =
+    Math.abs(
+      3.5 - move.to[0]
+    ) +
+    Math.abs(
+      3.5 - move.to[1]
+    );
 
-  score += Math.max(0, 6 - centerDistance);
+  score +=
+    Math.max(
+      0,
+      7 - center
+    );
 
-  if (move.piece.toLowerCase() === "p") {
-    score += 1;
+  if (
+    move.piece.toLowerCase() === "p" &&
+    (
+      move.to[0] === 0 ||
+      move.to[0] === 7
+    )
+  ) {
+    score += 80;
   }
 
   return score;
 }
 
-function chooseGalaxyChessMove() {
-  const game = Games.chess;
+function applyChessMove(
+  move,
+  actor = "You"
+) {
+  const game =
+    GameCenter.chess;
 
-  let moves = chessAllMoves("b");
-
-  if (!moves.length) return null;
-
-  moves = moves.map(move => ({
-    ...move,
-    score: chessMoveScore(move)
-  }));
-
-  moves.sort((a, b) => b.score - a.score);
-
-  const strength = game.elo;
-
-  let poolSize = moves.length;
-
-  if (strength >= 1200) poolSize = Math.min(2, moves.length);
-  else if (strength >= 1000) poolSize = Math.min(3, moves.length);
-  else if (strength >= 800) poolSize = Math.min(5, moves.length);
-  else if (strength >= 500) poolSize = Math.min(8, moves.length);
-  else if (strength >= 200) poolSize = Math.min(14, moves.length);
-
-  return randomItem(
-    moves.slice(0, Math.max(1, poolSize))
+  game.snapshots.push(
+    JSON.parse(
+      JSON.stringify({
+        board: game.board,
+        turn: game.turn,
+        history: game.history,
+        review: game.review,
+        finished: game.finished,
+        message: game.message
+      })
+    )
   );
-}
 
-function chessApplyMove(move, actor = "player") {
-  const game = Games.chess;
+  const beforeScore =
+    scoreChessMove(move);
 
-  if (game.finished) return;
+  game.board[
+    move.to[0]
+  ][
+    move.to[1]
+  ] =
+    move.piece;
 
-  game.snapshots.push(chessSnapshot());
-
-  const piece =
-    game.board[move.from.row][move.from.col];
-
-  const captured =
-    game.board[move.to.row][move.to.col];
-
-  game.board[move.to.row][move.to.col] = piece;
-  game.board[move.from.row][move.from.col] = "";
-
-  if (
-    piece === "P" &&
-    move.to.row === 0
-  ) {
-    game.board[move.to.row][move.to.col] = "Q";
-  }
+  game.board[
+    move.from[0]
+  ][
+    move.from[1]
+  ] =
+    "";
 
   if (
-    piece === "p" &&
-    move.to.row === 7
+    move.piece === "P" &&
+    move.to[0] === 0
   ) {
-    game.board[move.to.row][move.to.col] = "q";
+    game.board[
+      move.to[0]
+    ][
+      move.to[1]
+    ] =
+      "Q";
   }
 
-  game.history.push({
-    actor,
-    text: chessMoveText(
-      {
-        ...move,
-        piece
-      },
-      captured
-    ),
-    captured
-  });
-
-  if (captured?.toLowerCase() === "k") {
-    game.finished = true;
-
-    game.winner =
-      actor === "galaxy"
-        ? "GALAXY"
-        : actor === "friend"
-          ? "Friend"
-          : "You";
+  if (
+    move.piece === "p" &&
+    move.to[0] === 7
+  ) {
+    game.board[
+      move.to[0]
+    ][
+      move.to[1]
+    ] =
+      "q";
   }
 
-  game.turn =
-    game.turn === "w" ? "b" : "w";
+  game.history.push(
+    `${actor}: ${chessNotation(move)}`
+  );
+
+  if (actor === "You") {
+    const options =
+      allChessMoves("white")
+        .map(scoreChessMove);
+
+    const best =
+      Math.max(
+        beforeScore,
+        ...options,
+        0
+      );
+
+    if (
+      beforeScore >= best - 1
+    ) {
+      game.review.best++;
+
+    } else if (
+      beforeScore >= best - 4
+    ) {
+      game.review.good++;
+
+    } else if (
+      beforeScore >= best - 10
+    ) {
+      game.review.mistakes++;
+
+    } else {
+      game.review.blunders++;
+    }
+  }
 
   game.selected = null;
   game.legal = [];
 
-  renderChess();
+  game.turn =
+    game.turn === "white"
+      ? "black"
+      : "white";
+
+  const allPieces =
+    game.board.flat();
 
   if (
-    !game.finished &&
-    game.mode === "galaxy" &&
-    game.turn === "b"
+    !allPieces.includes("K") ||
+    !allPieces.includes("k")
   ) {
-    setTimeout(galaxyChessTurn, 450);
+    game.finished = true;
+
+    const whiteKing =
+      allPieces.includes("K");
+
+    game.message =
+      whiteKing
+        ? "🏆 You Win!"
+        : `🏆 ${opponentName(game.mode)} Wins!`;
   }
 }
 
-function galaxyChessTurn() {
-  const game = Games.chess;
+function galaxyChessMove() {
+  const game =
+    GameCenter.chess;
 
   if (
+    !game ||
     game.finished ||
     game.mode !== "galaxy" ||
-    game.turn !== "b"
+    game.turn !== "black"
   ) {
     return;
   }
 
-  const move = chooseGalaxyChessMove();
+  const moves =
+    allChessMoves("black");
 
-  if (!move) {
+  if (!moves.length) {
     game.finished = true;
-    game.winner = "You";
+    game.message = "🤝 Draw Game";
+
     renderChess();
     return;
   }
 
-  chessApplyMove(move, "galaxy");
+  moves.sort(
+    (a, b) =>
+      scoreChessMove(b) -
+      scoreChessMove(a)
+  );
+
+  const smart =
+    Math.random() <
+    difficultyChance(
+      game.elo
+    );
+
+  const pick =
+    smart
+      ? moves[
+          Math.floor(
+            Math.random() *
+            Math.min(
+              3,
+              moves.length
+            )
+          )
+        ]
+      : moves[
+          Math.floor(
+            Math.random() *
+            moves.length
+          )
+        ];
+
+  applyChessMove(
+    pick,
+    "GALAXY"
+  );
+
+  game.message =
+    game.finished
+      ? game.message
+      : "Your turn";
+
+  renderChess();
 }
 
-function chessClickSquare(row, col) {
-  const game = Games.chess;
-
-  if (game.finished) return;
+function clickChessSquare(r, c) {
+  const game =
+    GameCenter.chess;
 
   if (
-    game.mode === "galaxy" &&
-    game.turn === "b"
+    !game ||
+    game.finished
   ) {
     return;
   }
 
-  const piece = game.board[row][col];
+  const humanSide =
+    game.mode === "friend"
+      ? game.turn
+      : "white";
 
-  const playerColor =
-    game.turn;
+  if (
+    game.mode === "galaxy" &&
+    game.turn !== "white"
+  ) {
+    return;
+  }
 
   if (game.selected) {
-    const legal = game.legal.find(
-      move =>
-        move.row === row &&
-        move.col === col
-    );
-
-    if (legal) {
-      const actor =
-        game.mode === "friend" &&
-        game.turn === "b"
-          ? "friend"
-          : "player";
-
-      chessApplyMove(
-        {
-          from: game.selected,
-          to: legal
-        },
-        actor
+    const allowed =
+      game.legal.find(
+        pos =>
+          pos[0] === r &&
+          pos[1] === c
       );
+
+    if (allowed) {
+      const [
+        fromR,
+        fromC
+      ] =
+        game.selected;
+
+      const piece =
+        game.board[fromR][fromC];
+
+      const move = {
+        from: [
+          fromR,
+          fromC
+        ],
+
+        to: [
+          r,
+          c
+        ],
+
+        piece,
+
+        target:
+          game.board[r][c]
+      };
+
+      applyChessMove(
+        move,
+
+        game.mode === "friend"
+          ? (
+              game.turn === "white"
+                ? "Player 1"
+                : "Friend"
+            )
+          : "You"
+      );
+
+      game.message =
+        game.finished
+          ? game.message
+          : (
+              game.mode === "friend"
+                ? `${
+                    game.turn === "white"
+                      ? "Player 1"
+                      : "Friend"
+                  } turn`
+                : "GALAXY is thinking…"
+            );
+
+      renderChess();
+
+      if (
+        game.mode === "galaxy" &&
+        !game.finished
+      ) {
+        setTimeout(
+          galaxyChessMove,
+          350
+        );
+      }
 
       return;
     }
   }
 
+  const piece =
+    game.board[r][c];
+
   if (
     piece &&
-    chessColor(piece) === playerColor
+    (
+      (
+        humanSide === "white" &&
+        isWhitePiece(piece)
+      ) ||
+      (
+        humanSide === "black" &&
+        !isWhitePiece(piece)
+      )
+    )
   ) {
-    game.selected = { row, col };
-    game.legal = chessPseudoMoves(row, col);
+    game.selected = [
+      r,
+      c
+    ];
+
+    game.legal =
+      chessMoves(
+        game.board,
+        r,
+        c
+      );
+
   } else {
     game.selected = null;
     game.legal = [];
@@ -1274,352 +1315,411 @@ function chessClickSquare(row, col) {
   renderChess();
 }
 
-function chessHint() {
-  const game = Games.chess;
-
-  if (game.finished) return;
-
-  const moves = chessAllMoves(game.turn);
-
-  if (!moves.length) {
-    toast("No move available.");
-    return;
-  }
-
-  moves.sort(
-    (a, b) =>
-      chessMoveScore(b) -
-      chessMoveScore(a)
-  );
-
-  const best = moves[0];
-
-  game.hints += 1;
-
-  toast(
-    `Hint: ${chessSquareName(
-      best.from.row,
-      best.from.col
-    )} → ${chessSquareName(
-      best.to.row,
-      best.to.col
-    )}`
-  );
-}
-
-function chessUndo() {
-  const game = Games.chess;
-
-  if (!game.snapshots.length) {
-    toast("Nothing to undo.");
-    return;
-  }
-
-  let snapshot = game.snapshots.pop();
-
-  if (
-    game.mode === "galaxy" &&
-    snapshot.turn === "b" &&
-    game.snapshots.length
-  ) {
-    snapshot = game.snapshots.pop();
-  }
-
-  chessRestore(snapshot);
-  renderChess();
-}
-
-function chessResign() {
-  const game = Games.chess;
-
-  if (game.finished) return;
-
-  game.finished = true;
-
-  if (game.mode === "galaxy") {
-    game.winner = "GALAXY";
-  } else {
-    game.winner =
-      game.turn === "w"
-        ? "Friend"
-        : "You";
-  }
-
-  renderChess();
-}
-
-function chessReviewHTML() {
-  const game = Games.chess;
-
-  const playerMoves =
-    game.history.filter(
-      item => item.actor === "player"
-    );
-
-  const captures =
-    playerMoves.filter(
-      item => item.captured
-    ).length;
-
-  const moves = playerMoves.length;
-
-  let accuracy =
-    Math.max(
-      35,
-      Math.min(
-        98,
-        72 +
-        captures * 4 -
-        Math.max(0, moves - captures * 2) * 0.7 -
-        game.hints * 2
-      )
-    );
-
-  accuracy = Math.round(accuracy);
-
-  const best = Math.max(
-    0,
-    Math.round(captures * 0.7)
-  );
-
-  const good = Math.max(
-    0,
-    moves - best - Math.floor(moves * 0.15)
-  );
-
-  const mistakes =
-    Math.max(
-      0,
-      Math.floor(moves * 0.1)
-    );
-
-  const blunders =
-    Math.max(
-      0,
-      Math.floor(moves * 0.05)
-    );
-
-  return reviewCardHTML(
-    "Chess Review",
-    [
-      ["Estimated accuracy", `${accuracy}%`],
-      ["Moves", moves],
-      ["Best moves", best],
-      ["Good moves", good],
-      ["Mistakes", mistakes],
-      ["Blunders", blunders],
-      ["Hints used", game.hints],
-      ["Result", game.winner || "In progress"]
-    ],
-    "GALAXY Chess review is heuristic and is not Stockfish-certified."
-  );
-}
-
 function renderChess() {
-  const game = Games.chess;
+  const game =
+    GameCenter.chess ||
+    (
+      resetChess(),
+      GameCenter.chess
+    );
 
-  const status =
-    game.finished
-      ? `${game.winner || "Game"} wins`
-      : game.mode === "galaxy"
-        ? game.turn === "w"
-          ? "Your turn"
-          : "GALAXY is thinking"
-        : game.turn === "w"
-          ? "Your turn"
-          : "Friend's turn";
+  GameCenter.current =
+    "chess";
 
-  const toolbar = `
-    ${gameModeSelector("chess")}
-    ${gameLevelSelector("chess")}
-    ${commonGameButtons("chess")}
-  `;
+  const files =
+    "abcdefgh";
 
-  let boardHTML = "";
+  const body =
+    $("#contentBody");
 
-  for (let row = 0; row < 8; row++) {
-    for (let col = 0; col < 8; col++) {
-      const piece =
-        game.board[row][col];
+  if (!body) return;
 
-      const light =
-        (row + col) % 2 === 0;
+  body.innerHTML = `
+    <div class="game-shell">
 
-      const selected =
-        game.selected &&
-        game.selected.row === row &&
-        game.selected.col === col;
+      <div class="game-topline">
 
-      const legalMove =
-        game.legal.find(
-          move =>
-            move.row === row &&
-            move.col === col
-        );
-
-      boardHTML += `
         <button
-          class="
-            chess-square
-            ${light ? "light" : "dark"}
-            ${selected ? "selected" : ""}
-            ${legalMove ? "legal" : ""}
-            ${
-              legalMove?.capture
-                ? "capture"
-                : ""
-            }
-          "
-          data-chess-square="${row},${col}"
-          type="button"
+          class="secondary-btn"
+          data-game-back
         >
-          ${piece ? CHESS_ICONS[piece] : ""}
+          ← Games
         </button>
-      `;
-    }
-  }
 
-  const historyHTML =
-    game.history.length
-      ? game.history
-          .map(
-            (move, index) =>
-              `<div>${index + 1}. ${escapeHTML(
-                move.text
-              )}</div>`
-          )
-          .join("")
-      : "<div>No moves yet.</div>";
+        <div class="game-status">
+          ${escapeHTML(game.message)}
+        </div>
 
-  setContent(
-    "Chess",
-    "GALAXY GAMES",
-    `
-      <div class="game-shell">
-
-        ${gameHeader(
-          "Chess",
-          status,
-          toolbar
+        ${commonToolbar(
+          "chess",
+          game.mode,
+          game.elo
         )}
 
-        <div class="game-layout">
+      </div>
 
-          <div class="chess-board-wrap">
+      <div class="game-layout">
 
-            <div class="chess-board">
-              ${boardHTML}
-            </div>
+        <div class="chess-board-wrap">
 
-            <div class="chess-files">
-              <span>a</span>
-              <span>b</span>
-              <span>c</span>
-              <span>d</span>
-              <span>e</span>
-              <span>f</span>
-              <span>g</span>
-              <span>h</span>
-            </div>
+          <div class="chess-board">
+
+            ${
+              game.board
+                .map((row, r) =>
+                  row.map((piece, c) => {
+                    const selected =
+                      game.selected?.[0] === r &&
+                      game.selected?.[1] === c;
+
+                    const legal =
+                      game.legal.some(
+                        pos =>
+                          pos[0] === r &&
+                          pos[1] === c
+                      );
+
+                    const capture =
+                      legal &&
+                      !!piece;
+
+                    return `
+                      <button
+                        class="
+                          chess-square
+                          ${(r + c) % 2 ? "dark" : "light"}
+                          ${selected ? "selected" : ""}
+                          ${legal ? "legal" : ""}
+                          ${capture ? "capture" : ""}
+                        "
+                        data-chess-square="${r},${c}"
+                      >
+                        ${CHESS.pieces[piece] || ""}
+                      </button>
+                    `;
+                  }).join("")
+                )
+                .join("")
+            }
 
           </div>
 
-          <div class="game-side-panel">
-
-            <div class="player-card">
-              <div class="player-avatar">Y</div>
-              <div>
-                <strong>You</strong>
-                <span>White</span>
-              </div>
-            </div>
-
-            <div class="player-card">
-              <div class="player-avatar galaxy-avatar">
-                ${
-                  game.mode === "galaxy"
-                    ? "✦"
-                    : "F"
-                }
-              </div>
-
-              <div>
-                <strong>
-                  ${
-                    game.mode === "galaxy"
-                      ? "GALAXY"
-                      : "Friend"
-                  }
-                </strong>
-
-                <span>
-                  ${
-                    game.mode === "galaxy"
-                      ? `${game.elo} ELO`
-                      : "Black"
-                  }
-                </span>
-              </div>
-            </div>
-
-            <div class="move-history">
-              <strong>Move history</strong>
-
-              <div class="move-history-list">
-                ${historyHTML}
-              </div>
-            </div>
+          <div class="chess-files">
 
             ${
-              game.reviewOpen
-                ? chessReviewHTML()
-                : ""
+              files
+                .split("")
+                .map(
+                  file =>
+                    `<span>${file}</span>`
+                )
+                .join("")
             }
 
           </div>
 
         </div>
+
+        <div class="game-side-panel">
+
+          <div class="player-card">
+
+            <div class="player-avatar">
+              Y
+            </div>
+
+            <div>
+
+              <strong>
+                Player 1 / You
+              </strong>
+
+              <span>
+                White
+              </span>
+
+            </div>
+
+          </div>
+
+          <div class="player-card">
+
+            <div class="player-avatar galaxy-avatar">
+              ${
+                game.mode === "galaxy"
+                  ? "✦"
+                  : "F"
+              }
+            </div>
+
+            <div>
+
+              <strong>
+                ${opponentName(game.mode)}
+              </strong>
+
+              <span>
+                Black
+                ${
+                  game.mode === "galaxy"
+                    ? ` • ${game.elo} ELO`
+                    : ""
+                }
+              </span>
+
+            </div>
+
+          </div>
+
+          <div class="move-history">
+
+            <strong>
+              Moves
+            </strong>
+
+            <div class="move-history-list">
+
+              ${
+                game.history.length
+                  ? game.history
+                      .map(
+                        move =>
+                          `<div>${escapeHTML(move)}</div>`
+                      )
+                      .join("")
+                  : "No moves yet"
+              }
+
+            </div>
+
+          </div>
+
+          <div id="gameReview">
+          </div>
+
+        </div>
+
       </div>
-    `
-  );
+
+    </div>
+  `;
+
+  syncGameSelectors(game);
 }
 
+function chessHint() {
+  const game =
+    GameCenter.chess;
+
+  if (
+    !game ||
+    game.finished
+  ) {
+    return;
+  }
+
+  const side =
+    game.mode === "galaxy"
+      ? "white"
+      : game.turn;
+
+  const moves =
+    allChessMoves(side)
+      .sort(
+        (a, b) =>
+          scoreChessMove(b) -
+          scoreChessMove(a)
+      );
+
+  if (moves[0]) {
+    game.review.hints++;
+
+    toast(
+      `Hint: ${chessNotation(moves[0])}`
+    );
+  }
+}
+
+function chessUndo() {
+  const game =
+    GameCenter.chess;
+
+  if (
+    !game?.snapshots.length
+  ) {
+    return toast(
+      "Nothing to undo"
+    );
+  }
+
+  let snapshot =
+    game.snapshots.pop();
+
+  if (
+    game.mode === "galaxy" &&
+    game.turn === "white" &&
+    game.snapshots.length
+  ) {
+    snapshot =
+      game.snapshots.pop();
+  }
+
+  Object.assign(
+    game,
+    snapshot,
+    {
+      selected: null,
+      legal: []
+    }
+  );
+
+  renderChess();
+}
+
+function chessReview() {
+  const game =
+    GameCenter.chess;
+
+  const total =
+    game.review.best +
+    game.review.good +
+    game.review.mistakes +
+    game.review.blunders;
+
+  const accuracy =
+    total
+      ? Math.max(
+          0,
+          Math.round(
+            (
+              game.review.best * 100 +
+              game.review.good * 85 +
+              game.review.mistakes * 55
+            ) /
+            total
+          )
+        )
+      : 0;
+
+  const review =
+    $("#gameReview");
+
+  if (!review) return;
+
+  review.innerHTML =
+    reviewHTML(
+      "Game Review",
+
+      [
+        [
+          "Estimated accuracy",
+          `${accuracy}%`
+        ],
+
+        [
+          "Best moves",
+          String(
+            game.review.best
+          )
+        ],
+
+        [
+          "Good moves",
+          String(
+            game.review.good
+          )
+        ],
+
+        [
+          "Mistakes",
+          String(
+            game.review.mistakes
+          )
+        ],
+
+        [
+          "Blunders",
+          String(
+            game.review.blunders
+          )
+        ],
+
+        [
+          "Hints used",
+          String(
+            game.review.hints
+          )
+        ]
+      ],
+
+      "GALAXY review is heuristic, not Stockfish-certified."
+    );
+}
 
 /* =========================================================
-   TIC TAC TOE
+   END OF PART 1
+   PART 2 MUST BE PASTED DIRECTLY BELOW
+   ========================================================= */
+/* =========================================================
+   PART 2 OF 2
+   TIC-TAC-TOE
    ========================================================= */
 
-function resetTTT(render = true) {
-  const game = Games.ttt;
+function resetTTT(keepSettings = true) {
+  const old = GameCenter.ttt || {};
 
-  game.board = Array(9).fill("");
-  game.turn = "X";
-  game.history = [];
-  game.finished = false;
-  game.winner = null;
-  game.hints = 0;
-  game.reviewOpen = false;
+  GameCenter.ttt = {
+    board: Array(9).fill(""),
+    turn: "X",
+
+    mode: keepSettings
+      ? old.mode || "galaxy"
+      : "galaxy",
+
+    elo: keepSettings
+      ? old.elo || 500
+      : 500,
+
+    history: [],
+    snapshots: [],
+
+    finished: false,
+    winner: null,
+
+    message: "Your turn",
+
+    review: {
+      moves: 0,
+      strong: 0,
+      mistakes: 0,
+      missedWins: 0,
+      blocks: 0,
+      hints: 0
+    }
+  };
 
   renderTTT();
 }
 
-const TTT_LINES = [
-  [0,1,2],
-  [3,4,5],
-  [6,7,8],
-  [0,3,6],
-  [1,4,7],
-  [2,5,8],
-  [0,4,8],
-  [2,4,6]
+const TTT_WINS = [
+  [0, 1, 2],
+  [3, 4, 5],
+  [6, 7, 8],
+
+  [0, 3, 6],
+  [1, 4, 7],
+  [2, 5, 8],
+
+  [0, 4, 8],
+  [2, 4, 6]
 ];
 
 function tttWinner(board) {
-  for (const [a,b,c] of TTT_LINES) {
+  for (const [a, b, c] of TTT_WINS) {
     if (
       board[a] &&
       board[a] === board[b] &&
-      board[b] === board[c]
+      board[a] === board[c]
     ) {
       return board[a];
     }
@@ -1636,432 +1736,820 @@ function tttWinningMove(board, symbol) {
   for (let i = 0; i < 9; i++) {
     if (board[i]) continue;
 
-    const copy = [...board];
-    copy[i] = symbol;
+    const test = [...board];
+    test[i] = symbol;
 
-    if (tttWinner(copy) === symbol) {
+    if (tttWinner(test) === symbol) {
       return i;
     }
   }
 
-  return null;
+  return -1;
 }
 
-function tttGalaxyChoice() {
-  const game = Games.ttt;
+function tttBestMove(symbol) {
+  const game = GameCenter.ttt;
   const board = game.board;
 
-  const available = board
-    .map((cell, index) =>
-      cell ? null : index
-    )
+  const winning = tttWinningMove(board, symbol);
+
+  if (winning !== -1) {
+    return winning;
+  }
+
+  const opponent = symbol === "X" ? "O" : "X";
+  const block = tttWinningMove(board, opponent);
+
+  if (block !== -1) {
+    return block;
+  }
+
+  if (!board[4]) {
+    return 4;
+  }
+
+  const corners = [0, 2, 6, 8].filter(i => !board[i]);
+
+  if (corners.length) {
+    return corners[
+      Math.floor(Math.random() * corners.length)
+    ];
+  }
+
+  const empty = board
+    .map((value, index) => value ? null : index)
     .filter(index => index !== null);
 
-  if (!available.length) return null;
-
-  const win = tttWinningMove(board, "O");
-  const block = tttWinningMove(board, "X");
-
-  const random = () =>
-    randomItem(available);
-
-  if (game.elo >= 1000) {
-    if (win !== null) return win;
-    if (block !== null) return block;
-
-    if (!board[4]) return 4;
-
-    const corners = [0,2,6,8]
-      .filter(index => !board[index]);
-
-    if (corners.length) {
-      return randomItem(corners);
-    }
-
-    return random();
-  }
-
-  if (game.elo >= 800) {
-    if (win !== null) return win;
-
-    if (
-      block !== null &&
-      Math.random() < 0.92
-    ) {
-      return block;
-    }
-
-    if (!board[4] && Math.random() < 0.8) {
-      return 4;
-    }
-  }
-
-  if (game.elo >= 500) {
-    if (
-      win !== null &&
-      Math.random() < 0.85
-    ) {
-      return win;
-    }
-
-    if (
-      block !== null &&
-      Math.random() < 0.7
-    ) {
-      return block;
-    }
-  }
-
-  if (game.elo >= 200) {
-    if (
-      win !== null &&
-      Math.random() < 0.55
-    ) {
-      return win;
-    }
-
-    if (
-      block !== null &&
-      Math.random() < 0.45
-    ) {
-      return block;
-    }
-  }
-
-  return random();
+  return empty.length
+    ? empty[Math.floor(Math.random() * empty.length)]
+    : -1;
 }
 
-function tttApplyMove(index, symbol, actor) {
-  const game = Games.ttt;
+function finishTTT() {
+  const game = GameCenter.ttt;
+  const winner = tttWinner(game.board);
 
-  if (
-    game.finished ||
-    game.board[index]
-  ) {
-    return;
+  if (!winner) {
+    return false;
   }
 
-  game.board[index] = symbol;
+  game.finished = true;
+  game.winner = winner;
 
-  game.history.push({
-    index,
-    symbol,
-    actor
-  });
+  if (winner === "draw") {
+    game.message = "🤝 Draw Game";
+  } else if (game.mode === "galaxy") {
+    game.message =
+      winner === "X"
+        ? "🏆 You Win!"
+        : "🤖 GALAXY Wins!";
+  } else {
+    game.message =
+      winner === "X"
+        ? "🏆 Player 1 Wins!"
+        : "🏆 Friend Wins!";
+  }
 
-  const winner =
-    tttWinner(game.board);
+  return true;
+}
 
-  if (winner) {
-    game.finished = true;
+function makeTTTMove(index, actor) {
+  const game = GameCenter.ttt;
 
-    if (winner === "draw") {
-      game.winner = "Draw";
-    } else if (winner === "X") {
-      game.winner = "You";
+  if (game.finished || game.board[index]) {
+    return false;
+  }
+
+  game.snapshots.push(
+    JSON.parse(
+      JSON.stringify({
+        board: game.board,
+        turn: game.turn,
+        history: game.history,
+        finished: game.finished,
+        winner: game.winner,
+        message: game.message,
+        review: game.review
+      })
+    )
+  );
+
+  game.board[index] = game.turn;
+
+  game.history.push(
+    `${actor}: ${game.turn} → ${index + 1}`
+  );
+
+  if (actor === "You") {
+    game.review.moves++;
+
+    const opponentWin = tttWinningMove(
+      game.board,
+      "O"
+    );
+
+    if (opponentWin !== -1) {
+      game.review.mistakes++;
     } else {
-      game.winner =
-        game.mode === "galaxy"
-          ? "GALAXY"
-          : "Friend";
+      game.review.strong++;
     }
+  }
 
+  if (finishTTT()) {
     renderTTT();
-    return;
+    return true;
   }
 
   game.turn =
-    symbol === "X"
+    game.turn === "X"
       ? "O"
       : "X";
 
-  renderTTT();
-
-  if (
-    game.mode === "galaxy" &&
-    game.turn === "O"
-  ) {
-    setTimeout(tttGalaxyTurn, 380);
-  }
+  return true;
 }
 
-function tttClick(index) {
-  const game = Games.ttt;
+function clickTTT(index) {
+  const game = GameCenter.ttt;
 
-  if (
-    game.finished ||
-    game.board[index]
-  ) {
+  if (!game || game.finished) {
     return;
   }
 
   if (
     game.mode === "galaxy" &&
-    game.turn === "O"
+    game.turn !== "X"
   ) {
     return;
   }
 
   const actor =
-    game.mode === "friend" &&
-    game.turn === "O"
-      ? "friend"
-      : "player";
+    game.mode === "friend"
+      ? game.turn === "X"
+        ? "Player 1"
+        : "Friend"
+      : "You";
 
-  tttApplyMove(
-    index,
-    game.turn,
-    actor
+  if (!makeTTTMove(index, actor)) {
+    return;
+  }
+
+  if (game.finished) {
+    return;
+  }
+
+  if (game.mode === "friend") {
+    game.message =
+      game.turn === "X"
+        ? "Player 1 turn"
+        : "Friend turn";
+
+    renderTTT();
+    return;
+  }
+
+  game.message = "GALAXY is thinking…";
+
+  renderTTT();
+
+  setTimeout(
+    galaxyTTTMove,
+    300
   );
 }
 
-function tttGalaxyTurn() {
-  const game = Games.ttt;
+function galaxyTTTMove() {
+  const game = GameCenter.ttt;
 
   if (
-    game.mode !== "galaxy" ||
+    !game ||
     game.finished ||
+    game.mode !== "galaxy" ||
     game.turn !== "O"
   ) {
     return;
   }
 
-  const move = tttGalaxyChoice();
+  const empty = game.board
+    .map((v, i) => v ? null : i)
+    .filter(i => i !== null);
 
-  if (move === null) return;
-
-  tttApplyMove(
-    move,
-    "O",
-    "galaxy"
-  );
-}
-
-function tttHint() {
-  const game = Games.ttt;
-
-  if (game.finished) return;
-
-  const symbol = game.turn;
-
-  const win =
-    tttWinningMove(
-      game.board,
-      symbol
-    );
-
-  const block =
-    tttWinningMove(
-      game.board,
-      symbol === "X" ? "O" : "X"
-    );
-
-  let move = win ?? block;
-
-  if (
-    move === null ||
-    move === undefined
-  ) {
-    if (!game.board[4]) {
-      move = 4;
-    } else {
-      const available =
-        game.board
-          .map((cell, index) =>
-            cell ? null : index
-          )
-          .filter(index => index !== null);
-
-      move = randomItem(available);
-    }
-  }
-
-  game.hints += 1;
-
-  toast(
-    `Hint: choose square ${move + 1}`
-  );
-}
-
-function tttUndo() {
-  const game = Games.ttt;
-
-  if (!game.history.length) {
-    toast("Nothing to undo.");
+  if (!empty.length) {
+    finishTTT();
+    renderTTT();
     return;
   }
 
-  let count =
-    game.mode === "galaxy"
-      ? 2
-      : 1;
+  let move;
 
-  while (
-    count > 0 &&
-    game.history.length
+  if (
+    Math.random() <
+    difficultyChance(game.elo)
   ) {
-    const last = game.history.pop();
-
-    game.board[last.index] = "";
-
-    count--;
+    move = tttBestMove("O");
+  } else {
+    move =
+      empty[
+        Math.floor(
+          Math.random() * empty.length
+        )
+      ];
   }
 
-  game.finished = false;
-  game.winner = null;
+  makeTTTMove(move, "GALAXY");
 
-  game.turn =
-    game.history.length % 2 === 0
-      ? "X"
-      : "O";
+  if (!game.finished) {
+    game.message = "Your turn";
+  }
+
+  renderTTT();
+}
+/* =========================================================
+   PART 2 OF 2
+   TIC-TAC-TOE
+   ========================================================= */
+
+function resetTTT(keepSettings = true) {
+  const old = GameCenter.ttt || {};
+
+  GameCenter.ttt = {
+    board: Array(9).fill(""),
+    turn: "X",
+
+    mode: keepSettings
+      ? old.mode || "galaxy"
+      : "galaxy",
+
+    elo: keepSettings
+      ? old.elo || 500
+      : 500,
+
+    history: [],
+    snapshots: [],
+
+    finished: false,
+    winner: null,
+
+    message: "Your turn",
+
+    review: {
+      moves: 0,
+      strong: 0,
+      mistakes: 0,
+      missedWins: 0,
+      blocks: 0,
+      hints: 0
+    }
+  };
 
   renderTTT();
 }
 
-function tttResign() {
-  const game = Games.ttt;
+const TTT_WINS = [
+  [0, 1, 2],
+  [3, 4, 5],
+  [6, 7, 8],
 
-  if (game.finished) return;
+  [0, 3, 6],
+  [1, 4, 7],
+  [2, 5, 8],
+
+  [0, 4, 8],
+  [2, 4, 6]
+];
+
+function tttWinner(board) {
+  for (const [a, b, c] of TTT_WINS) {
+    if (
+      board[a] &&
+      board[a] === board[b] &&
+      board[a] === board[c]
+    ) {
+      return board[a];
+    }
+  }
+
+  if (board.every(Boolean)) {
+    return "draw";
+  }
+
+  return null;
+}
+
+function tttWinningMove(board, symbol) {
+  for (let i = 0; i < 9; i++) {
+    if (board[i]) continue;
+
+    const test = [...board];
+    test[i] = symbol;
+
+    if (tttWinner(test) === symbol) {
+      return i;
+    }
+  }
+
+  return -1;
+}
+
+function tttBestMove(symbol) {
+  const game = GameCenter.ttt;
+  const board = game.board;
+
+  const winning =
+    tttWinningMove(board, symbol);
+
+  if (winning !== -1) {
+    return winning;
+  }
+
+  const opponent =
+    symbol === "X" ? "O" : "X";
+
+  const block =
+    tttWinningMove(board, opponent);
+
+  if (block !== -1) {
+    return block;
+  }
+
+  if (!board[4]) {
+    return 4;
+  }
+
+  const corners =
+    [0, 2, 6, 8].filter(
+      i => !board[i]
+    );
+
+  if (corners.length) {
+    return corners[
+      Math.floor(
+        Math.random() * corners.length
+      )
+    ];
+  }
+
+  const empty =
+    board
+      .map((value, index) =>
+        value ? null : index
+      )
+      .filter(index => index !== null);
+
+  return empty.length
+    ? empty[
+        Math.floor(
+          Math.random() * empty.length
+        )
+      ]
+    : -1;
+}
+
+function finishTTT() {
+  const game = GameCenter.ttt;
+  const winner =
+    tttWinner(game.board);
+
+  if (!winner) {
+    return false;
+  }
 
   game.finished = true;
+  game.winner = winner;
 
-  game.winner =
-    game.mode === "galaxy"
-      ? "GALAXY"
-      : game.turn === "X"
-        ? "Friend"
-        : "You";
+  if (winner === "draw") {
+    game.message =
+      "🤝 Draw Game";
+
+  } else if (game.mode === "galaxy") {
+    game.message =
+      winner === "X"
+        ? "🏆 You Win!"
+        : "🤖 GALAXY Wins!";
+
+  } else {
+    game.message =
+      winner === "X"
+        ? "🏆 Player 1 Wins!"
+        : "🏆 Friend Wins!";
+  }
+
+  return true;
+}
+
+function makeTTTMove(index, actor) {
+  const game = GameCenter.ttt;
+
+  if (
+    game.finished ||
+    game.board[index]
+  ) {
+    return false;
+  }
+
+  game.snapshots.push(
+    JSON.parse(
+      JSON.stringify({
+        board: game.board,
+        turn: game.turn,
+        history: game.history,
+        finished: game.finished,
+        winner: game.winner,
+        message: game.message,
+        review: game.review
+      })
+    )
+  );
+
+  game.board[index] =
+    game.turn;
+
+  game.history.push(
+    `${actor}: ${game.turn} → ${index + 1}`
+  );
+
+  if (actor === "You") {
+    game.review.moves++;
+
+    const opponentWin =
+      tttWinningMove(
+        game.board,
+        "O"
+      );
+
+    if (opponentWin !== -1) {
+      game.review.mistakes++;
+    } else {
+      game.review.strong++;
+    }
+  }
+
+  if (finishTTT()) {
+    renderTTT();
+    return true;
+  }
+
+  game.turn =
+    game.turn === "X"
+      ? "O"
+      : "X";
+
+  return true;
+}
+
+function clickTTT(index) {
+  const game = GameCenter.ttt;
+
+  if (
+    !game ||
+    game.finished
+  ) {
+    return;
+  }
+
+  if (
+    game.mode === "galaxy" &&
+    game.turn !== "X"
+  ) {
+    return;
+  }
+
+  const actor =
+    game.mode === "friend"
+      ? (
+          game.turn === "X"
+            ? "Player 1"
+            : "Friend"
+        )
+      : "You";
+
+  if (
+    !makeTTTMove(
+      index,
+      actor
+    )
+  ) {
+    return;
+  }
+
+  if (game.finished) {
+    return;
+  }
+
+  if (game.mode === "friend") {
+    game.message =
+      game.turn === "X"
+        ? "Player 1 turn"
+        : "Friend turn";
+
+    renderTTT();
+    return;
+  }
+
+  game.message =
+    "GALAXY is thinking…";
+
+  renderTTT();
+
+  setTimeout(
+    galaxyTTTMove,
+    300
+  );
+}
+
+function galaxyTTTMove() {
+  const game = GameCenter.ttt;
+
+  if (
+    !game ||
+    game.finished ||
+    game.mode !== "galaxy" ||
+    game.turn !== "O"
+  ) {
+    return;
+  }
+
+  const empty =
+    game.board
+      .map((v, i) =>
+        v ? null : i
+      )
+      .filter(i => i !== null);
+
+  if (!empty.length) {
+    finishTTT();
+    renderTTT();
+    return;
+  }
+
+  let move;
+
+  if (
+    Math.random() <
+    difficultyChance(game.elo)
+  ) {
+    move =
+      tttBestMove("O");
+  } else {
+    move =
+      empty[
+        Math.floor(
+          Math.random() *
+          empty.length
+        )
+      ];
+  }
+
+  makeTTTMove(
+    move,
+    "GALAXY"
+  );
+
+  if (!game.finished) {
+    game.message =
+      "Your turn";
+  }
 
   renderTTT();
 }
 
-function tttReviewHTML() {
-  const game = Games.ttt;
+function tttHint() {
+  const game = GameCenter.ttt;
 
-  const playerMoves =
-    game.history.filter(
-      move => move.actor === "player"
-    ).length;
+  if (
+    !game ||
+    game.finished
+  ) {
+    return;
+  }
 
-  return reviewCardHTML(
-    "Tic-Tac-Toe Review",
-    [
-      ["Your moves", playerMoves],
-      ["Total moves", game.history.length],
-      ["Hints used", game.hints],
-      ["Result", game.winner || "In progress"],
-      [
-        "Difficulty",
-        game.mode === "galaxy"
-          ? `${game.elo} ELO`
-          : "Friend mode"
-      ],
-      [
-        "Board filled",
-        `${game.board.filter(Boolean).length}/9`
-      ]
-    ]
+  const symbol =
+    game.turn;
+
+  const move =
+    tttBestMove(symbol);
+
+  if (move !== -1) {
+    game.review.hints++;
+
+    toast(
+      `Hint: choose square ${move + 1}`
+    );
+  }
+}
+
+function tttUndo() {
+  const game = GameCenter.ttt;
+
+  if (
+    !game?.snapshots.length
+  ) {
+    toast("Nothing to undo");
+    return;
+  }
+
+  let snapshot =
+    game.snapshots.pop();
+
+  if (
+    game.mode === "galaxy" &&
+    game.turn === "X" &&
+    game.snapshots.length
+  ) {
+    snapshot =
+      game.snapshots.pop();
+  }
+
+  Object.assign(
+    game,
+    snapshot
   );
+
+  renderTTT();
+}
+
+function tttReview() {
+  const game = GameCenter.ttt;
+
+  const total =
+    Math.max(
+      1,
+      game.review.moves
+    );
+
+  const accuracy =
+    Math.round(
+      (
+        game.review.strong /
+        total
+      ) * 100
+    );
+
+  const review =
+    $("#gameReview");
+
+  if (!review) return;
+
+  review.innerHTML =
+    reviewHTML(
+      "Tic-Tac-Toe Review",
+      [
+        [
+          "Accuracy",
+          `${accuracy}%`
+        ],
+        [
+          "Moves",
+          String(game.review.moves)
+        ],
+        [
+          "Strong moves",
+          String(game.review.strong)
+        ],
+        [
+          "Mistakes",
+          String(game.review.mistakes)
+        ],
+        [
+          "Hints",
+          String(game.review.hints)
+        ]
+      ]
+    );
 }
 
 function renderTTT() {
-  const game = Games.ttt;
+  if (!GameCenter.ttt) {
+    resetTTT();
+    return;
+  }
 
-  const status =
-    game.finished
-      ? game.winner === "Draw"
-        ? "Draw"
-        : `${game.winner} wins`
-      : game.mode === "galaxy"
-        ? game.turn === "X"
-          ? "Your turn"
-          : "GALAXY's turn"
-        : game.turn === "X"
-          ? "Your turn"
-          : "Friend's turn";
+  const game =
+    GameCenter.ttt;
 
-  const toolbar = `
-    ${gameModeSelector("ttt")}
-    ${gameLevelSelector("ttt")}
-    ${commonGameButtons("ttt")}
-  `;
+  GameCenter.current =
+    "tictactoe";
 
-  setContent(
-    "Tic-Tac-Toe",
-    "GALAXY GAMES",
-    `
-      <div class="game-shell">
+  const body =
+    $("#contentBody");
 
-        ${gameHeader(
-          "Tic-Tac-Toe",
-          status,
-          toolbar
+  if (!body) return;
+
+  body.innerHTML = `
+    <div class="game-shell">
+
+      <div class="game-topline">
+
+        <button
+          class="secondary-btn"
+          data-game-back
+        >
+          ← Games
+        </button>
+
+        <div class="game-status">
+          ${escapeHTML(game.message)}
+        </div>
+
+        ${commonToolbar(
+          "ttt",
+          game.mode,
+          game.elo
         )}
 
-        <div class="game-layout">
+      </div>
 
-          <div class="ttt-board">
-            ${game.board.map((cell, index) => `
-              <button
-                class="ttt-cell"
-                data-ttt-cell="${index}"
-                type="button"
-              >
-                ${cell}
-              </button>
-            `).join("")}
+      <div class="game-layout">
+
+        <div class="ttt-board">
+
+          ${game.board
+            .map(
+              (value, index) => `
+                <button
+                  class="
+                    ttt-cell
+                    ${
+                      value
+                        ? `filled ${value.toLowerCase()}`
+                        : ""
+                    }
+                  "
+                  data-ttt-cell="${index}"
+                >
+                  ${value}
+                </button>
+              `
+            )
+            .join("")}
+
+        </div>
+
+        <div class="game-side-panel">
+
+          <div class="player-card">
+
+            <div class="player-avatar">
+              X
+            </div>
+
+            <div>
+              <strong>
+                ${
+                  game.mode === "friend"
+                    ? "Player 1"
+                    : "You"
+                }
+              </strong>
+
+              <span>
+                X
+              </span>
+            </div>
+
           </div>
 
-          <div class="game-side-panel">
+          <div class="player-card">
 
-            <div class="player-card">
-              <div class="player-avatar">X</div>
-              <div>
-                <strong>You</strong>
-                <span>Player X</span>
-              </div>
+            <div class="player-avatar galaxy-avatar">
+              O
             </div>
 
-            <div class="player-card">
-              <div class="player-avatar galaxy-avatar">
-                ${
-                  game.mode === "galaxy"
-                    ? "✦"
-                    : "O"
-                }
-              </div>
+            <div>
+              <strong>
+                ${opponentName(game.mode)}
+              </strong>
 
-              <div>
-                <strong>
-                  ${
-                    game.mode === "galaxy"
-                      ? "GALAXY"
-                      : "Friend"
-                  }
-                </strong>
-
-                <span>
-                  ${
-                    game.mode === "galaxy"
-                      ? `${game.elo} ELO`
-                      : "Player O"
-                  }
-                </span>
-              </div>
+              <span>
+                O
+              </span>
             </div>
 
-            ${
-              game.reviewOpen
-                ? tttReviewHTML()
-                : ""
-            }
+          </div>
 
+          ${
+            game.finished
+              ? `
+                <button
+                  class="primary-btn"
+                  data-ttt-reset
+                >
+                  Play Again
+                </button>
+              `
+              : ""
+          }
+
+          <div id="gameReview">
           </div>
 
         </div>
+
       </div>
-    `
-  );
+
+    </div>
+  `;
+
+  syncGameSelectors(game);
 }
 
 
@@ -2069,27 +2557,78 @@ function renderTTT() {
    CONNECT FOUR
    ========================================================= */
 
-function resetConnect(render = true) {
-  const game = Games.connect;
+const CONNECT_ROWS = 6;
+const CONNECT_COLS = 7;
 
-  game.board =
-    Array.from(
-      { length: 6 },
-      () => Array(7).fill("")
-    );
+function newConnectBoard() {
+  return Array.from(
+    { length: CONNECT_ROWS },
+    () =>
+      Array(CONNECT_COLS)
+        .fill("")
+  );
+}
 
-  game.turn = "P";
-  game.history = [];
-  game.finished = false;
-  game.winner = null;
-  game.hints = 0;
-  game.reviewOpen = false;
+function resetConnect(
+  keepSettings = true
+) {
+  const old =
+    GameCenter.connect || {};
+
+  GameCenter.connect = {
+    board:
+      newConnectBoard(),
+
+    turn:
+      "R",
+
+    mode:
+      keepSettings
+        ? old.mode || "galaxy"
+        : "galaxy",
+
+    elo:
+      keepSettings
+        ? old.elo || 500
+        : 500,
+
+    finished:
+      false,
+
+    winner:
+      null,
+
+    message:
+      "Your turn",
+
+    history:
+      [],
+
+    snapshots:
+      [],
+
+    review: {
+      moves: 0,
+      strong: 0,
+      mistakes: 0,
+      blocks: 0,
+      hints: 0
+    }
+  };
 
   renderConnect();
 }
 
-function connectAvailableRow(board, col) {
-  for (let row = 5; row >= 0; row--) {
+function connectDropRow(
+  board,
+  col
+) {
+  for (
+    let row =
+      CONNECT_ROWS - 1;
+    row >= 0;
+    row--
+  ) {
     if (!board[row][col]) {
       return row;
     }
@@ -2098,33 +2637,52 @@ function connectAvailableRow(board, col) {
   return -1;
 }
 
-function connectWinner(board, symbol) {
+function connectWinner(board) {
   const directions = [
-    [0,1],
-    [1,0],
-    [1,1],
-    [1,-1]
+    [0, 1],
+    [1, 0],
+    [1, 1],
+    [1, -1]
   ];
 
-  for (let row = 0; row < 6; row++) {
-    for (let col = 0; col < 7; col++) {
-      if (board[row][col] !== symbol) {
-        continue;
-      }
+  for (
+    let r = 0;
+    r < CONNECT_ROWS;
+    r++
+  ) {
+    for (
+      let c = 0;
+      c < CONNECT_COLS;
+      c++
+    ) {
+      const token =
+        board[r][c];
 
-      for (const [dr, dc] of directions) {
+      if (!token) continue;
+
+      for (
+        const [dr, dc]
+        of directions
+      ) {
         let count = 1;
 
-        for (let step = 1; step < 4; step++) {
-          const r = row + dr * step;
-          const c = col + dc * step;
+        for (
+          let k = 1;
+          k < 4;
+          k++
+        ) {
+          const rr =
+            r + dr * k;
+
+          const cc =
+            c + dc * k;
 
           if (
-            r < 0 ||
-            r >= 6 ||
-            c < 0 ||
-            c >= 7 ||
-            board[r][c] !== symbol
+            rr < 0 ||
+            rr >= CONNECT_ROWS ||
+            cc < 0 ||
+            cc >= CONNECT_COLS ||
+            board[rr][cc] !== token
           ) {
             break;
           }
@@ -2133,1182 +2691,1329 @@ function connectWinner(board, symbol) {
         }
 
         if (count >= 4) {
-          return true;
+          return token;
         }
       }
     }
   }
 
-  return false;
+  if (
+    board
+      .flat()
+      .every(Boolean)
+  ) {
+    return "draw";
+  }
+
+  return null;
 }
 
-function connectBoardFull(board) {
-  return board[0].every(Boolean);
-}
-
-function connectWinningColumn(board, symbol) {
-  for (let col = 0; col < 7; col++) {
+function connectWinningColumn(
+  board,
+  token
+) {
+  for (
+    let col = 0;
+    col < CONNECT_COLS;
+    col++
+  ) {
     const row =
-      connectAvailableRow(board, col);
+      connectDropRow(
+        board,
+        col
+      );
 
-    if (row < 0) continue;
+    if (row === -1) continue;
 
-    const copy = clone(board);
+    const test =
+      board.map(
+        row => [...row]
+      );
 
-    copy[row][col] = symbol;
+    test[row][col] =
+      token;
 
     if (
-      connectWinner(copy, symbol)
+      connectWinner(test) ===
+      token
     ) {
       return col;
     }
   }
 
-  return null;
+  return -1;
 }
 
-function connectGalaxyChoice() {
-  const game = Games.connect;
+function connectBestColumn(
+  token
+) {
+  const game =
+    GameCenter.connect;
 
-  const available =
-    [0,1,2,3,4,5,6]
-      .filter(
-        col =>
-          connectAvailableRow(
-            game.board,
-            col
-          ) >= 0
-      );
+  const board =
+    game.board;
 
-  if (!available.length) return null;
-
-  const win =
+  const winning =
     connectWinningColumn(
-      game.board,
-      "G"
+      board,
+      token
     );
+
+  if (winning !== -1) {
+    return winning;
+  }
+
+  const enemy =
+    token === "R"
+      ? "Y"
+      : "R";
 
   const block =
     connectWinningColumn(
-      game.board,
-      "P"
+      board,
+      enemy
     );
 
-  if (game.elo >= 1000) {
-    if (win !== null) return win;
-    if (block !== null) return block;
-
-    const preferred =
-      [3,2,4,1,5,0,6]
-        .filter(
-          col =>
-            available.includes(col)
-        );
-
-    return preferred[0];
+  if (block !== -1) {
+    return block;
   }
 
-  if (game.elo >= 800) {
-    if (win !== null) return win;
+  const preference =
+    [3, 2, 4, 1, 5, 0, 6];
 
-    if (
-      block !== null &&
-      Math.random() < 0.92
-    ) {
-      return block;
-    }
-
-    if (
-      available.includes(3) &&
-      Math.random() < 0.75
-    ) {
-      return 3;
-    }
-  }
-
-  if (game.elo >= 500) {
-    if (
-      win !== null &&
-      Math.random() < 0.85
-    ) {
-      return win;
-    }
-
-    if (
-      block !== null &&
-      Math.random() < 0.7
-    ) {
-      return block;
-    }
-  }
-
-  if (game.elo >= 200) {
-    if (
-      win !== null &&
-      Math.random() < 0.5
-    ) {
-      return win;
-    }
-
-    if (
-      block !== null &&
-      Math.random() < 0.4
-    ) {
-      return block;
-    }
-  }
-
-  return randomItem(available);
+  return (
+    preference.find(
+      col =>
+        connectDropRow(
+          board,
+          col
+        ) !== -1
+    ) ?? -1
+  );
 }
 
-function connectDrop(col, actor) {
-  const game = Games.connect;
+function finishConnect() {
+  const game =
+    GameCenter.connect;
 
-  if (game.finished) return;
+  const winner =
+    connectWinner(
+      game.board
+    );
+
+  if (!winner) {
+    return false;
+  }
+
+  game.finished =
+    true;
+
+  game.winner =
+    winner;
+
+  if (winner === "draw") {
+    game.message =
+      "🤝 Draw Game";
+
+  } else if (
+    game.mode === "galaxy"
+  ) {
+    game.message =
+      winner === "R"
+        ? "🏆 You Win!"
+        : "🤖 GALAXY Wins!";
+
+  } else {
+    game.message =
+      winner === "R"
+        ? "🏆 Player 1 Wins!"
+        : "🏆 Friend Wins!";
+  }
+
+  return true;
+}
+
+function makeConnectMove(
+  col,
+  actor
+) {
+  const game =
+    GameCenter.connect;
+
+  if (
+    !game ||
+    game.finished
+  ) {
+    return false;
+  }
 
   const row =
-    connectAvailableRow(
+    connectDropRow(
       game.board,
       col
     );
 
-  if (row < 0) return;
-
-  const symbol =
-    game.turn;
-
-  game.board[row][col] = symbol;
-
-  game.history.push({
-    row,
-    col,
-    symbol,
-    actor
-  });
-
-  if (
-    connectWinner(
-      game.board,
-      symbol
-    )
-  ) {
-    game.finished = true;
-
-    if (symbol === "P") {
-      game.winner = "You";
-    } else {
-      game.winner =
-        game.mode === "galaxy"
-          ? "GALAXY"
-          : "Friend";
-    }
-
-    renderConnect();
-    return;
+  if (row === -1) {
+    return false;
   }
 
-  if (connectBoardFull(game.board)) {
-    game.finished = true;
-    game.winner = "Draw";
-    renderConnect();
-    return;
+  game.snapshots.push(
+    JSON.parse(
+      JSON.stringify({
+        board:
+          game.board,
+
+        turn:
+          game.turn,
+
+        history:
+          game.history,
+
+        finished:
+          game.finished,
+
+        winner:
+          game.winner,
+
+        message:
+          game.message,
+
+        review:
+          game.review
+      })
+    )
+  );
+
+  game.board[row][col] =
+    game.turn;
+
+  game.history.push(
+    `${actor}: column ${col + 1}`
+  );
+
+  if (actor === "You") {
+    game.review.moves++;
+
+    if (
+      col === 3 ||
+      col === 2 ||
+      col === 4
+    ) {
+      game.review.strong++;
+    }
+  }
+
+  if (finishConnect()) {
+    return true;
   }
 
   game.turn =
-    symbol === "P"
-      ? "G"
-      : "P";
+    game.turn === "R"
+      ? "Y"
+      : "R";
 
-  renderConnect();
+  return true;
+}
+
+function clickConnect(col) {
+  const game =
+    GameCenter.connect;
+
+  if (
+    !game ||
+    game.finished
+  ) {
+    return;
+  }
 
   if (
     game.mode === "galaxy" &&
-    game.turn === "G"
-  ) {
-    setTimeout(
-      connectGalaxyTurn,
-      450
-    );
-  }
-}
-
-function connectClick(col) {
-  const game = Games.connect;
-
-  if (
-    game.finished ||
-    (
-      game.mode === "galaxy" &&
-      game.turn === "G"
-    )
+    game.turn !== "R"
   ) {
     return;
   }
 
   const actor =
-    game.mode === "friend" &&
-    game.turn === "G"
-      ? "friend"
-      : "player";
+    game.mode === "friend"
+      ? (
+          game.turn === "R"
+            ? "Player 1"
+            : "Friend"
+        )
+      : "You";
 
-  connectDrop(
-    col,
-    actor
+  if (
+    !makeConnectMove(
+      col,
+      actor
+    )
+  ) {
+    toast(
+      "That column is full"
+    );
+
+    return;
+  }
+
+  if (game.finished) {
+    renderConnect();
+    return;
+  }
+
+  if (
+    game.mode === "friend"
+  ) {
+    game.message =
+      game.turn === "R"
+        ? "Player 1 turn"
+        : "Friend turn";
+
+    renderConnect();
+    return;
+  }
+
+  game.message =
+    "GALAXY is thinking…";
+
+  renderConnect();
+
+  setTimeout(
+    galaxyConnectMove,
+    350
   );
 }
 
-function connectGalaxyTurn() {
-  const game = Games.connect;
+function galaxyConnectMove() {
+  const game =
+    GameCenter.connect;
 
   if (
+    !game ||
     game.finished ||
     game.mode !== "galaxy" ||
-    game.turn !== "G"
+    game.turn !== "Y"
+  ) {
+    return;
+  }
+
+  const available =
+    Array.from(
+      { length: CONNECT_COLS },
+      (_, i) => i
+    )
+    .filter(
+      col =>
+        connectDropRow(
+          game.board,
+          col
+        ) !== -1
+    );
+
+  if (!available.length) {
+    finishConnect();
+    renderConnect();
+    return;
+  }
+
+  let col;
+
+  if (
+    Math.random() <
+    difficultyChance(
+      game.elo
+    )
+  ) {
+    col =
+      connectBestColumn("Y");
+
+  } else {
+    col =
+      available[
+        Math.floor(
+          Math.random() *
+          available.length
+        )
+      ];
+  }
+
+  makeConnectMove(
+    col,
+    "GALAXY"
+  );
+
+  if (!game.finished) {
+    game.message =
+      "Your turn";
+  }
+
+  renderConnect();
+}
+
+function connectHint() {
+  const game =
+    GameCenter.connect;
+
+  if (
+    !game ||
+    game.finished
   ) {
     return;
   }
 
   const col =
-    connectGalaxyChoice();
-
-  if (col === null) return;
-
-  connectDrop(
-    col,
-    "galaxy"
-  );
-}
-
-function connectHint() {
-  const game = Games.connect;
-
-  if (game.finished) return;
-
-  const symbol = game.turn;
-
-  let col =
-    connectWinningColumn(
-      game.board,
-      symbol
+    connectBestColumn(
+      game.turn
     );
 
-  if (col === null) {
-    col =
-      connectWinningColumn(
-        game.board,
-        symbol === "P"
-          ? "G"
-          : "P"
-      );
+  if (col !== -1) {
+    game.review.hints++;
+
+    toast(
+      `Hint: try column ${col + 1}`
+    );
   }
-
-  if (col === null) {
-    const available =
-      [3,2,4,1,5,0,6]
-        .filter(
-          column =>
-            connectAvailableRow(
-              game.board,
-              column
-            ) >= 0
-        );
-
-    col = available[0];
-  }
-
-  game.hints++;
-
-  toast(
-    `Hint: play column ${col + 1}`
-  );
 }
 
 function connectUndo() {
-  const game = Games.connect;
+  const game =
+    GameCenter.connect;
 
-  if (!game.history.length) {
-    toast("Nothing to undo.");
+  if (
+    !game?.snapshots.length
+  ) {
+    toast(
+      "Nothing to undo"
+    );
+
     return;
   }
 
-  let count =
-    game.mode === "galaxy"
-      ? 2
-      : 1;
+  let snapshot =
+    game.snapshots.pop();
 
-  while (
-    count > 0 &&
-    game.history.length
+  if (
+    game.mode === "galaxy" &&
+    game.turn === "R" &&
+    game.snapshots.length
   ) {
-    const last =
-      game.history.pop();
-
-    game.board[last.row][last.col] = "";
-
-    count--;
+    snapshot =
+      game.snapshots.pop();
   }
 
-  game.finished = false;
-  game.winner = null;
-
-  game.turn =
-    game.history.length % 2 === 0
-      ? "P"
-      : "G";
-
-  renderConnect();
-}
-
-function connectResign() {
-  const game = Games.connect;
-
-  if (game.finished) return;
-
-  game.finished = true;
-
-  game.winner =
-    game.mode === "galaxy"
-      ? "GALAXY"
-      : game.turn === "P"
-        ? "Friend"
-        : "You";
-
-  renderConnect();
-}
-
-function connectReviewHTML() {
-  const game = Games.connect;
-
-  return reviewCardHTML(
-    "Connect Four Review",
-    [
-      [
-        "Your moves",
-        game.history.filter(
-          move =>
-            move.actor === "player"
-        ).length
-      ],
-      ["Total moves", game.history.length],
-      ["Hints", game.hints],
-      ["Result", game.winner || "In progress"],
-      [
-        "Difficulty",
-        game.mode === "galaxy"
-          ? `${game.elo} ELO`
-          : "Friend mode"
-      ]
-    ]
+  Object.assign(
+    game,
+    snapshot
   );
+
+  renderConnect();
+}
+
+function connectReview() {
+  const game =
+    GameCenter.connect;
+
+  const total =
+    Math.max(
+      1,
+      game.review.moves
+    );
+
+  const accuracy =
+    Math.round(
+      (
+        game.review.strong /
+        total
+      ) * 100
+    );
+
+  const review =
+    $("#gameReview");
+
+  if (!review) return;
+
+  review.innerHTML =
+    reviewHTML(
+      "Connect Four Review",
+      [
+        [
+          "Accuracy",
+          `${accuracy}%`
+        ],
+        [
+          "Moves",
+          String(
+            game.review.moves
+          )
+        ],
+        [
+          "Strong moves",
+          String(
+            game.review.strong
+          )
+        ],
+        [
+          "Blocks",
+          String(
+            game.review.blocks
+          )
+        ],
+        [
+          "Mistakes",
+          String(
+            game.review.mistakes
+          )
+        ],
+        [
+          "Hints",
+          String(
+            game.review.hints
+          )
+        ]
+      ]
+    );
 }
 
 function renderConnect() {
-  const game = Games.connect;
-
-  const status =
-    game.finished
-      ? game.winner === "Draw"
-        ? "Draw"
-        : `${game.winner} wins`
-      : game.mode === "galaxy"
-        ? game.turn === "P"
-          ? "Your turn"
-          : "GALAXY's turn"
-        : game.turn === "P"
-          ? "Your turn"
-          : "Friend's turn";
-
-  const toolbar = `
-    ${gameModeSelector("connect")}
-    ${gameLevelSelector("connect")}
-    ${commonGameButtons("connect")}
-  `;
-
-  let boardHTML = "";
-
-  for (let row = 0; row < 6; row++) {
-    for (let col = 0; col < 7; col++) {
-      const value =
-        game.board[row][col];
-
-      boardHTML += `
-        <div class="connect-cell">
-          <span
-            class="
-              connect-disc
-              ${
-                value === "P"
-                  ? "player"
-                  : value === "G"
-                    ? game.mode === "galaxy"
-                      ? "galaxy"
-                      : "friend"
-                    : ""
-              }
-            "
-          ></span>
-        </div>
-      `;
-    }
+  if (!GameCenter.connect) {
+    resetConnect();
+    return;
   }
 
-  setContent(
-    "Connect Four",
-    "GALAXY GAMES",
-    `
-      <div class="game-shell">
+  const game =
+    GameCenter.connect;
 
-        ${gameHeader(
-          "Connect Four",
-          status,
-          toolbar
+  GameCenter.current =
+    "connect4";
+
+  const body =
+    $("#contentBody");
+
+  if (!body) return;
+
+  body.innerHTML = `
+    <div class="game-shell">
+
+      <div class="game-topline">
+
+        <button
+          class="secondary-btn"
+          data-game-back
+        >
+          ← Games
+        </button>
+
+        <div class="game-status">
+          ${escapeHTML(game.message)}
+        </div>
+
+        ${commonToolbar(
+          "connect",
+          game.mode,
+          game.elo
         )}
 
-        <div class="game-layout">
+      </div>
 
-          <div>
+      <div class="game-layout">
 
-            <div class="connect-columns">
-              ${[0,1,2,3,4,5,6]
-                .map(
-                  col => `
+        <div class="connect-board">
+
+          ${game.board
+            .map(
+              (row, r) =>
+                row.map(
+                  (value, c) => `
                     <button
-                      data-connect-column="${col}"
-                      type="button"
+                      class="connect-cell"
+                      data-connect-col="${c}"
                     >
-                      ↓
+                      <span
+                        class="
+                          connect-disc
+                          ${
+                            value === "R"
+                              ? "red"
+                              : value === "Y"
+                              ? "yellow"
+                              : ""
+                          }
+                        "
+                      ></span>
                     </button>
                   `
-                )
-                .join("")}
-            </div>
+                ).join("")
+            )
+            .join("")}
 
-            <div class="connect-board">
-              ${boardHTML}
-            </div>
-
-          </div>
-
-          <div class="game-side-panel">
-
-            <div class="player-card">
-              <div class="player-avatar">●</div>
-              <div>
-                <strong>You</strong>
-                <span>Red</span>
-              </div>
-            </div>
-
-            <div class="player-card">
-              <div class="player-avatar galaxy-avatar">
-                ${
-                  game.mode === "galaxy"
-                    ? "✦"
-                    : "●"
-                }
-              </div>
-
-              <div>
-                <strong>
-                  ${
-                    game.mode === "galaxy"
-                      ? "GALAXY"
-                      : "Friend"
-                  }
-                </strong>
-
-                <span>
-                  ${
-                    game.mode === "galaxy"
-                      ? `${game.elo} ELO`
-                      : "Blue"
-                  }
-                </span>
-              </div>
-            </div>
-
-            ${
-              game.reviewOpen
-                ? connectReviewHTML()
-                : ""
-            }
-
-          </div>
         </div>
+
+        <div class="game-side-panel">
+
+          <div class="player-card">
+            <div class="player-avatar">
+              ●
+            </div>
+
+            <div>
+              <strong>
+                ${
+                  game.mode === "friend"
+                    ? "Player 1"
+                    : "You"
+                }
+              </strong>
+
+              <span>
+                Red
+              </span>
+            </div>
+          </div>
+
+          <div class="player-card">
+
+            <div class="player-avatar galaxy-avatar">
+              ●
+            </div>
+
+            <div>
+              <strong>
+                ${opponentName(game.mode)}
+              </strong>
+
+              <span>
+                Yellow
+              </span>
+            </div>
+
+          </div>
+
+          ${
+            game.finished
+              ? `
+                <button
+                  class="primary-btn"
+                  data-connect-reset
+                >
+                  Play Again
+                </button>
+              `
+              : ""
+          }
+
+          <div id="gameReview">
+          </div>
+
+        </div>
+
       </div>
-    `
-  );
+
+    </div>
+  `;
+
+  syncGameSelectors(game);
 }
 
 
 /* =========================================================
-   MEMORY
+   MEMORY GAME
    ========================================================= */
 
-const MEMORY_SYMBOLS = [
-  "🚀",
-  "🌕",
-  "🪐",
-  "⭐",
-  "👾",
-  "☄️",
-  "🛰️",
-  "🌌"
-];
-
-function shuffle(array) {
-  const copy = [...array];
+function shuffleArray(array) {
+  const result =
+    [...array];
 
   for (
-    let i = copy.length - 1;
+    let i =
+      result.length - 1;
     i > 0;
     i--
   ) {
     const j =
       Math.floor(
-        Math.random() * (i + 1)
+        Math.random() *
+        (i + 1)
       );
 
-    [copy[i], copy[j]] =
-      [copy[j], copy[i]];
+    [
+      result[i],
+      result[j]
+    ] =
+    [
+      result[j],
+      result[i]
+    ];
   }
 
-  return copy;
+  return result;
 }
 
-function resetMemory(render = true) {
-  const game = Games.memory;
+function resetMemory(
+  keepSettings = true
+) {
+  const old =
+    GameCenter.memory || {};
+
+  const symbols = [
+    "🚀",
+    "🌙",
+    "⭐",
+    "🪐",
+    "👾",
+    "🤖",
+    "☄️",
+    "🌌"
+  ];
 
   const deck =
-    shuffle([
-      ...MEMORY_SYMBOLS,
-      ...MEMORY_SYMBOLS
+    shuffleArray([
+      ...symbols,
+      ...symbols
     ]);
 
-  game.cards =
-    deck.map((symbol, index) => ({
-      id: index,
-      symbol
-    }));
+  GameCenter.memory = {
+    cards:
+      deck.map(
+        (symbol, id) => ({
+          id,
+          symbol,
+          open: false,
+          matched: false
+        })
+      ),
 
-  game.revealed = [];
-  game.matched = new Set();
-  game.turn = "player";
-  game.playerScore = 0;
-  game.opponentScore = 0;
-  game.history = [];
-  game.known = {};
-  game.busy = false;
-  game.finished = false;
-  game.hints = 0;
-  game.reviewOpen = false;
-  game.playerAttempts = 0;
-  game.playerMatches = 0;
+    selected: [],
+
+    lock: false,
+
+    mode:
+      keepSettings
+        ? old.mode || "galaxy"
+        : "galaxy",
+
+    elo:
+      keepSettings
+        ? old.elo || 500
+        : 500,
+
+    turn:
+      "you",
+
+    youScore:
+      0,
+
+    opponentScore:
+      0,
+
+    attempts:
+      0,
+
+    matches:
+      0,
+
+    mismatches:
+      0,
+
+    streak:
+      0,
+
+    bestStreak:
+      0,
+
+    finished:
+      false,
+
+    message:
+      "Your turn",
+
+    known:
+      {}
+  };
 
   renderMemory();
 }
 
-function memoryRemember(index) {
-  const game = Games.memory;
+function memoryAvailableCards() {
+  const game =
+    GameCenter.memory;
 
-  const symbol =
-    game.cards[index]?.symbol;
-
-  if (!symbol) return;
-
-  game.known[index] = symbol;
+  return game.cards.filter(
+    card =>
+      !card.matched &&
+      !card.open
+  );
 }
 
-function memorySnapshot() {
-  const game = Games.memory;
-
-  return {
-    matched: [...game.matched],
-    turn: game.turn,
-    playerScore: game.playerScore,
-    opponentScore: game.opponentScore,
-    history: clone(game.history),
-    known: clone(game.known),
-    playerAttempts: game.playerAttempts,
-    playerMatches: game.playerMatches
-  };
-}
-
-function memoryRestore(snapshot) {
-  const game = Games.memory;
-
-  game.matched =
-    new Set(snapshot.matched);
-
-  game.turn = snapshot.turn;
-  game.playerScore = snapshot.playerScore;
-  game.opponentScore = snapshot.opponentScore;
-  game.history = clone(snapshot.history);
-  game.known = clone(snapshot.known);
-  game.playerAttempts = snapshot.playerAttempts;
-  game.playerMatches = snapshot.playerMatches;
-
-  game.revealed = [];
-  game.finished =
-    game.matched.size ===
-    game.cards.length;
-}
-
-async function memoryClick(index) {
-  const game = Games.memory;
+function finishMemoryIfNeeded() {
+  const game =
+    GameCenter.memory;
 
   if (
+    !game.cards.every(
+      card => card.matched
+    )
+  ) {
+    return false;
+  }
+
+  game.finished =
+    true;
+
+  if (
+    game.youScore >
+    game.opponentScore
+  ) {
+    game.message =
+      "🏆 You Win!";
+
+  } else if (
+    game.opponentScore >
+    game.youScore
+  ) {
+    game.message =
+      game.mode === "galaxy"
+        ? "🤖 GALAXY Wins!"
+        : "🏆 Friend Wins!";
+
+  } else {
+    game.message =
+      "🤝 Draw Game";
+  }
+
+  return true;
+}
+
+function memorySelectCard(id) {
+  const game =
+    GameCenter.memory;
+
+  if (
+    !game ||
     game.finished ||
-    game.busy ||
-    game.matched.has(index) ||
-    game.revealed.includes(index)
+    game.lock
   ) {
     return;
   }
 
   if (
     game.mode === "galaxy" &&
-    game.turn === "galaxy"
+    game.turn !== "you"
   ) {
     return;
   }
 
-  if (game.revealed.length === 0) {
-    game.history.push({
-      snapshot: memorySnapshot()
-    });
-  }
+  const card =
+    game.cards[id];
 
-  game.revealed.push(index);
-  memoryRemember(index);
-
-  renderMemory();
-
-  if (game.revealed.length < 2) {
+  if (
+    !card ||
+    card.open ||
+    card.matched
+  ) {
     return;
   }
 
-  game.busy = true;
+  card.open =
+    true;
+
+  game.selected.push(id);
+
+  game.known[id] =
+    card.symbol;
+
+  renderMemory();
+
+  if (
+    game.selected.length === 2
+  ) {
+    resolveMemoryPair();
+  }
+}
+
+function resolveMemoryPair() {
+  const game =
+    GameCenter.memory;
+
+  if (
+    game.selected.length !== 2
+  ) {
+    return;
+  }
+
+  game.lock =
+    true;
+
+  game.attempts++;
 
   const [a, b] =
-    game.revealed;
+    game.selected;
+
+  const cardA =
+    game.cards[a];
+
+  const cardB =
+    game.cards[b];
 
   const match =
-    game.cards[a].symbol ===
-    game.cards[b].symbol;
+    cardA.symbol ===
+    cardB.symbol;
 
-  if (game.turn === "player") {
-    game.playerAttempts++;
-  }
+  setTimeout(() => {
+    if (match) {
+      cardA.matched =
+        true;
 
-  await delay(650);
+      cardB.matched =
+        true;
 
-  if (match) {
-    game.matched.add(a);
-    game.matched.add(b);
+      game.matches++;
+      game.streak++;
 
-    if (game.turn === "player") {
-      game.playerScore++;
-      game.playerMatches++;
-    } else {
-      game.opponentScore++;
-    }
-  }
-
-  game.revealed = [];
-
-  if (
-    game.matched.size ===
-    game.cards.length
-  ) {
-    game.finished = true;
-    game.busy = false;
-    renderMemory();
-    return;
-  }
-
-  if (!match) {
-    game.turn =
-      game.turn === "player"
-        ? (
-            game.mode === "galaxy"
-              ? "galaxy"
-              : "friend"
-          )
-        : "player";
-  }
-
-  game.busy = false;
-  renderMemory();
-
-  if (
-    game.mode === "galaxy" &&
-    game.turn === "galaxy" &&
-    !game.finished
-  ) {
-    setTimeout(
-      memoryGalaxyTurn,
-      550
-    );
-  }
-}
-
-function memoryUnknownIndexes() {
-  const game = Games.memory;
-
-  return game.cards
-    .map((card, index) => index)
-    .filter(
-      index =>
-        !game.matched.has(index)
-    );
-}
-
-function memoryKnownPair() {
-  const game = Games.memory;
-
-  const groups = {};
-
-  for (
-    const [indexText, symbol]
-    of Object.entries(game.known)
-  ) {
-    const index =
-      Number(indexText);
-
-    if (game.matched.has(index)) {
-      continue;
-    }
-
-    if (!groups[symbol]) {
-      groups[symbol] = [];
-    }
-
-    groups[symbol].push(index);
-  }
-
-  for (
-    const indexes
-    of Object.values(groups)
-  ) {
-    if (indexes.length >= 2) {
-      return indexes.slice(0, 2);
-    }
-  }
-
-  return null;
-}
-
-function memoryGalaxyRecallChance() {
-  const elo =
-    Games.memory.elo;
-
-  if (elo >= 1200) return 0.98;
-  if (elo >= 1000) return 0.9;
-  if (elo >= 800) return 0.78;
-  if (elo >= 500) return 0.58;
-  if (elo >= 200) return 0.35;
-
-  return 0.15;
-}
-
-async function memoryGalaxyTurn() {
-  const game = Games.memory;
-
-  if (
-    game.finished ||
-    game.mode !== "galaxy" ||
-    game.turn !== "galaxy" ||
-    game.busy
-  ) {
-    return;
-  }
-
-  game.busy = true;
-
-  let choices = [];
-
-  const rememberedPair =
-    memoryKnownPair();
-
-  if (
-    rememberedPair &&
-    Math.random() <
-      memoryGalaxyRecallChance()
-  ) {
-    choices = rememberedPair;
-  } else {
-    const available =
-      memoryUnknownIndexes();
-
-    const first =
-      randomItem(available);
-
-    let secondPool =
-      available.filter(
-        index => index !== first
-      );
-
-    let second = null;
-
-    const knownMatch =
-      Object.entries(game.known)
-        .find(
-          ([indexText, symbol]) =>
-            Number(indexText) !== first &&
-            !game.matched.has(
-              Number(indexText)
-            ) &&
-            symbol ===
-              game.cards[first].symbol
+      game.bestStreak =
+        Math.max(
+          game.bestStreak,
+          game.streak
         );
 
-    if (
-      knownMatch &&
-      Math.random() <
-        memoryGalaxyRecallChance()
-    ) {
-      second =
-        Number(knownMatch[0]);
+      if (
+        game.turn === "you"
+      ) {
+        game.youScore++;
+
+      } else {
+        game.opponentScore++;
+      }
+
     } else {
-      second =
-        randomItem(secondPool);
+      cardA.open =
+        false;
+
+      cardB.open =
+        false;
+
+      game.mismatches++;
+      game.streak = 0;
+
+      game.turn =
+        game.turn === "you"
+          ? "opponent"
+          : "you";
     }
 
-    choices = [first, second];
-  }
+    game.selected = [];
+    game.lock = false;
 
-  game.history.push({
-    snapshot: memorySnapshot()
-  });
+    if (
+      finishMemoryIfNeeded()
+    ) {
+      renderMemory();
+      return;
+    }
 
-  game.revealed = [choices[0]];
-  memoryRemember(choices[0]);
-  renderMemory();
+    if (
+      game.mode === "galaxy" &&
+      game.turn === "opponent"
+    ) {
+      game.message =
+        "GALAXY is choosing…";
 
-  await delay(550);
+      renderMemory();
 
-  game.revealed = choices;
-  memoryRemember(choices[1]);
-  renderMemory();
+      setTimeout(
+        galaxyMemoryTurn,
+        450
+      );
 
-  await delay(700);
+    } else {
+      game.message =
+        game.turn === "you"
+          ? (
+              game.mode === "friend"
+                ? "Player 1 turn"
+                : "Your turn"
+            )
+          : "Friend turn";
 
-  const match =
-    game.cards[choices[0]].symbol ===
-    game.cards[choices[1]].symbol;
+      renderMemory();
+    }
 
-  if (match) {
-    game.matched.add(choices[0]);
-    game.matched.add(choices[1]);
-
-    game.opponentScore++;
-  }
-
-  game.revealed = [];
-
-  if (
-    game.matched.size ===
-    game.cards.length
-  ) {
-    game.finished = true;
-  } else if (!match) {
-    game.turn = "player";
-  }
-
-  game.busy = false;
-  renderMemory();
-
-  if (
-    !game.finished &&
-    game.turn === "galaxy" &&
-    match
-  ) {
-    setTimeout(
-      memoryGalaxyTurn,
-      500
-    );
-  }
+  }, 650);
 }
 
-function memoryHint() {
-  const game = Games.memory;
+function galaxyMemoryTurn() {
+  const game =
+    GameCenter.memory;
 
-  if (game.finished) return;
-
-  const knownPair =
-    memoryKnownPair();
-
-  if (knownPair) {
-    game.hints++;
-
-    toast(
-      `Hint: cards ${knownPair[0] + 1} and ${knownPair[1] + 1} match.`
-    );
-
+  if (
+    !game ||
+    game.finished ||
+    game.mode !== "galaxy" ||
+    game.turn !== "opponent"
+  ) {
     return;
   }
 
   const available =
-    memoryUnknownIndexes();
-
-  if (!available.length) return;
-
-  game.hints++;
-
-  toast(
-    `Hint: try card ${randomItem(available) + 1}.`
-  );
-}
-
-function memoryUndo() {
-  const game = Games.memory;
+    memoryAvailableCards();
 
   if (
-    game.busy ||
-    !game.history.length
+    available.length < 2
   ) {
-    toast("Nothing to undo.");
+    finishMemoryIfNeeded();
+    renderMemory();
     return;
   }
 
-  const item =
-    game.history.pop();
+  let first;
+  let second;
 
-  if (!item?.snapshot) return;
+  const smart =
+    Math.random() <
+    difficultyChance(
+      game.elo
+    );
 
-  memoryRestore(
-    item.snapshot
-  );
+  if (smart) {
+    const knownGroups = {};
 
-  renderMemory();
-}
+    for (
+      const card
+      of available
+    ) {
+      const symbol =
+        game.known[
+          card.id
+        ];
 
-function memoryResign() {
-  const game = Games.memory;
+      if (!symbol) continue;
 
-  if (game.finished) return;
+      if (!knownGroups[symbol]) {
+        knownGroups[symbol] = [];
+      }
 
-  game.finished = true;
-  game.busy = false;
+      knownGroups[symbol]
+        .push(card);
+    }
 
-  renderMemory();
-}
+    const pair =
+      Object.values(
+        knownGroups
+      )
+      .find(
+        group =>
+          group.length >= 2
+      );
 
-function memoryResultText() {
-  const game = Games.memory;
+    if (pair) {
+      [
+        first,
+        second
+      ] =
+        pair.slice(0, 2);
+    }
+  }
 
-  if (!game.finished) {
-    return "In progress";
+  if (!first || !second) {
+    const shuffled =
+      shuffleArray(
+        available
+      );
+
+    [
+      first,
+      second
+    ] =
+      shuffled.slice(0, 2);
   }
 
   if (
-    game.playerScore >
-    game.opponentScore
+    !first ||
+    !second
   ) {
-    return "You win";
+    return;
   }
 
-  if (
-    game.playerScore <
-    game.opponentScore
-  ) {
-    return `${opponentName(game.mode)} wins`;
-  }
+  first.open = true;
 
-  return "Draw";
+  game.known[first.id] =
+    first.symbol;
+
+  renderMemory();
+
+  setTimeout(() => {
+    second.open = true;
+
+    game.known[second.id] =
+      second.symbol;
+
+    game.selected = [
+      first.id,
+      second.id
+    ];
+
+    renderMemory();
+
+    resolveMemoryPair();
+
+  }, 500);
 }
 
-function memoryReviewHTML() {
-  const game = Games.memory;
+function memoryHint() {
+  const game =
+    GameCenter.memory;
+
+  if (
+    !game ||
+    game.finished
+  ) {
+    return;
+  }
+
+  const unmatched =
+    game.cards.filter(
+      card =>
+        !card.matched
+    );
+
+  const groups = {};
+
+  unmatched.forEach(card => {
+    if (!groups[card.symbol]) {
+      groups[card.symbol] = [];
+    }
+
+    groups[card.symbol]
+      .push(card);
+  });
+
+  const pair =
+    Object.values(groups)
+      .find(
+        cards =>
+          cards.length >= 2
+      );
+
+  if (pair) {
+    toast(
+      `Hint: cards ${pair[0].id + 1} and ${pair[1].id + 1} match`
+    );
+  }
+}
+
+function memoryReview() {
+  const game =
+    GameCenter.memory;
 
   const accuracy =
-    game.playerAttempts
+    game.attempts
       ? Math.round(
-          game.playerMatches /
-          game.playerAttempts *
-          100
+          (
+            game.matches /
+            game.attempts
+          ) * 100
         )
       : 0;
 
-  return reviewCardHTML(
-    "Memory Review",
-    [
-      ["Your pairs", game.playerScore],
+  const review =
+    $("#gameReview");
+
+  if (!review) return;
+
+  review.innerHTML =
+    reviewHTML(
+      "Memory Review",
       [
-        `${opponentName(game.mode)} pairs`,
-        game.opponentScore
-      ],
-      ["Your attempts", game.playerAttempts],
-      ["Match accuracy", `${accuracy}%`],
-      ["Hints", game.hints],
-      ["Result", memoryResultText()]
-    ]
-  );
+        [
+          "Match accuracy",
+          `${accuracy}%`
+        ],
+        [
+          "Pairs found",
+          String(
+            game.matches
+          )
+        ],
+        [
+          "Mismatches",
+          String(
+            game.mismatches
+          )
+        ],
+        [
+          "Best streak",
+          String(
+            game.bestStreak
+          )
+        ],
+        [
+          "Your score",
+          String(
+            game.youScore
+          )
+        ],
+        [
+          opponentName(
+            game.mode
+          ),
+          String(
+            game.opponentScore
+          )
+        ]
+      ]
+    );
 }
 
 function renderMemory() {
-  const game = Games.memory;
+  if (!GameCenter.memory) {
+    resetMemory();
+    return;
+  }
 
-  const turnName =
-    game.turn === "player"
-      ? "Your turn"
-      : game.mode === "galaxy"
-        ? "GALAXY's turn"
-        : "Friend's turn";
+  const game =
+    GameCenter.memory;
 
-  const status =
-    game.finished
-      ? memoryResultText()
-      : turnName;
+  GameCenter.current =
+    "memory";
 
-  const toolbar = `
-    ${gameModeSelector("memory")}
-    ${gameLevelSelector("memory")}
-    ${commonGameButtons("memory", {
-      hint: true,
-      undo: true,
-      resign: true,
-      review: true
-    })}
-  `;
+  const body =
+    $("#contentBody");
 
-  const cards =
-    game.cards.map((card, index) => {
-      const revealed =
-        game.revealed.includes(index);
+  if (!body) return;
 
-      const matched =
-        game.matched.has(index);
+  body.innerHTML = `
+    <div class="game-shell">
 
-      return `
+      <div class="game-topline">
+
         <button
-          class="
-            memory-card
-            ${
-              revealed || matched
-                ? "revealed"
-                : ""
-            }
-            ${
-              matched
-                ? "matched"
-                : ""
-            }
-          "
-          data-memory-card="${index}"
-          type="button"
+          class="secondary-btn"
+          data-game-back
         >
-          <span class="back">✦</span>
-          <span class="front">
-            ${card.symbol}
-          </span>
+          ← Games
         </button>
-      `;
-    }).join("");
 
-  setContent(
-    "Memory",
-    "GALAXY GAMES",
-    `
-      <div class="game-shell">
+        <div class="game-status">
+          ${escapeHTML(game.message)}
+        </div>
 
-        ${gameHeader(
-          "Memory",
-          status,
-          toolbar
-        )}
+        <div class="game-toolbar">
 
-        <div class="scoreboard">
+          ${modeOptions(
+            game.mode
+          )}
 
-          <div class="scorebox">
-            <span>You</span>
+          ${levelOptions(
+            game.elo
+          )}
+
+          <button
+            class="secondary-btn"
+            data-memory-hint
+          >
+            Hint
+          </button>
+
+          <button
+            class="secondary-btn"
+            data-memory-review
+          >
+            Game Review
+          </button>
+
+          <button
+            class="primary-btn"
+            data-memory-reset
+          >
+            New Game
+          </button>
+
+        </div>
+
+      </div>
+
+      <div class="game-layout">
+
+        <div class="memory-board">
+
+          ${game.cards
+            .map(
+              card => `
+                <button
+                  class="
+                    memory-card
+                    ${
+                      card.open ||
+                      card.matched
+                        ? "open"
+                        : ""
+                    }
+                    ${
+                      card.matched
+                        ? "matched"
+                        : ""
+                    }
+                  "
+                  data-memory-card="${card.id}"
+                >
+                  <span class="memory-back">
+                    ✦
+                  </span>
+
+                  <span class="memory-front">
+                    ${card.symbol}
+                  </span>
+                </button>
+              `
+            )
+            .join("")}
+
+        </div>
+
+        <div class="game-side-panel">
+
+          <div class="score-card">
+            <span>
+              You
+            </span>
+
             <strong>
-              ${game.playerScore}
+              ${game.youScore}
             </strong>
           </div>
 
-          <div class="scorebox">
+          <div class="score-card">
             <span>
               ${opponentName(game.mode)}
             </span>
+
             <strong>
               ${game.opponentScore}
             </strong>
           </div>
 
-          <div class="scorebox">
-            <span>Pairs left</span>
-            <strong>
-              ${
-                8 -
-                game.matched.size / 2
-              }
-            </strong>
-          </div>
+          ${
+            game.finished
+              ? `
+                <button
+                  class="primary-btn"
+                  data-memory-reset
+                >
+                  Play Again
+                </button>
+              `
+              : ""
+          }
 
-          <div class="scorebox">
-            <span>Hints</span>
-            <strong>${game.hints}</strong>
-          </div>
-
-        </div>
-
-        <div class="game-layout">
-
-          <div class="memory-board">
-            ${cards}
-          </div>
-
-          <div class="game-side-panel">
-
-            <div class="player-card">
-              <div class="player-avatar">Y</div>
-
-              <div>
-                <strong>You</strong>
-                <span>
-                  ${game.playerScore} pairs
-                </span>
-              </div>
-            </div>
-
-            <div class="player-card">
-              <div class="player-avatar galaxy-avatar">
-                ${
-                  game.mode === "galaxy"
-                    ? "✦"
-                    : "F"
-                }
-              </div>
-
-              <div>
-                <strong>
-                  ${opponentName(game.mode)}
-                </strong>
-
-                <span>
-                  ${
-                    game.mode === "galaxy"
-                      ? `${game.elo} ELO memory`
-                      : `${game.opponentScore} pairs`
-                  }
-                </span>
-              </div>
-            </div>
-
-            ${
-              game.reviewOpen
-                ? memoryReviewHTML()
-                : ""
-            }
-
+          <div id="gameReview">
           </div>
 
         </div>
+
       </div>
-    `
-  );
+
+    </div>
+  `;
+
+  syncGameSelectors(game);
 }
 
 
@@ -3316,944 +4021,751 @@ function renderMemory() {
    SHOOTING GAME
    ========================================================= */
 
-function stopShooterTimers() {
-  const game = Games.shooter;
-
-  if (game.timer) {
-    clearInterval(game.timer);
-    game.timer = null;
+function clearShooterTimers() {
+  if (
+    GameCenter.shooterTimer
+  ) {
+    clearInterval(
+      GameCenter.shooterTimer
+    );
   }
 
-  if (game.galaxyTimer) {
-    clearInterval(game.galaxyTimer);
-    game.galaxyTimer = null;
+  if (
+    GameCenter.shooterGalaxyTimer
+  ) {
+    clearInterval(
+      GameCenter.shooterGalaxyTimer
+    );
   }
+
+  GameCenter.shooterTimer =
+    null;
+
+  GameCenter.shooterGalaxyTimer =
+    null;
 }
 
-function resetShooter(render = true) {
-  const game = Games.shooter;
+function resetShooter(
+  keepSettings = true
+) {
+  clearShooterTimers();
 
-  stopShooterTimers();
+  const old =
+    GameCenter.shooter || {};
 
-  game.running = false;
-  game.finished = false;
-  game.time = 30;
-  game.playerScore = 0;
-  game.opponentScore = 0;
-  game.shots = 0;
-  game.hits = 0;
-  game.misses = 0;
-  game.streak = 0;
-  game.bestStreak = 0;
-  game.target = null;
-  game.friendTurn = 1;
-  game.friendScores = [0, 0];
+  GameCenter.shooter = {
+    mode:
+      keepSettings
+        ? old.mode || "galaxy"
+        : "galaxy",
 
-  game.friendStats = [
-    {
-      shots: 0,
-      hits: 0,
-      misses: 0,
-      bestStreak: 0
-    },
-    {
-      shots: 0,
-      hits: 0,
-      misses: 0,
-      bestStreak: 0
-    }
-  ];
+    elo:
+      keepSettings
+        ? old.elo || 500
+        : 500,
 
-  game.reviewOpen = false;
+    running:
+      false,
+
+    finished:
+      false,
+
+    round:
+      1,
+
+    activePlayer:
+      "you",
+
+    time:
+      30,
+
+    targetX:
+      50,
+
+    targetY:
+      50,
+
+    targetSize:
+      56,
+
+    youScore:
+      0,
+
+    opponentScore:
+      0,
+
+    youShots:
+      0,
+
+    youHits:
+      0,
+
+    opponentShots:
+      0,
+
+    opponentHits:
+      0,
+
+    streak:
+      0,
+
+    bestStreak:
+      0,
+
+    message:
+      "Press Start Game"
+  };
 
   renderShooter();
 }
 
-function shooterDifficulty() {
-  const elo =
-    Games.shooter.elo;
+function moveShooterTarget() {
+  const game =
+    GameCenter.shooter;
 
-  if (elo >= 1200) {
-    return {
-      interval: 650,
-      hitChance: 0.9,
-      targetSize: 44
-    };
-  }
+  game.targetX =
+    8 +
+    Math.random() * 84;
 
-  if (elo >= 1000) {
-    return {
-      interval: 800,
-      hitChance: 0.8,
-      targetSize: 48
-    };
-  }
+  game.targetY =
+    12 +
+    Math.random() * 76;
 
-  if (elo >= 800) {
-    return {
-      interval: 950,
-      hitChance: 0.7,
-      targetSize: 50
-    };
-  }
-
-  if (elo >= 500) {
-    return {
-      interval: 1150,
-      hitChance: 0.58,
-      targetSize: 54
-    };
-  }
-
-  if (elo >= 200) {
-    return {
-      interval: 1400,
-      hitChance: 0.4,
-      targetSize: 58
-    };
-  }
-
-  return {
-    interval: 1650,
-    hitChance: 0.25,
-    targetSize: 64
-  };
+  game.targetSize =
+    38 +
+    Math.random() * 32;
 }
 
-function shooterNewTarget() {
-  const game = Games.shooter;
-
-  const stage =
-    $(".shooting-stage");
+function shooterStart() {
+  const game =
+    GameCenter.shooter;
 
   if (
-    !stage ||
-    !game.running
+    !game ||
+    game.running
   ) {
     return;
   }
-
-  const rect =
-    stage.getBoundingClientRect();
-
-  const difficulty =
-    shooterDifficulty();
-
-  const size =
-    difficulty.targetSize;
-
-  const maxX =
-    Math.max(
-      0,
-      rect.width - size - 20
-    );
-
-  const maxY =
-    Math.max(
-      0,
-      rect.height - size - 20
-    );
-
-  game.target = {
-    x:
-      10 +
-      Math.random() * maxX,
-    y:
-      10 +
-      Math.random() * maxY,
-    size
-  };
-
-  renderShooter();
-}
-
-function startShooter() {
-  const game = Games.shooter;
-
-  if (game.running) return;
 
   if (game.finished) {
     resetShooter();
   }
 
-  game.running = true;
-  game.finished = false;
-  game.time = 30;
+  game.running =
+    true;
 
-  shooterNewTarget();
+  game.time =
+    30;
 
-  game.timer =
-    setInterval(() => {
-      game.time--;
+  game.activePlayer =
+    "you";
 
-      if (game.time <= 0) {
-        finishShooter();
-        return;
-      }
+  game.message =
+    game.mode === "friend"
+      ? "Player 1 round"
+      : "Shoot the targets!";
 
-      const timerEl =
-        $("[data-shooter-time]");
-
-      if (timerEl) {
-        timerEl.textContent =
-          game.time;
-      }
-    }, 1000);
-
-  if (game.mode === "galaxy") {
-    startGalaxyShooterAI();
-  }
+  moveShooterTarget();
 
   renderShooter();
-}
 
-function startGalaxyShooterAI() {
-  const game = Games.shooter;
+  clearShooterTimers();
+
+  GameCenter.shooterTimer =
+    setInterval(
+      shooterTick,
+      1000
+    );
 
   if (
-    game.mode !== "galaxy" ||
+    game.mode === "galaxy"
+  ) {
+    startGalaxyShooter();
+  }
+}
+
+function shooterTick() {
+  const game =
+    GameCenter.shooter;
+
+  if (
+    !game ||
     !game.running
   ) {
+    clearShooterTimers();
     return;
   }
 
-  if (game.galaxyTimer) {
-    clearInterval(
-      game.galaxyTimer
-    );
+  game.time--;
+
+  if (game.time <= 0) {
+    if (
+      game.mode === "friend" &&
+      game.round === 1
+    ) {
+      game.round = 2;
+
+      game.activePlayer =
+        "opponent";
+
+      game.time =
+        30;
+
+      game.message =
+        "Friend round";
+
+      moveShooterTarget();
+
+      renderShooter();
+
+      return;
+    }
+
+    finishShooter();
+    return;
   }
 
-  const difficulty =
-    shooterDifficulty();
+  const timer =
+    $("#shooterTime");
 
-  game.galaxyTimer =
+  if (timer) {
+    timer.textContent =
+      String(game.time);
+  }
+}
+
+function startGalaxyShooter() {
+  const game =
+    GameCenter.shooter;
+
+  const speed =
+    Math.max(
+      260,
+      1000 -
+      Math.round(
+        game.elo * 0.5
+      )
+    );
+
+  GameCenter.shooterGalaxyTimer =
     setInterval(() => {
       if (
         !game.running ||
-        game.mode !== "galaxy"
+        game.finished
       ) {
         return;
       }
 
+      game.opponentShots++;
+
+      const chance =
+        0.25 +
+        (
+          game.elo /
+          1200
+        ) * 0.65;
+
       if (
         Math.random() <
-        difficulty.hitChance
+        chance
       ) {
-        game.opponentScore += 10;
+        game.opponentHits++;
 
-        shooterGalaxyEffect();
-        shooterNewTarget();
+        game.opponentScore +=
+          Math.random() < 0.15
+            ? 2
+            : 1;
       }
-    }, difficulty.interval);
+
+      updateShooterScoreUI();
+
+    }, speed);
 }
 
-function shooterGalaxyEffect() {
-  const stage =
-    $(".shooting-stage");
-
-  if (!stage) return;
-
-  const effect =
-    document.createElement("span");
-
-  effect.className =
-    "galaxy-shot";
-
-  effect.style.left =
-    `${20 + Math.random() * 70}%`;
-
-  effect.style.top =
-    `${15 + Math.random() * 70}%`;
-
-  stage.appendChild(effect);
-
-  setTimeout(
-    () => effect.remove(),
-    400
-  );
-}
-
-function shooterHit(event) {
-  const game = Games.shooter;
-
-  if (!game.running) return;
-
-  event.preventDefault();
-  event.stopPropagation();
-
-  game.shots++;
-  game.hits++;
-  game.streak++;
-
-  game.bestStreak =
-    Math.max(
-      game.bestStreak,
-      game.streak
-    );
-
-  game.playerScore +=
-    10 + Math.min(20, game.streak);
-
-  if (game.mode === "friend") {
-    game.friendScores[
-      game.friendTurn - 1
-    ] = game.playerScore;
-
-    const stats =
-      game.friendStats[
-        game.friendTurn - 1
-      ];
-
-    stats.shots = game.shots;
-    stats.hits = game.hits;
-    stats.misses = game.misses;
-    stats.bestStreak =
-      game.bestStreak;
-  }
-
-  shooterNewTarget();
-}
-
-function shooterMiss(event) {
-  const game = Games.shooter;
-
-  if (!game.running) return;
+function shooterHit() {
+  const game =
+    GameCenter.shooter;
 
   if (
-    event.target.closest(
-      "[data-shooter-target]"
-    )
+    !game ||
+    !game.running ||
+    game.finished
   ) {
     return;
   }
-
-  game.shots++;
-  game.misses++;
-  game.streak = 0;
-
-  if (game.mode === "friend") {
-    const stats =
-      game.friendStats[
-        game.friendTurn - 1
-      ];
-
-    stats.shots = game.shots;
-    stats.hits = game.hits;
-    stats.misses = game.misses;
-    stats.bestStreak =
-      game.bestStreak;
-  }
-
-  renderShooter();
-}
-
-function finishShooter() {
-  const game = Games.shooter;
-
-  stopShooterTimers();
-
-  game.running = false;
 
   if (
     game.mode === "friend" &&
-    game.friendTurn === 1
+    game.activePlayer === "opponent"
   ) {
-    game.friendScores[0] =
-      game.playerScore;
+    game.opponentShots++;
+    game.opponentHits++;
+    game.opponentScore++;
 
-    game.friendStats[0] = {
-      shots: game.shots,
-      hits: game.hits,
-      misses: game.misses,
-      bestStreak: game.bestStreak
-    };
+  } else {
+    game.youShots++;
+    game.youHits++;
+    game.youScore++;
 
-    game.friendTurn = 2;
+    game.streak++;
 
-    game.time = 30;
-    game.playerScore = 0;
-    game.shots = 0;
-    game.hits = 0;
-    game.misses = 0;
+    game.bestStreak =
+      Math.max(
+        game.bestStreak,
+        game.streak
+      );
+  }
+
+  moveShooterTarget();
+
+  renderShooter();
+}
+
+function shooterMiss() {
+  const game =
+    GameCenter.shooter;
+
+  if (
+    !game ||
+    !game.running ||
+    game.finished
+  ) {
+    return;
+  }
+
+  if (
+    game.mode === "friend" &&
+    game.activePlayer === "opponent"
+  ) {
+    game.opponentShots++;
+
+  } else {
+    game.youShots++;
     game.streak = 0;
-    game.bestStreak = 0;
-    game.target = null;
-
-    renderShooter();
-
-    toast(
-      "Friend's turn. Press Start Round."
-    );
-
-    return;
   }
 
-  if (game.mode === "friend") {
-    game.friendScores[1] =
-      game.playerScore;
+  updateShooterScoreUI();
+}
 
-    game.friendStats[1] = {
-      shots: game.shots,
-      hits: game.hits,
-      misses: game.misses,
-      bestStreak: game.bestStreak
-    };
+function updateShooterScoreUI() {
+  const game =
+    GameCenter.shooter;
+
+  const you =
+    $("#shooterYouScore");
+
+  const opponent =
+    $("#shooterOpponentScore");
+
+  if (you) {
+    you.textContent =
+      String(
+        game.youScore
+      );
   }
 
-  game.finished = true;
-  game.target = null;
+  if (opponent) {
+    opponent.textContent =
+      String(
+        game.opponentScore
+      );
+  }
+}
+
+function finishShooter() {
+  const game =
+    GameCenter.shooter;
+
+  clearShooterTimers();
+
+  game.running =
+    false;
+
+  game.finished =
+    true;
+
+  const scoreText =
+    `You ${game.youScore} - ${opponentName(game.mode)} ${game.opponentScore}`;
+
+  if (
+    game.youScore >
+    game.opponentScore
+  ) {
+    game.message =
+      `🏆 You Win! ${scoreText}`;
+
+  } else if (
+    game.opponentScore >
+    game.youScore
+  ) {
+    game.message =
+      game.mode === "galaxy"
+        ? `🤖 GALAXY Wins! ${scoreText}`
+        : `🏆 Friend Wins! ${scoreText}`;
+
+  } else {
+    game.message =
+      `🤝 Draw Game — ${scoreText}`;
+  }
 
   renderShooter();
 }
 
-function shooterResign() {
-  const game = Games.shooter;
-
-  if (
-    !game.running &&
-    !game.finished
-  ) {
-    return;
-  }
-
-  stopShooterTimers();
-
-  game.running = false;
-  game.finished = true;
-  game.target = null;
-
-  renderShooter();
-}
-
-function shooterResultText() {
-  const game = Games.shooter;
-
-  if (!game.finished) {
-    return "In progress";
-  }
-
-  if (game.mode === "galaxy") {
-    if (
-      game.playerScore >
-      game.opponentScore
-    ) {
-      return "You win";
-    }
-
-    if (
-      game.playerScore <
-      game.opponentScore
-    ) {
-      return "GALAXY wins";
-    }
-
-    return "Draw";
-  }
-
-  if (
-    game.friendScores[0] >
-    game.friendScores[1]
-  ) {
-    return "You win";
-  }
-
-  if (
-    game.friendScores[0] <
-    game.friendScores[1]
-  ) {
-    return "Friend wins";
-  }
-
-  return "Draw";
-}
-
-function shooterReviewHTML() {
-  const game = Games.shooter;
-
-  if (game.mode === "friend") {
-    const p1 =
-      game.friendStats[0];
-
-    const p2 =
-      game.friendStats[1];
-
-    const accuracy1 =
-      p1.shots
-        ? Math.round(
-            p1.hits /
-            p1.shots *
-            100
-          )
-        : 0;
-
-    const accuracy2 =
-      p2.shots
-        ? Math.round(
-            p2.hits /
-            p2.shots *
-            100
-          )
-        : 0;
-
-    return reviewCardHTML(
-      "Shooting Review",
-      [
-        ["Your score", game.friendScores[0]],
-        ["Friend score", game.friendScores[1]],
-        ["Your accuracy", `${accuracy1}%`],
-        ["Friend accuracy", `${accuracy2}%`],
-        ["Your best streak", p1.bestStreak],
-        ["Friend best streak", p2.bestStreak],
-        ["Result", shooterResultText()]
-      ]
-    );
-  }
+function shooterReview() {
+  const game =
+    GameCenter.shooter;
 
   const accuracy =
-    game.shots
+    game.youShots
       ? Math.round(
-          game.hits /
-          game.shots *
-          100
+          (
+            game.youHits /
+            game.youShots
+          ) * 100
         )
       : 0;
 
-  return reviewCardHTML(
-    "Shooting Review",
-    [
-      ["Your score", game.playerScore],
-      ["GALAXY score", game.opponentScore],
-      ["Shots", game.shots],
-      ["Hits", game.hits],
-      ["Misses", game.misses],
-      ["Accuracy", `${accuracy}%`],
-      ["Best streak", game.bestStreak],
-      ["Result", shooterResultText()]
-    ]
-  );
+  const opponentAccuracy =
+    game.opponentShots
+      ? Math.round(
+          (
+            game.opponentHits /
+            game.opponentShots
+          ) * 100
+        )
+      : 0;
+
+  const review =
+    $("#gameReview");
+
+  if (!review) return;
+
+  review.innerHTML =
+    reviewHTML(
+      "Shooting Review",
+      [
+        [
+          "Your score",
+          String(
+            game.youScore
+          )
+        ],
+        [
+          "Shots",
+          String(
+            game.youShots
+          )
+        ],
+        [
+          "Hits",
+          String(
+            game.youHits
+          )
+        ],
+        [
+          "Accuracy",
+          `${accuracy}%`
+        ],
+        [
+          "Best streak",
+          String(
+            game.bestStreak
+          )
+        ],
+        [
+          `${opponentName(game.mode)} score`,
+          String(
+            game.opponentScore
+          )
+        ],
+        [
+          `${opponentName(game.mode)} accuracy`,
+          `${opponentAccuracy}%`
+        ]
+      ]
+    );
 }
 
 function renderShooter() {
-  const game = Games.shooter;
+  if (!GameCenter.shooter) {
+    resetShooter();
+    return;
+  }
 
-  let status =
-    game.running
-      ? game.mode === "friend"
-        ? `Player ${game.friendTurn} shooting`
-        : "Target active"
-      : game.finished
-        ? shooterResultText()
-        : game.mode === "friend"
-          ? game.friendTurn === 1
-            ? "Your round"
-            : "Friend's round"
-          : "Ready";
+  const game =
+    GameCenter.shooter;
 
-  const toolbar = `
-    ${gameModeSelector("shooter")}
-    ${gameLevelSelector("shooter")}
+  GameCenter.current =
+    "shooter";
 
-    <button
-      class="primary-btn"
-      data-game-command="shooter:start"
-      type="button"
-    >
-      ${
-        game.running
-          ? "Running"
-          : "Start Round"
-      }
-    </button>
+  const body =
+    $("#contentBody");
 
-    <button
-      class="secondary-btn"
-      data-game-command="shooter:resign"
-      type="button"
-    >
-      End
-    </button>
+  if (!body) return;
 
-    <button
-      class="secondary-btn"
-      data-game-command="shooter:review"
-      type="button"
-    >
-      Review
-    </button>
+  body.innerHTML = `
+    <div class="game-shell">
 
-    <button
-      class="secondary-btn"
-      data-game-command="shooter:reset"
-      type="button"
-    >
-      New Game
-    </button>
-  `;
+      <div class="game-topline">
 
-  const opponentScore =
-    game.mode === "galaxy"
-      ? game.opponentScore
-      : game.friendScores[1];
+        <button
+          class="secondary-btn"
+          data-game-back
+        >
+          ← Games
+        </button>
 
-  setContent(
-    "GALAXY Shooting",
-    "GALAXY GAMES",
-    `
-      <div class="game-shell">
+        <div class="game-status">
+          ${escapeHTML(game.message)}
+        </div>
 
-        ${gameHeader(
-          "GALAXY Shooting",
-          status,
-          toolbar
-        )}
+        <div class="game-toolbar">
 
-        <div class="shooting-hud">
+          ${modeOptions(
+            game.mode
+          )}
 
-          <div class="scorebox">
-            <span>Time</span>
-            <strong data-shooter-time>
-              ${game.time}
-            </strong>
-          </div>
+          ${levelOptions(
+            game.elo
+          )}
 
-          <div class="scorebox">
+          ${
+            !game.running
+              ? `
+                <button
+                  class="primary-btn"
+                  data-shooter-start
+                >
+                  ${
+                    game.finished
+                      ? "Play Again"
+                      : "Start Game"
+                  }
+                </button>
+              `
+              : `
+                <button
+                  class="secondary-btn"
+                  data-shooter-end
+                >
+                  End Game
+                </button>
+              `
+          }
+
+          <button
+            class="secondary-btn"
+            data-shooter-review
+          >
+            Game Review
+          </button>
+
+        </div>
+
+      </div>
+
+      <div class="game-layout">
+
+        <div
+          class="shooter-arena"
+          data-shooter-arena
+        >
+
+          <div class="shooter-hud">
+
+            <span>
+              Time:
+              <strong id="shooterTime">
+                ${game.time}
+              </strong>
+            </span>
+
             <span>
               ${
                 game.mode === "friend"
-                  ? game.friendTurn === 1
-                    ? "Your score"
-                    : "Friend score"
-                  : "Your score"
+                  ? (
+                      game.activePlayer === "you"
+                        ? "Player 1"
+                        : "Friend"
+                    )
+                  : "You"
               }
             </span>
 
-            <strong>
-              ${game.playerScore}
-            </strong>
           </div>
 
-          <div class="scorebox">
+          ${
+            game.running
+              ? `
+                <button
+                  class="shoot-target"
+                  data-shoot-target
+                  style="
+                    left:${game.targetX}%;
+                    top:${game.targetY}%;
+                    width:${game.targetSize}px;
+                    height:${game.targetSize}px;
+                  "
+                  aria-label="Target"
+                >
+                  ◎
+                </button>
+              `
+              : `
+                <div class="shooter-ready">
+                  <strong>
+                    GALAXY TARGET ARENA
+                  </strong>
+
+                  <span>
+                    Hit as many targets as you can.
+                  </span>
+                </div>
+              `
+          }
+
+        </div>
+
+        <div class="game-side-panel">
+
+          <div class="score-card">
+
             <span>
-              ${
-                game.mode === "galaxy"
-                  ? "GALAXY score"
-                  : "Your Round 1"
-              }
+              You
             </span>
 
-            <strong>
-              ${
-                game.mode === "galaxy"
-                  ? opponentScore
-                  : game.friendScores[0]
-              }
+            <strong id="shooterYouScore">
+              ${game.youScore}
             </strong>
+
           </div>
 
-          <div class="scorebox">
-            <span>Best streak</span>
-            <strong>
-              ${game.bestStreak}
+          <div class="score-card">
+
+            <span>
+              ${opponentName(game.mode)}
+            </span>
+
+            <strong id="shooterOpponentScore">
+              ${game.opponentScore}
             </strong>
+
+          </div>
+
+          <div id="gameReview">
           </div>
 
         </div>
 
-        <div class="game-layout">
-
-          <div
-            class="shooting-stage"
-            data-shooter-arena
-          >
-
-            ${
-              game.target &&
-              game.running
-                ? `
-                  <button
-                    class="shooting-target"
-                    data-shooter-target
-                    type="button"
-                    style="
-                      left:${game.target.x}px;
-                      top:${game.target.y}px;
-                      width:${game.target.size}px;
-                      height:${game.target.size}px;
-                    "
-                    aria-label="Target"
-                  ></button>
-                `
-                : `
-                  <div
-                    style="
-                      height:100%;
-                      min-height:500px;
-                      display:grid;
-                      place-items:center;
-                      color:var(--muted);
-                      text-align:center;
-                      padding:30px;
-                    "
-                  >
-                    ${
-                      game.finished
-                        ? escapeHTML(
-                            shooterResultText()
-                          )
-                        : "Press Start Round to begin."
-                    }
-                  </div>
-                `
-            }
-
-          </div>
-
-          <div class="game-side-panel">
-
-            <div class="game-stat">
-              <span>Shots</span>
-              <strong>
-                ${game.shots}
-              </strong>
-            </div>
-
-            <div class="game-stat">
-              <span>Hits</span>
-              <strong>
-                ${game.hits}
-              </strong>
-            </div>
-
-            <div class="game-stat">
-              <span>Misses</span>
-              <strong>
-                ${game.misses}
-              </strong>
-            </div>
-
-            <div class="game-stat">
-              <span>Current streak</span>
-              <strong>
-                ${game.streak}
-              </strong>
-            </div>
-
-            ${
-              game.reviewOpen
-                ? shooterReviewHTML()
-                : ""
-            }
-
-          </div>
-
-        </div>
       </div>
-    `
-  );
-}
-
-
-/* =========================================================
-   REVIEW CARD
-   ========================================================= */
-
-function reviewCardHTML(
-  title,
-  metrics,
-  note = ""
-) {
-  return `
-    <div class="review-card">
-
-      <strong>
-        ${escapeHTML(title)}
-      </strong>
-
-      <div
-        class="review-grid"
-        style="margin-top:10px"
-      >
-        ${metrics.map(
-          ([label, value]) => `
-            <div class="review-metric">
-
-              <span>
-                ${escapeHTML(label)}
-              </span>
-
-              <strong>
-                ${escapeHTML(value)}
-              </strong>
-
-            </div>
-          `
-        ).join("")}
-      </div>
-
-      ${
-        note
-          ? `
-            <p
-              style="
-                color:var(--muted);
-                font-size:11px;
-                line-height:1.45;
-                margin:10px 0 0;
-              "
-            >
-              ${escapeHTML(note)}
-            </p>
-          `
-          : ""
-      }
 
     </div>
   `;
+
+  syncGameSelectors(game);
 }
 
 
 /* =========================================================
-   GAME COMMANDS
+   GAME SELECTOR SYNCHRONIZATION
    ========================================================= */
 
-function handleGameCommand(
-  gameName,
-  command
-) {
-  if (gameName === "chess") {
-    if (command === "reset") resetChess();
-    if (command === "hint") chessHint();
-    if (command === "undo") chessUndo();
-    if (command === "resign") chessResign();
+function currentGameObject() {
+  switch (
+    GameCenter.current
+  ) {
+    case "chess":
+      return GameCenter.chess;
 
-    if (command === "review") {
-      Games.chess.reviewOpen =
-        !Games.chess.reviewOpen;
+    case "tictactoe":
+      return GameCenter.ttt;
 
+    case "connect4":
+      return GameCenter.connect;
+
+    case "memory":
+      return GameCenter.memory;
+
+    case "shooter":
+      return GameCenter.shooter;
+
+    default:
+      return null;
+  }
+}
+
+function syncGameSelectors(game) {
+  const mode =
+    $("[data-game-mode]");
+
+  const level =
+    $("[data-game-level]");
+
+  if (mode) {
+    mode.value =
+      game.mode;
+  }
+
+  if (level) {
+    level.value =
+      String(
+        game.elo
+      );
+
+    level.disabled =
+      game.mode === "friend";
+  }
+}
+
+function rerenderCurrentGame() {
+  switch (
+    GameCenter.current
+  ) {
+    case "chess":
       renderChess();
-    }
+      break;
 
-    return;
-  }
-
-  if (gameName === "ttt") {
-    if (command === "reset") resetTTT();
-    if (command === "hint") tttHint();
-    if (command === "undo") tttUndo();
-    if (command === "resign") tttResign();
-
-    if (command === "review") {
-      Games.ttt.reviewOpen =
-        !Games.ttt.reviewOpen;
-
+    case "tictactoe":
       renderTTT();
-    }
+      break;
 
-    return;
-  }
-
-  if (gameName === "connect") {
-    if (command === "reset") resetConnect();
-    if (command === "hint") connectHint();
-    if (command === "undo") connectUndo();
-    if (command === "resign") connectResign();
-
-    if (command === "review") {
-      Games.connect.reviewOpen =
-        !Games.connect.reviewOpen;
-
+    case "connect4":
       renderConnect();
-    }
+      break;
 
-    return;
-  }
-
-  if (gameName === "memory") {
-    if (command === "reset") resetMemory();
-    if (command === "hint") memoryHint();
-    if (command === "undo") memoryUndo();
-    if (command === "resign") memoryResign();
-
-    if (command === "review") {
-      Games.memory.reviewOpen =
-        !Games.memory.reviewOpen;
-
+    case "memory":
       renderMemory();
-    }
+      break;
 
-    return;
-  }
-
-  if (gameName === "shooter") {
-    if (command === "reset") resetShooter();
-    if (command === "start") startShooter();
-    if (command === "resign") shooterResign();
-
-    if (command === "review") {
-      Games.shooter.reviewOpen =
-        !Games.shooter.reviewOpen;
-
+    case "shooter":
       renderShooter();
-    }
+      break;
   }
 }
 
-function changeGameMode(
-  gameName,
-  mode
-) {
-  if (!Games[gameName]) return;
+function resetCurrentGame() {
+  switch (
+    GameCenter.current
+  ) {
+    case "chess":
+      resetChess();
+      break;
 
-  Games[gameName].mode = mode;
+    case "tictactoe":
+      resetTTT();
+      break;
 
-  if (gameName === "chess") {
-    resetChess();
-  }
+    case "connect4":
+      resetConnect();
+      break;
 
-  if (gameName === "ttt") {
-    resetTTT();
-  }
+    case "memory":
+      resetMemory();
+      break;
 
-  if (gameName === "connect") {
-    resetConnect();
-  }
-
-  if (gameName === "memory") {
-    resetMemory();
-  }
-
-  if (gameName === "shooter") {
-    resetShooter();
-  }
-}
-
-function changeGameLevel(
-  gameName,
-  elo
-) {
-  if (!Games[gameName]) return;
-
-  Games[gameName].elo =
-    Number(elo);
-
-  if (gameName === "chess") {
-    resetChess();
-  }
-
-  if (gameName === "ttt") {
-    resetTTT();
-  }
-
-  if (gameName === "connect") {
-    resetConnect();
-  }
-
-  if (gameName === "memory") {
-    resetMemory();
-  }
-
-  if (gameName === "shooter") {
-    resetShooter();
+    case "shooter":
+      resetShooter();
+      break;
   }
 }
 
@@ -4276,13 +4788,10 @@ async function sendWork() {
     return;
   }
 
-  const text =
+  const prompt =
     input.value.trim();
 
-  if (!text) {
-    toast(
-      "Enter a work request."
-    );
+  if (!prompt) {
     return;
   }
 
@@ -4290,634 +4799,742 @@ async function sendWork() {
     "GALAXY is working…";
 
   try {
-    const provider =
-      $("#aiProvider")?.value ||
-      "gemini";
-
-    const endpoint =
-      provider === "openai"
-        ? "/api/chat"
-        : "/api/gemini";
-
-    const response =
-      await fetch(endpoint, {
-        method: "POST",
-
-        headers: {
-          "Content-Type":
-            "application/json"
-        },
-
-        body: JSON.stringify({
-          message: text,
-          messages: [
-            {
-              role: "user",
-              content: text
-            }
-          ]
-        })
-      });
-
-    const data =
-      await response.json();
-
-    if (!response.ok) {
-      throw new Error(
-        data.error ||
-        data.message ||
-        "GALAXY backend error"
+    const reply =
+      await fetchAIResponse(
+        prompt
       );
-    }
 
     output.textContent =
-      data.reply ||
-      data.text ||
-      data.output ||
-      data.message ||
-      "No output returned.";
-  } catch (error) {
-    output.textContent =
-      `Error: ${error.message}`;
-  }
-}
-
-
-/* =========================================================
-   CLICK HANDLER
-   ========================================================= */
-
-function handleClick(event) {
-  const viewButton =
-    event.target.closest(
-      "[data-view]"
-    );
-
-  if (viewButton) {
-    switchView(
-      viewButton.dataset.view
-    );
-
-    return;
-  }
-
-  const gameOpen =
-    event.target.closest(
-      "[data-game-open]"
-    );
-
-  if (gameOpen) {
-    openGame(
-      gameOpen.dataset.gameOpen
-    );
-
-    return;
-  }
-
-  const gameBack =
-    event.target.closest(
-      "[data-game-back]"
-    );
-
-  if (gameBack) {
-    renderGamesHome();
-    return;
-  }
-
-  const command =
-    event.target.closest(
-      "[data-game-command]"
-    );
-
-  if (command) {
-    const [
-      gameName,
-      action
-    ] =
-      command.dataset.gameCommand.split(":");
-
-    handleGameCommand(
-      gameName,
-      action
-    );
-
-    return;
-  }
-
-  const chessSquare =
-    event.target.closest(
-      "[data-chess-square]"
-    );
-
-  if (chessSquare) {
-    const [row, col] =
-      chessSquare.dataset.chessSquare
-        .split(",")
-        .map(Number);
-
-    chessClickSquare(
-      row,
-      col
-    );
-
-    return;
-  }
-
-  const tttCell =
-    event.target.closest(
-      "[data-ttt-cell]"
-    );
-
-  if (tttCell) {
-    tttClick(
-      Number(
-        tttCell.dataset.tttCell
-      )
-    );
-
-    return;
-  }
-
-  const connectColumn =
-    event.target.closest(
-      "[data-connect-column]"
-    );
-
-  if (connectColumn) {
-    connectClick(
-      Number(
-        connectColumn.dataset.connectColumn
-      )
-    );
-
-    return;
-  }
-
-  const memoryCard =
-    event.target.closest(
-      "[data-memory-card]"
-    );
-
-  if (memoryCard) {
-    memoryClick(
-      Number(
-        memoryCard.dataset.memoryCard
-      )
-    );
-
-    return;
-  }
-
-  const shooterTarget =
-    event.target.closest(
-      "[data-shooter-target]"
-    );
-
-  if (shooterTarget) {
-    shooterHit(event);
-    return;
-  }
-
-  const shooterArena =
-    event.target.closest(
-      "[data-shooter-arena]"
-    );
-
-  if (shooterArena) {
-    shooterMiss(event);
-    return;
-  }
-
-  const actionButton =
-    event.target.closest(
-      "[data-action]"
-    );
-
-  if (!actionButton) return;
-
-  const action =
-    actionButton.dataset.action;
-
-  if (action === "new-chat") {
-    newChat();
-    return;
-  }
-
-  /*
-    IMPORTANT:
-    SEND is also directly bound inside bindEvents().
-    The direct listener stops propagation.
-    This delegated fallback only runs if necessary.
-  */
-  if (action === "send") {
-    sendMessage();
-    return;
-  }
-
-  if (action === "attach") {
-    $("#fileInput")?.click();
-    return;
-  }
-
-  if (action === "web-search") {
-    App.searchEnabled =
-      !App.searchEnabled;
-
-    actionButton.classList.toggle(
-      "active",
-      App.searchEnabled
-    );
-
-    toast(
-      App.searchEnabled
-        ? "Web search enabled"
-        : "Web search disabled"
-    );
-
-    return;
-  }
-
-  if (action === "image") {
-    toast(
-      "GALAXY Image Studio"
-    );
-
-    switchView("studio");
-    return;
-  }
-
-  if (action === "video") {
-    toast(
-      "GALAXY Video Studio"
-    );
-
-    switchView("studio");
-    return;
-  }
-
-  if (action === "voice") {
-    toast(
-      "Voice mode can be connected next."
-    );
-
-    return;
-  }
-
-  if (action === "send-work") {
-    sendWork();
-  }
-}
-
-
-/* =========================================================
-   CHANGE HANDLER
-   ========================================================= */
-
-function handleChange(event) {
-  const modeSelect =
-    event.target.closest(
-      "[data-game-mode]"
-    );
-
-  if (modeSelect) {
-    changeGameMode(
-      modeSelect.dataset.gameMode,
-      modeSelect.value
-    );
-
-    return;
-  }
-
-  const levelSelect =
-    event.target.closest(
-      "[data-game-level]"
-    );
-
-  if (levelSelect) {
-    changeGameLevel(
-      levelSelect.dataset.gameLevel,
-      levelSelect.value
-    );
-  }
-}
-
-
-/* =========================================================
-   KEYBOARD
-   ========================================================= */
-
-function handlePromptKeydown(event) {
-  if (
-    event.key === "Enter" &&
-    !event.shiftKey
-  ) {
-    event.preventDefault();
-    sendMessage();
-  }
-}
-
-
-/* =========================================================
-   BIND EVENTS
-   ========================================================= */
-
-function bindEvents() {
-  /*
-    General delegated click handler
-  */
-  document.addEventListener(
-    "click",
-    handleClick
-  );
-
-  /*
-    Game mode + level changes
-  */
-  document.addEventListener(
-    "change",
-    handleChange
-  );
-
-  /*
-    SEND ARROW FIX
-    This directly binds the send button.
-  */
-  const sendButton =
-    $("#sendButton");
-
-  if (sendButton) {
-    sendButton.type = "button";
-
-    sendButton.addEventListener(
-      "click",
-      event => {
-        event.preventDefault();
-        event.stopPropagation();
-
-        sendMessage();
-      }
-    );
-  }
-
-  /*
-    Prompt typing
-  */
-  const promptInput =
-    $("#promptInput");
-
-  if (promptInput) {
-    promptInput.addEventListener(
-      "input",
-      autoResizePrompt
-    );
-
-    promptInput.addEventListener(
-      "keydown",
-      handlePromptKeydown
-    );
-  }
-
-  /*
-    File upload
-  */
-  const fileInput =
-    $("#fileInput");
-
-  if (fileInput) {
-    fileInput.addEventListener(
-      "change",
-      event => {
-        handleFiles(
-          event.target.files
-        );
-
-        event.target.value = "";
-      }
-    );
-  }
-
-  /*
-    Protect composer if it is inside a form
-  */
-  const composer =
-    $("#composer");
-
-  if (
-    composer &&
-    composer.tagName === "FORM"
-  ) {
-    composer.addEventListener(
-      "submit",
-      event => {
-        event.preventDefault();
-        sendMessage();
-      }
-    );
-  }
-}
-
-
-/* =========================================================
-   INITIALIZE
-   ========================================================= */
-
-function initGalaxy() {
-  bindEvents();
-
-  updateSendButtonState();
-  autoResizePrompt();
-  renderMessages();
-
-  switchView("chat");
-
-  console.log(
-    "GALAXY AI loaded successfully."
-  );
-}
-
-if (
-  document.readyState === "loading"
-) {
-  document.addEventListener(
-    "DOMContentLoaded",
-    initGalaxy
-  );
-} else {
-  initGalaxy();
-}
-async function fetchAIResponse(message) {
-  const creatorContext =
-    "You are GALAXY AI. " +
-    "GALAXY AI was created and founded by Harshavardhan. " +
-    "If anyone asks who created, made, founded, designed or owns GALAXY AI, " +
-    "answer: Harshavardhan created GALAXY AI. " +
-    "GALAXY AI uses Gemini technology through an API for AI responses. " +
-    "Be intelligent, friendly, clear and helpful.";
-
-  const history = state.messages
-    .slice(-20)
-    .map(item => ({
-      role: item.role,
-      content: item.text
-    }));
-
-  const response = await fetch("/api/gemini", {
-    method: "POST",
-
-    headers: {
-      "Content-Type": "application/json"
-    },
-
-    body: JSON.stringify({
-      message: message,
-      prompt: message,
-      system: creatorContext,
-      messages: [
-        {
-          role: "system",
-          content: creatorContext
-        },
-        ...history,
-        {
-          role: "user",
-          content: message
-        }
-      ]
-    })
-  });
-
-  let data = {};
-
-  try {
-    data = await response.json();
-  } catch {
-    throw new Error(
-      "GALAXY received an invalid response from Gemini."
-    );
-  }
-
-  if (!response.ok) {
-    throw new Error(
-      data.error ||
-      data.message ||
-      `Gemini backend error ${response.status}`
-    );
-  }
-
-  const reply =
-    data.reply ||
-    data.text ||
-    data.output ||
-    data.response ||
-    data.message;
-
-  if (!reply) {
-    throw new Error(
-      "Gemini returned an empty response."
-    );
-  }
-
-  return reply;
-}
-async function sendWork() {
-  const input = $("#workPrompt");
-  const output = $("#workOutput");
-
-  if (!input || !output) {
-    return;
-  }
-
-  const text = input.value.trim();
-
-  if (!text) {
-    toast("Enter a work request.");
-    return;
-  }
-
-  output.textContent = "GALAXY is working…";
-
-  try {
-    const response = await fetch("/api/gemini", {
-      method: "POST",
-
-      headers: {
-        "Content-Type": "application/json"
-      },
-
-      body: JSON.stringify({
-        message: text,
-        prompt: text,
-        system:
-          "You are GALAXY AI, created by Harshavardhan. " +
-          "Help the user complete professional and creative work clearly."
-      })
-    });
-
-    let data = {};
-
-    try {
-      data = await response.json();
-    } catch {
-      throw new Error(
-        "GALAXY received an invalid Gemini response."
-      );
-    }
-
-    if (!response.ok) {
-      throw new Error(
-        data.error ||
-        data.message ||
-        `Gemini backend error ${response.status}`
-      );
-    }
-
-    output.textContent =
-      data.reply ||
-      data.text ||
-      data.output ||
-      data.response ||
-      data.message ||
-      "No response received.";
+      reply;
 
   } catch (error) {
     output.textContent =
       `GALAXY error: ${error.message}`;
 
-    toast(error.message, "error");
+    toast(
+      error.message,
+      "error"
+    );
   }
 }
+
+
 /* =========================================================
-   GALAXY — GEMINI ONLY
+   GLOBAL CLICK HANDLER
    ========================================================= */
 
-function forceGalaxyGemini() {
-  const provider = document.querySelector("#aiProvider");
+document.addEventListener(
+  "click",
+  event => {
 
-  if (!provider) {
-    return;
+    const target =
+      event.target;
+
+    const action =
+      target.closest(
+        "[data-action]"
+      );
+
+    if (action) {
+      const type =
+        action.dataset.action;
+
+      if (type === "send") {
+        event.preventDefault();
+        sendMessage();
+        return;
+      }
+
+      if (
+        type === "new-chat"
+      ) {
+        newChat();
+        return;
+      }
+
+      if (
+        type === "work-send"
+      ) {
+        sendWork();
+        return;
+      }
+    }
+
+
+    const view =
+      target.closest(
+        "[data-view]"
+      );
+
+    if (view) {
+      setView(
+        view.dataset.view
+      );
+
+      return;
+    }
+
+
+    const openGame =
+      target.closest(
+        "[data-game-open]"
+      );
+
+    if (openGame) {
+      const id =
+        openGame.dataset.gameOpen;
+
+      if (id === "chess") {
+        resetChess();
+
+      } else if (
+        id === "tictactoe"
+      ) {
+        resetTTT();
+
+      } else if (
+        id === "connect4"
+      ) {
+        resetConnect();
+
+      } else if (
+        id === "memory"
+      ) {
+        resetMemory();
+
+      } else if (
+        id === "shooter"
+      ) {
+        resetShooter();
+      }
+
+      return;
+    }
+
+
+    if (
+      target.closest(
+        "[data-game-back]"
+      )
+    ) {
+      clearShooterTimers();
+      renderGames();
+      return;
+    }
+
+
+    const chessSquare =
+      target.closest(
+        "[data-chess-square]"
+      );
+
+    if (chessSquare) {
+      const [r, c] =
+        chessSquare
+          .dataset
+          .chessSquare
+          .split(",")
+          .map(Number);
+
+      clickChessSquare(
+        r,
+        c
+      );
+
+      return;
+    }
+
+
+    if (
+      target.closest(
+        "[data-chess-hint]"
+      )
+    ) {
+      chessHint();
+      return;
+    }
+
+    if (
+      target.closest(
+        "[data-chess-undo]"
+      )
+    ) {
+      chessUndo();
+      return;
+    }
+
+    if (
+      target.closest(
+        "[data-chess-review]"
+      )
+    ) {
+      chessReview();
+      return;
+    }
+
+    if (
+      target.closest(
+        "[data-chess-reset]"
+      )
+    ) {
+      resetChess();
+      return;
+    }
+
+    if (
+      target.closest(
+        "[data-chess-resign]"
+      )
+    ) {
+      const game =
+        GameCenter.chess;
+
+      if (
+        game &&
+        !game.finished
+      ) {
+        game.finished =
+          true;
+
+        game.message =
+          game.mode === "galaxy"
+            ? "🤖 GALAXY Wins!"
+            : "🏆 Friend Wins!";
+
+        renderChess();
+      }
+
+      return;
+    }
+
+
+    const tttCell =
+      target.closest(
+        "[data-ttt-cell]"
+      );
+
+    if (tttCell) {
+      clickTTT(
+        Number(
+          tttCell.dataset.tttCell
+        )
+      );
+
+      return;
+    }
+
+    if (
+      target.closest(
+        "[data-ttt-hint]"
+      )
+    ) {
+      tttHint();
+      return;
+    }
+
+    if (
+      target.closest(
+        "[data-ttt-undo]"
+      )
+    ) {
+      tttUndo();
+      return;
+    }
+
+    if (
+      target.closest(
+        "[data-ttt-review]"
+      )
+    ) {
+      tttReview();
+      return;
+    }
+
+    if (
+      target.closest(
+        "[data-ttt-reset]"
+      )
+    ) {
+      resetTTT();
+      return;
+    }
+
+    if (
+      target.closest(
+        "[data-ttt-resign]"
+      )
+    ) {
+      const game =
+        GameCenter.ttt;
+
+      if (
+        game &&
+        !game.finished
+      ) {
+        game.finished =
+          true;
+
+        game.message =
+          game.mode === "galaxy"
+            ? "🤖 GALAXY Wins!"
+            : "🏆 Friend Wins!";
+
+        renderTTT();
+      }
+
+      return;
+    }
+
+
+    const connectCell =
+      target.closest(
+        "[data-connect-col]"
+      );
+
+    if (connectCell) {
+      clickConnect(
+        Number(
+          connectCell.dataset.connectCol
+        )
+      );
+
+      return;
+    }
+
+    if (
+      target.closest(
+        "[data-connect-hint]"
+      )
+    ) {
+      connectHint();
+      return;
+    }
+
+    if (
+      target.closest(
+        "[data-connect-undo]"
+      )
+    ) {
+      connectUndo();
+      return;
+    }
+
+    if (
+      target.closest(
+        "[data-connect-review]"
+      )
+    ) {
+      connectReview();
+      return;
+    }
+
+    if (
+      target.closest(
+        "[data-connect-reset]"
+      )
+    ) {
+      resetConnect();
+      return;
+    }
+
+    if (
+      target.closest(
+        "[data-connect-resign]"
+      )
+    ) {
+      const game =
+        GameCenter.connect;
+
+      if (
+        game &&
+        !game.finished
+      ) {
+        game.finished =
+          true;
+
+        game.message =
+          game.mode === "galaxy"
+            ? "🤖 GALAXY Wins!"
+            : "🏆 Friend Wins!";
+
+        renderConnect();
+      }
+
+      return;
+    }
+
+
+    const memoryCard =
+      target.closest(
+        "[data-memory-card]"
+      );
+
+    if (memoryCard) {
+      memorySelectCard(
+        Number(
+          memoryCard
+            .dataset
+            .memoryCard
+        )
+      );
+
+      return;
+    }
+
+    if (
+      target.closest(
+        "[data-memory-hint]"
+      )
+    ) {
+      memoryHint();
+      return;
+    }
+
+    if (
+      target.closest(
+        "[data-memory-review]"
+      )
+    ) {
+      memoryReview();
+      return;
+    }
+
+    if (
+      target.closest(
+        "[data-memory-reset]"
+      )
+    ) {
+      resetMemory();
+      return;
+    }
+
+
+    if (
+      target.closest(
+        "[data-shooter-start]"
+      )
+    ) {
+      if (
+        GameCenter
+          .shooter
+          ?.finished
+      ) {
+        resetShooter();
+
+        setTimeout(
+          shooterStart,
+          50
+        );
+
+      } else {
+        shooterStart();
+      }
+
+      return;
+    }
+
+    if (
+      target.closest(
+        "[data-shooter-end]"
+      )
+    ) {
+      finishShooter();
+      return;
+    }
+
+    if (
+      target.closest(
+        "[data-shooter-review]"
+      )
+    ) {
+      shooterReview();
+      return;
+    }
+
+    if (
+      target.closest(
+        "[data-shoot-target]"
+      )
+    ) {
+      event.stopPropagation();
+
+      shooterHit();
+      return;
+    }
+
+    if (
+      target.closest(
+        "[data-shooter-arena]"
+      )
+    ) {
+      shooterMiss();
+      return;
+    }
+  }
+);
+
+
+/* =========================================================
+   GAME MODE / LEVEL CHANGES
+   ========================================================= */
+
+document.addEventListener(
+  "change",
+  event => {
+
+    if (
+      event.target.matches(
+        "[data-game-mode]"
+      )
+    ) {
+      const game =
+        currentGameObject();
+
+      if (!game) return;
+
+      game.mode =
+        event.target.value;
+
+      resetCurrentGame();
+
+      return;
+    }
+
+
+    if (
+      event.target.matches(
+        "[data-game-level]"
+      )
+    ) {
+      const game =
+        currentGameObject();
+
+      if (!game) return;
+
+      game.elo =
+        Number(
+          event.target.value
+        );
+
+      rerenderCurrentGame();
+    }
+  }
+);
+
+
+/* =========================================================
+   PROMPT INPUT
+   ========================================================= */
+
+function initializePromptInput() {
+  const input =
+    $("#promptInput");
+
+  if (!input) return;
+
+  input.addEventListener(
+    "input",
+    () =>
+      autoResize(input)
+  );
+
+  input.addEventListener(
+    "keydown",
+    event => {
+
+      if (
+        event.key === "Enter" &&
+        !event.shiftKey
+      ) {
+        event.preventDefault();
+
+        sendMessage();
+      }
+    }
+  );
+}
+
+
+/* =========================================================
+   SEND BUTTON — DIRECT BACKUP
+   ========================================================= */
+
+function initializeSendButton() {
+  const button =
+    $("#sendButton");
+
+  if (!button) return;
+
+  button.type =
+    "button";
+
+  button.onclick =
+    event => {
+
+      event.preventDefault();
+      event.stopPropagation();
+
+      sendMessage();
+    };
+}
+
+
+/* =========================================================
+   WORK MODE INITIALIZATION
+   ========================================================= */
+
+function initializeWork() {
+  const input =
+    $("#workPrompt");
+
+  if (input) {
+    input.addEventListener(
+      "keydown",
+      event => {
+
+        if (
+          event.key === "Enter" &&
+          (
+            event.ctrlKey ||
+            event.metaKey
+          )
+        ) {
+          event.preventDefault();
+
+          sendWork();
+        }
+      }
+    );
   }
 
-  const openAIOption =
+  const button =
+    $(
+      "#workSend, " +
+      "[data-work-send]"
+    );
+
+  if (button) {
+    button.addEventListener(
+      "click",
+      sendWork
+    );
+  }
+}
+
+
+/* =========================================================
+   GEMINI ONLY
+   ========================================================= */
+
+function forceGeminiOnly() {
+  const provider =
+    $("#aiProvider");
+
+  if (!provider) return;
+
+  const openAI =
     provider.querySelector(
       'option[value="openai"]'
     );
 
-  if (openAIOption) {
-    openAIOption.remove();
+  if (openAI) {
+    openAI.remove();
   }
 
-  provider.value = "gemini";
-  provider.disabled = true;
+  provider.value =
+    "gemini";
+
+  provider.disabled =
+    true;
 
   provider.title =
     "GALAXY AI powered by Gemini";
 }
 
-if (document.readyState === "loading") {
+
+/* =========================================================
+   INITIALIZE GALAXY
+   ========================================================= */
+
+function initializeGalaxy() {
+  forceGeminiOnly();
+
+  initializePromptInput();
+
+  initializeSendButton();
+
+  initializeWork();
+
+  updateSendButtonState();
+
+  const input =
+    $("#promptInput");
+
+  if (input) {
+    autoResize(input);
+  }
+
+  console.log(
+    "GALAXY AI initialized — Gemini only"
+  );
+}
+
+
+/* =========================================================
+   START
+   ========================================================= */
+
+if (
+  document.readyState ===
+  "loading"
+) {
   document.addEventListener(
     "DOMContentLoaded",
-    forceGalaxyGemini
+    initializeGalaxy
   );
+
 } else {
-  forceGalaxyGemini();
+  initializeGalaxy();
 }
+
+
+/* =========================================================
+   GALAXY GLOBAL API
+   ========================================================= */
+
+window.GALAXY = {
+  state,
+
+  games:
+    GameCenter,
+
+  newChat,
+
+  sendMessage,
+
+  sendWork,
+
+  openGames:
+    renderGames,
+
+  openChess:
+    () => resetChess(),
+
+  openTicTacToe:
+    () => resetTTT(),
+
+  openConnectFour:
+    () => resetConnect(),
+
+  openMemory:
+    () => resetMemory(),
+
+  openShooter:
+    () => resetShooter()
+};
+
+
+/* =========================================================
+   END OF GALAXY AI SCRIPT.JS
+   PART 1 + PART 2 = COMPLETE SCRIPT
+   ========================================================= */
