@@ -7722,22 +7722,9 @@ return {};
 
 
 function openPals() {
-
-if (
-window.GALAXY_PALS_3D?.openPals
-) {
-
-return window.GALAXY_PALS_3D.openPals();
-
+  window.location.href =
+    "https://galaxy-csxwhhb4q-harshavardhan5.vercel.app";
 }
-
-toast(
-"GALAXY PALS 3D is loading…"
-);
-
-}
-
-
 function startPals() {
 
 if (
