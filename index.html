@@ -14,6 +14,16 @@
     content="#0b0d10"
   >
 
+  <meta
+    name="color-scheme"
+    content="dark light"
+  >
+
+  <meta
+    name="description"
+    content="GALAXY AI — chat, work, projects, library, packs, images, sites, GPTs and AI tools."
+  >
+
   <title>GALAXY AI</title>
 
   <link
@@ -25,50 +35,100 @@
 
 <body>
 
+  <!-- ======================================================
+       GALAXY AI
+       MAIN APPLICATION
+  ======================================================= -->
+
   <div
     id="app"
     class="app-shell"
   >
 
 
-    <!-- =========================
+    <!-- ====================================================
          SIDEBAR
-         ========================= -->
+    ===================================================== -->
 
     <aside
       id="sidebar"
       class="sidebar"
+      aria-label="GALAXY navigation"
     >
+
+
+      <!-- ==================================================
+           SIDEBAR TOP
+      =================================================== -->
 
       <div class="sidebar-header">
 
+
+        <!-- BRAND -->
+
         <button
           class="brand"
-          type="button"
-          data-action="new-chat"
+          data-action="home"
+          aria-label="GALAXY AI home"
         >
-          <span class="brand-mark">
+
+          <span
+            class="brand-mark"
+            aria-hidden="true"
+          >
             ✦
           </span>
 
           <span class="brand-name">
             GALAXY AI
           </span>
+
+          <span
+            class="brand-caret"
+            aria-hidden="true"
+          >
+            ⌄
+          </span>
+
+        </button>
+
+
+        <!-- CLOSE SIDEBAR -->
+
+        <button
+          class="icon-btn sidebar-close"
+          data-action="toggle-sidebar"
+          aria-label="Close sidebar"
+          title="Close sidebar"
+        >
+          ‹
         </button>
 
       </div>
 
 
-      <nav class="sidebar-nav">
 
+      <!-- ==================================================
+           PRIMARY NAVIGATION
+      =================================================== -->
+
+      <nav
+        class="sidebar-nav"
+        aria-label="Main navigation"
+      >
+
+
+        <!-- NEW CHAT -->
 
         <button
           class="nav-row"
-          type="button"
           data-action="new-chat"
         >
 
-          <span class="nav-icon">
+          <span
+            class="nav-icon"
+            aria-hidden="true"
+          >
             ＋
           </span>
 
@@ -80,31 +140,50 @@
 
 
 
+        <!-- SEARCH -->
+
         <button
           class="nav-row"
-          type="button"
-          data-view="games"
+          data-action="search"
         >
 
-          <span class="nav-icon">
-            ♛
+          <span
+            class="nav-icon"
+            aria-hidden="true"
+          >
+            ⌕
           </span>
 
           <span class="nav-label">
-            Gaming Center
+            Search
+          </span>
+
+          <span class="nav-key">
+            Ctrl K
           </span>
 
         </button>
 
 
 
+        <div
+          class="nav-gap"
+          aria-hidden="true"
+        ></div>
+
+
+
+        <!-- PROJECTS -->
+
         <button
           class="nav-row"
-          type="button"
           data-view="projects"
         >
 
-          <span class="nav-icon">
+          <span
+            class="nav-icon"
+            aria-hidden="true"
+          >
             ▱
           </span>
 
@@ -112,17 +191,28 @@
             Projects
           </span>
 
+          <span
+            class="nav-arrow"
+            aria-hidden="true"
+          >
+            ›
+          </span>
+
         </button>
 
 
 
+        <!-- LIBRARY -->
+
         <button
           class="nav-row"
-          type="button"
           data-view="library"
         >
 
-          <span class="nav-icon">
+          <span
+            class="nav-icon"
+            aria-hidden="true"
+          >
             ▣
           </span>
 
@@ -130,37 +220,277 @@
             Library
           </span>
 
+          <span
+            class="nav-arrow"
+            aria-hidden="true"
+          >
+            ›
+          </span>
+
         </button>
 
 
+
+        <!-- SCHEDULED -->
 
         <button
           class="nav-row"
-          type="button"
-          data-view="studio"
+          data-view="scheduled"
         >
 
-          <span class="nav-icon">
-            ◫
+          <span
+            class="nav-icon"
+            aria-hidden="true"
+          >
+            ◷
           </span>
 
           <span class="nav-label">
-            Create Studio
+            Scheduled
+          </span>
+
+          <span
+            class="nav-arrow"
+            aria-hidden="true"
+          >
+            ›
           </span>
 
         </button>
 
+
+
+        <!-- PLUGINS -->
+
+        <button
+          class="nav-row"
+          data-view="plugins"
+        >
+
+          <span
+            class="nav-icon"
+            aria-hidden="true"
+          >
+            ◉
+          </span>
+
+          <span class="nav-label">
+            Plugins
+          </span>
+
+          <span
+            class="nav-arrow"
+            aria-hidden="true"
+          >
+            ›
+          </span>
+
+        </button>
+
+
+
+        <!-- ==================================================
+             MORE
+        =================================================== -->
+
+        <div class="more-wrap">
+
+
+          <button
+            class="nav-row"
+            data-action="toggle-more"
+            aria-expanded="false"
+            aria-controls="moreMenu"
+          >
+
+            <span
+              class="nav-icon"
+              aria-hidden="true"
+            >
+              ⋯
+            </span>
+
+            <span class="nav-label">
+              More
+            </span>
+
+            <span
+              class="nav-arrow"
+              aria-hidden="true"
+            >
+              ›
+            </span>
+
+          </button>
+
+
+
+          <!-- MORE MENU -->
+
+          <div
+            id="moreMenu"
+            class="more-menu"
+            hidden
+          >
+
+
+            <!-- PACKS -->
+
+            <button
+              class="menu-row"
+              data-view="packs"
+            >
+
+              <span
+                class="menu-icon"
+                aria-hidden="true"
+              >
+                ▦
+              </span>
+
+              <span>
+                Packs
+              </span>
+
+            </button>
+
+
+
+            <!-- IMAGES -->
+
+            <button
+              class="menu-row"
+              data-view="images"
+            >
+
+              <span
+                class="menu-icon"
+                aria-hidden="true"
+              >
+                ◫
+              </span>
+
+              <span>
+                Images
+              </span>
+
+            </button>
+
+
+
+            <!-- SITES -->
+
+            <button
+              class="menu-row"
+              data-view="sites"
+            >
+
+              <span
+                class="menu-icon"
+                aria-hidden="true"
+              >
+                ⌘
+              </span>
+
+              <span>
+                Sites
+              </span>
+
+            </button>
+
+
+
+            <!-- GPTS -->
+
+            <button
+              class="menu-row"
+              data-view="gpts"
+            >
+
+              <span
+                class="menu-icon"
+                aria-hidden="true"
+              >
+                ✧
+              </span>
+
+              <span>
+                GPTs
+              </span>
+
+            </button>
+
+
+
+            <!-- TOOLS -->
+
+            <button
+              class="menu-row"
+              data-view="tools"
+            >
+
+              <span
+                class="menu-icon"
+                aria-hidden="true"
+              >
+                ⌁
+              </span>
+
+              <span>
+                Tools
+              </span>
+
+            </button>
+
+          </div>
+
+        </div>
 
       </nav>
 
 
+
+      <!-- ==================================================
+           RECENT CHATS
+      =================================================== -->
+
+      <section
+        class="recent-section"
+        aria-label="Recent chats"
+      >
+
+        <div class="section-label">
+          Recent
+        </div>
+
+        <div
+          id="recentChats"
+          class="recent-list"
+        ></div>
+
+      </section>
+
+
+
+      <!-- ==================================================
+           SIDEBAR PROFILE
+      =================================================== -->
+
       <div class="sidebar-footer">
 
-        <div class="profile-row">
 
-          <span class="avatar">
+        <button
+          class="profile-row"
+          data-action="settings"
+        >
+
+          <span
+            class="avatar"
+            aria-hidden="true"
+          >
             G
           </span>
+
 
           <span class="profile-copy">
 
@@ -174,53 +504,99 @@
 
           </span>
 
-        </div>
+
+          <span
+            class="nav-arrow"
+            aria-hidden="true"
+          >
+            ›
+          </span>
+
+        </button>
 
       </div>
-
 
     </aside>
 
 
 
-    <!-- =========================
-         MAIN
-         ========================= -->
+    <!-- ====================================================
+         MAIN SHELL
+    ===================================================== -->
 
     <main class="main-shell">
 
 
-      <!-- TOP BAR -->
+      <!-- ==================================================
+           TOP BAR
+      =================================================== -->
 
       <header class="topbar">
 
+
+        <!-- TOP LEFT -->
+
         <div class="topbar-left">
+
+
+          <button
+            class="icon-btn sidebar-open"
+            data-action="toggle-sidebar"
+            aria-label="Open sidebar"
+            title="Open sidebar"
+          >
+            ☰
+          </button>
+
 
           <button
             class="top-brand"
-            type="button"
-            data-action="new-chat"
+            data-action="home"
           >
-            GALAXY AI
+
+            <span>
+              GALAXY AI
+            </span>
+
+            <span
+              class="top-brand-arrow"
+              aria-hidden="true"
+            >
+              ⌄
+            </span>
+
           </button>
 
         </div>
 
 
-        <div class="mode-tabs">
+
+        <!-- ==================================================
+             CHAT / WORK
+        =================================================== -->
+
+        <div
+          class="mode-tabs"
+          role="tablist"
+          aria-label="GALAXY mode"
+        >
+
 
           <button
             class="mode-tab active"
-            type="button"
-            onclick="setView('chat')"
+            data-mode="chat"
+            role="tab"
+            aria-selected="true"
           >
             Chat
           </button>
 
+
           <button
             class="mode-tab"
-            type="button"
-            onclick="setView('work')"
+            data-mode="work"
+            role="tab"
+            aria-selected="false"
           >
             Work
           </button>
@@ -228,20 +604,69 @@
         </div>
 
 
+
+        <!-- TOP RIGHT -->
+
         <div class="topbar-right">
+
+
+          <!-- COMMAND PALETTE -->
 
           <button
             class="icon-btn"
-            type="button"
+            data-action="command"
+            aria-label="Command palette"
+            title="Command palette"
           >
             ⌘
           </button>
 
+
+
+          <!-- FOCUS -->
+
           <button
             class="icon-btn"
-            type="button"
+            data-action="focus"
+            aria-label="Focus mode"
+            title="Focus mode"
           >
-            ◔
+            ◌
+          </button>
+
+
+
+          <!-- NOTIFICATIONS -->
+
+          <button
+            class="icon-btn notification-button"
+            data-action="notifications"
+            aria-label="Notifications"
+            title="Notifications"
+          >
+
+            <span aria-hidden="true">
+              ◔
+            </span>
+
+            <span
+              class="notification-dot"
+              aria-hidden="true"
+            ></span>
+
+          </button>
+
+
+
+          <!-- SHARE -->
+
+          <button
+            class="icon-btn"
+            data-action="share"
+            aria-label="Share"
+            title="Share"
+          >
+            ↗
           </button>
 
         </div>
@@ -250,15 +675,18 @@
 
 
 
-      <!-- =========================
+      <!-- ==================================================
            CHAT VIEW
-           ========================= -->
+      =================================================== -->
 
       <section
         id="chatView"
         class="view active-view"
+        aria-label="Chat"
       >
 
+
+        <!-- CHAT SCROLLER -->
 
         <div
           id="chatScroller"
@@ -266,14 +694,23 @@
         >
 
 
+          <!-- ==================================================
+               EMPTY CHAT
+          =================================================== -->
+
           <section
-            id="chatEmpty"
+            id="emptyState"
             class="empty-state"
           >
 
-            <div class="empty-logo">
+
+            <div
+              class="empty-logo"
+              aria-hidden="true"
+            >
               ✦
             </div>
+
 
             <h1>
               What can I help with?
@@ -282,95 +719,212 @@
           </section>
 
 
+
+          <!-- ==================================================
+               CHAT MESSAGES
+          =================================================== -->
+
           <div
             id="messages"
             class="messages"
+            aria-live="polite"
+            aria-relevant="additions"
           ></div>
-
 
         </div>
 
 
 
+        <!-- ==================================================
+             TOOL ACTIVITY
+        =================================================== -->
+
+        <div
+          id="toolActivity"
+          class="tool-activity"
+          hidden
+          aria-live="polite"
+        >
+
+          <span
+            class="tool-activity-spinner"
+            aria-hidden="true"
+          ></span>
+
+          <span id="toolActivityText">
+            Thinking…
+          </span>
+
+        </div>
+
+
+
+        <!-- ==================================================
+             COMPOSER AREA
+        =================================================== -->
+
         <div class="composer-dock">
 
 
-          <div class="composer">
+          <!-- DRAG AND DROP -->
 
+          <div
+            id="dropHint"
+            class="drop-hint"
+          >
+
+            <span
+              class="drop-icon"
+              aria-hidden="true"
+            >
+              ＋
+            </span>
+
+            <span>
+              Drop files here
+            </span>
+
+          </div>
+
+
+
+          <!-- ATTACHMENTS -->
+
+          <div
+            id="attachmentStrip"
+            class="attachment-strip"
+            hidden
+          ></div>
+
+
+
+          <!-- ==================================================
+               MAIN MESSAGE BOX
+          =================================================== -->
+
+          <div
+            id="composer"
+            class="composer"
+          >
+
+
+            <!-- PLUS -->
 
             <button
-              class="composer-icon"
-              type="button"
+              class="composer-icon composer-plus"
+              data-action="attach"
+              aria-label="Add files"
+              title="Add files"
             >
               ＋
             </button>
 
+<select
+  id="aiProvider"
+  class="ai-provider-select"
+  aria-label="Choose AI"
+>
+  <option value="openai">OpenAI</option>
+  <option value="gemini">Gemini</option>
+</select>
 
-
-            <select
-              id="aiProvider"
-              class="ai-provider-select"
-            >
-
-              <option
-                value="gemini"
-                selected
-              >
-                GALAXY
-              </option>
-
-            </select>
-
-
+            <!-- MESSAGE -->
 
             <textarea
               id="promptInput"
               rows="1"
+              maxlength="50000"
               placeholder="Ask anything"
+              aria-label="Message GALAXY AI"
+              autocomplete="off"
+              spellcheck="true"
             ></textarea>
 
 
 
+            <!-- WEB SEARCH -->
+
             <button
               class="composer-icon"
-              type="button"
+              data-action="web-search"
+              aria-label="Search the web"
+              title="Search the web"
             >
               ⌕
             </button>
 
 
 
+            <!-- IMAGE -->
+
             <button
               class="composer-icon"
-              type="button"
+              data-action="image"
+              aria-label="Add or create image"
+              title="Images"
             >
               ◫
             </button>
 
 
 
+            <!-- VIDEO -->
+
             <button
               class="composer-icon"
-              type="button"
+              data-action="video"
+              aria-label="Add or create video"
+              title="Videos"
             >
-              ◉
+              ▷
             </button>
 
 
+
+            <!-- VOICE -->
+
+            <button
+              class="composer-icon voice-button"
+              data-action="voice"
+              aria-label="Voice"
+              title="Voice"
+            >
+
+              <span
+                class="voice-idle-icon"
+                aria-hidden="true"
+              >
+                ◉
+              </span>
+
+              <span
+                class="voice-recording-icon"
+                aria-hidden="true"
+              >
+                ■
+              </span>
+
+            </button>
+
+
+
+            <!-- SEND / STOP -->
 
             <button
               id="sendButton"
               class="send-arrow"
-              type="button"
               data-action="send"
+              aria-label="Send"
+              title="Send"
             >
               ↑
             </button>
 
-
           </div>
 
 
+
+          <!-- COMPOSER FOOTNOTE -->
 
           <div class="composer-footer">
 
@@ -379,137 +933,255 @@
             </span>
 
             <span class="composer-hint">
-              GALAXY can make mistakes.
-              Check important information.
+              GALAXY can make mistakes. Check important information.
             </span>
 
           </div>
 
-
         </div>
-
 
       </section>
 
 
 
-      <!-- =========================
+      <!-- ==================================================
            WORK VIEW
-           ========================= -->
+      =================================================== -->
 
       <section
         id="workView"
         class="view"
+        aria-label="Work"
       >
 
 
         <div class="workbench">
 
 
+          <!-- ==================================================
+               WORK CHAT PANE
+          =================================================== -->
+
           <section class="work-chat-pane">
 
 
             <header class="pane-head">
 
-              <strong>
-                ✦ GALAXY Work
-              </strong>
+              <div class="pane-title">
+
+                <span
+                  class="pane-title-icon"
+                  aria-hidden="true"
+                >
+                  ✦
+                </span>
+
+                <span>
+                  GALAXY
+                </span>
+
+              </div>
+
+
+              <span class="live-status">
+                Work
+              </span>
 
             </header>
 
 
 
             <div
-              id="workOutput"
+              id="workMessages"
               class="work-messages"
-            >
-
-              Ask GALAXY to work on
-              documents, websites,
-              code or plans.
-
-            </div>
+              aria-live="polite"
+            ></div>
 
 
+
+            <!-- WORK COMPOSER -->
 
             <div class="work-composer">
-
 
               <textarea
                 id="workPrompt"
                 rows="1"
-                placeholder="Ask GALAXY to create or change something..."
+                placeholder="Ask GALAXY to change the work..."
+                aria-label="Work message"
               ></textarea>
 
 
               <button
-                id="workSend"
                 class="send-arrow"
-                type="button"
-                data-action="work-send"
+                data-action="send-work"
+                aria-label="Send work request"
               >
                 ↑
               </button>
 
-
             </div>
-
 
           </section>
 
 
+
+          <!-- SPLITTER -->
+
+          <div
+            id="workSplitter"
+            class="splitter"
+            role="separator"
+            tabindex="0"
+            aria-label="Resize work panels"
+          ></div>
+
+
+
+          <!-- ==================================================
+               WORK PREVIEW PANE
+          =================================================== -->
 
           <section class="preview-pane">
 
 
             <header class="pane-head">
 
-              <strong>
-                Preview
-              </strong>
+
+              <!-- PREVIEW TABS -->
+
+              <div
+                class="preview-tabs"
+                role="tablist"
+              >
+
+
+                <button
+                  class="preview-tab active"
+                  data-preview="preview"
+                  role="tab"
+                  aria-selected="true"
+                >
+                  Preview
+                </button>
+
+
+                <button
+                  class="preview-tab"
+                  data-preview="code"
+                  role="tab"
+                  aria-selected="false"
+                >
+                  Code
+                </button>
+
+
+                <button
+                  class="preview-tab"
+                  data-preview="files"
+                  role="tab"
+                  aria-selected="false"
+                >
+                  Files
+                </button>
+
+              </div>
+
+
+
+              <!-- PREVIEW ACTIONS -->
+
+              <div class="pane-actions">
+
+
+                <button
+                  class="icon-btn"
+                  data-action="refresh-preview"
+                  aria-label="Refresh preview"
+                  title="Refresh"
+                >
+                  ↻
+                </button>
+
+
+                <button
+                  class="icon-btn"
+                  data-action="fullscreen-preview"
+                  aria-label="Fullscreen preview"
+                  title="Fullscreen"
+                >
+                  ⛶
+                </button>
+
+              </div>
 
             </header>
 
 
-            <div class="preview-surface">
+
+            <!-- PREVIEW -->
+
+            <div
+              id="previewSurface"
+              class="preview-surface"
+            >
+
 
               <div class="preview-empty">
 
-                <span class="preview-empty-icon">
+                <span
+                  class="preview-empty-icon"
+                  aria-hidden="true"
+                >
                   ✦
                 </span>
+
 
                 <h2>
                   Work on anything
                 </h2>
 
+
+                <p>
+                  Documents, websites, code, plans and creative work.
+                </p>
+
               </div>
 
             </div>
 
-
           </section>
 
-
         </div>
-
 
       </section>
 
 
 
-      <!-- =========================
-           CONTENT / GAMING VIEW
-           ========================= -->
+      <!-- ==================================================
+           DYNAMIC CONTENT VIEW
+
+           Projects
+           Library
+           Scheduled
+           Plugins
+           Packs
+           Images
+           Sites
+           GPTs
+           Tools
+      =================================================== -->
 
       <section
         id="contentView"
         class="view"
+        aria-label="Workspace"
       >
 
 
         <div class="content-shell">
 
+
+          <!-- CONTENT HEADER -->
 
           <header class="content-head">
 
@@ -520,58 +1192,182 @@
                 id="contentEyebrow"
                 class="content-eyebrow"
               >
-                GALAXY
+                Workspace
               </p>
 
 
               <h1 id="contentTitle">
-                GALAXY
+                Library
               </h1>
 
             </div>
 
 
+
+            <div
+              id="contentActions"
+              class="content-actions"
+            ></div>
+
           </header>
 
 
+
+          <!-- ==================================================
+               CLEAN FLAT TABS
+          =================================================== -->
+
+          <div
+            id="contentTabs"
+            class="flat-tabs"
+            role="tablist"
+          ></div>
+
+
+
+          <!-- CONTENT -->
 
           <div
             id="contentBody"
             class="content-body"
           ></div>
 
-
         </div>
-
 
       </section>
 
-
     </main>
-
 
   </div>
 
 
 
-  <!-- =========================
-       GLOBAL UI
-       ========================= -->
+  <!-- ======================================================
+       FILE INPUTS
+  ======================================================= -->
 
-  <div id="toastRoot"></div>
+
+  <!-- GENERAL FILES -->
+
+  <input
+    id="fileInput"
+    type="file"
+    multiple
+    hidden
+  >
+
+
+
+  <!-- IMAGES -->
+
+  <input
+    id="imageInput"
+    type="file"
+    accept="image/*"
+    multiple
+    hidden
+  >
+
+
+
+  <!-- VIDEOS -->
+
+  <input
+    id="videoInput"
+    type="file"
+    accept="video/*"
+    multiple
+    hidden
+  >
+
+
+
+  <!-- CONVERSATION IMPORT -->
+
+  <input
+    id="conversationImportInput"
+    type="file"
+    accept=".json,.galaxy.json,application/json"
+    hidden
+  >
+
+
+
+  <!-- LIBRARY IMPORT -->
+
+  <input
+    id="libraryInput"
+    type="file"
+    accept="image/*,video/*,.pdf,.txt,.md,.doc,.docx,.csv,.json,.html,.css,.js"
+    multiple
+    hidden
+  >
+
+
+
+  <!-- ======================================================
+       OVERLAYS
+  ======================================================= -->
 
   <div id="overlayRoot"></div>
 
-  <div id="contextMenuRoot"></div>
+
+
+  <!-- ======================================================
+       CONTEXT MENU ROOT
+  ======================================================= -->
+
+  <div
+    id="contextMenuRoot"
+    class="context-menu-root"
+  ></div>
 
 
 
-  <!-- =========================
-       SCRIPT
-       ========================= -->
+  <!-- ======================================================
+       TOASTS
+  ======================================================= -->
+
+  <div
+    id="toastRoot"
+    class="toast-root"
+    aria-live="polite"
+    aria-atomic="true"
+  ></div>
+
+
+
+  <!-- ======================================================
+       MOBILE BACKDROP
+  ======================================================= -->
+
+  <button
+    id="sidebarBackdrop"
+    class="sidebar-backdrop"
+    data-action="toggle-sidebar"
+    aria-label="Close sidebar"
+    hidden
+  ></button>
+
+
+
+  <!-- ======================================================
+       ACCESSIBILITY STATUS
+  ======================================================= -->
+
+  <div
+    id="statusRegion"
+    class="sr-only"
+    aria-live="polite"
+  ></div>
+
+
+
+  <!-- ======================================================
+       JAVASCRIPT
+  ======================================================= -->
 
   <script src="script.js"></script>
-
 
 </body>
 
