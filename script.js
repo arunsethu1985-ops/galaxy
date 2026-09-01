@@ -13542,3 +13542,2088 @@ openPalsHome();
 
 
 })();
+/* ============================================================
+   GALAXY FINAL UPDATE
+   - REMOVE PALS
+   - REMOVE GUN / ARENA GAME
+   - ADD NOKIA RETRO CAR RACING
+   - 20 SECOND AI RESPONSE LIMIT
+============================================================ */
+
+
+/* ============================================================
+   AI — MAXIMUM 20 SECOND WAIT
+============================================================ */
+
+fetchAIResponse = async function (
+  message,
+  includeHistory = true
+) {
+
+  const creatorContext =
+    "You are GALAXY AI. " +
+    "GALAXY AI was created and founded by Harshavardhan. " +
+    "If asked who created, made, founded, designed or owns GALAXY AI, " +
+    "answer: Harshavardhan created GALAXY AI. " +
+    "GALAXY uses Gemini through an API for AI responses. " +
+    "Answer quickly, clearly and concisely.";
+
+  const payload = {
+
+    message,
+
+    prompt:
+      message,
+
+    mode:
+      includeHistory
+        ? "chat"
+        : "work",
+
+    system:
+      creatorContext,
+
+    messages: [
+
+      {
+        role:
+          "system",
+
+        content:
+          creatorContext
+      },
+
+      ...(
+        includeHistory &&
+        typeof state !== "undefined"
+          ? state.messages
+              .slice(0, -1)
+              .slice(-12)
+              .map(
+                item => ({
+                  role:
+                    item.role,
+
+                  content:
+                    item.text
+                })
+              )
+          : []
+      ),
+
+      {
+        role:
+          "user",
+
+        content:
+          message
+      }
+
+    ]
+
+  };
+
+
+  const controller =
+    new AbortController();
+
+
+  const timeout =
+    setTimeout(
+      () => {
+        controller.abort();
+      },
+      20000
+    );
+
+
+  try {
+
+    const response =
+      await fetch(
+        "/api/gemini",
+        {
+
+          method:
+            "POST",
+
+          headers: {
+
+            "Content-Type":
+              "application/json"
+
+          },
+
+          signal:
+            controller.signal,
+
+          body:
+            JSON.stringify(
+              payload
+            )
+
+        }
+      );
+
+
+    const data =
+      await response
+        .json()
+        .catch(
+          () => ({})
+        );
+
+
+    if (
+      !response.ok
+    ) {
+
+      throw new Error(
+
+        data.error ||
+        data.message ||
+        `Backend error ${response.status}`
+
+      );
+
+    }
+
+
+    return (
+
+      data.text ||
+
+      data.reply ||
+
+      data.output ||
+
+      data.response ||
+
+      data.message ||
+
+      "GALAXY received your request."
+
+    );
+
+  } catch (
+    error
+  ) {
+
+    if (
+      error.name ===
+      "AbortError"
+    ) {
+
+      throw new Error(
+        "GALAXY took longer than 20 seconds. Please try again."
+      );
+
+    }
+
+
+    throw error;
+
+  } finally {
+
+    clearTimeout(
+      timeout
+    );
+
+  }
+
+};
+
+
+/* ============================================================
+   GAMING CENTER
+============================================================ */
+
+renderGames = function () {
+
+  if (
+    typeof cleanup3D ===
+    "function"
+  ) {
+
+    cleanup3D();
+
+  }
+
+
+  if (
+    typeof clearGameTimers ===
+    "function"
+  ) {
+
+    clearGameTimers();
+
+  }
+
+
+  if (
+    typeof GameCenter !==
+    "undefined"
+  ) {
+
+    GameCenter.current =
+      null;
+
+  }
+
+
+  const title =
+    document.querySelector(
+      "#contentTitle"
+    );
+
+  const eyebrow =
+    document.querySelector(
+      "#contentEyebrow"
+    );
+
+  const body =
+    document.querySelector(
+      "#contentBody"
+    );
+
+
+  if (title) {
+
+    title.textContent =
+      "Gaming Center";
+
+  }
+
+
+  if (eyebrow) {
+
+    eyebrow.textContent =
+      "PLAY WITH GALAXY";
+
+  }
+
+
+  if (!body) {
+
+    return;
+
+  }
+
+
+  body.innerHTML = `
+
+    <div class="games-home">
+
+      <div class="games-hero">
+
+        <div>
+
+          <span class="eyebrow">
+            GALAXY GAMING
+          </span>
+
+          <h2>
+            Choose a game
+          </h2>
+
+          <p>
+            Classic games and retro arcade challenges.
+          </p>
+
+        </div>
+
+        <div class="games-hero-mark">
+          ✦
+        </div>
+
+      </div>
+
+
+      <div class="games-grid">
+
+
+        ${gameCard(
+          "chess",
+          "♟",
+          "Chess",
+          "vs GALAXY or Friend • Levels • Review"
+        )}
+
+
+        ${gameCard(
+          "tictactoe",
+          "✕○",
+          "Tic-Tac-Toe",
+          "vs GALAXY or Friend"
+        )}
+
+
+        ${gameCard(
+          "connect4",
+          "●●",
+          "Connect Four",
+          "vs GALAXY or Friend"
+        )}
+
+
+        ${gameCard(
+          "memory",
+          "▦",
+          "Memory",
+          "Match pairs • Score"
+        )}
+
+
+        ${gameCard(
+          "snake",
+          "▰",
+          "Snake",
+          "Classic Nokia-style • High score"
+        )}
+
+
+        ${gameCard(
+          "chicken",
+          "🐔",
+          "Chicken Crossing",
+          "Cross the roads • Levels"
+        )}
+
+
+        ${gameCard(
+          "retrocar",
+          "▣",
+          "Retro Car Racing",
+          "Classic Nokia-style • Endless racing"
+        )}
+
+
+      </div>
+
+    </div>
+
+  `;
+
+};
+
+
+/* ============================================================
+   RETRO CAR VARIABLES
+============================================================ */
+
+let retroCarState =
+  null;
+
+let retroCarAnimation =
+  null;
+
+let retroCarPreviousTime =
+  0;
+
+
+const RETRO_CAR_HIGH_KEY =
+  "galaxy-retro-car-highscore";
+
+
+/* ============================================================
+   DEFAULT CAR STATE
+============================================================ */
+
+function createRetroCarState() {
+
+  return {
+
+    running:
+      false,
+
+    paused:
+      false,
+
+    crashed:
+      false,
+
+    lane:
+      1,
+
+    score:
+      0,
+
+    distance:
+      0,
+
+    level:
+      1,
+
+    speed:
+      280,
+
+    spawnTimer:
+      0,
+
+    enemies:
+      [],
+
+    highScore:
+      Number(
+        localStorage.getItem(
+          RETRO_CAR_HIGH_KEY
+        ) ||
+        0
+      )
+
+  };
+
+}
+
+
+/* ============================================================
+   OPEN RETRO CAR
+============================================================ */
+
+function openRetroCar() {
+
+  if (
+    typeof GameCenter !==
+    "undefined"
+  ) {
+
+    GameCenter.current =
+      "retrocar";
+
+  }
+
+
+  const title =
+    document.querySelector(
+      "#contentTitle"
+    );
+
+  const eyebrow =
+    document.querySelector(
+      "#contentEyebrow"
+    );
+
+  const body =
+    document.querySelector(
+      "#contentBody"
+    );
+
+
+  if (!body) {
+
+    return;
+
+  }
+
+
+  if (title) {
+
+    title.textContent =
+      "Retro Car Racing";
+
+  }
+
+
+  if (eyebrow) {
+
+    eyebrow.textContent =
+      "NOKIA-STYLE ARCADE";
+
+  }
+
+
+  body.innerHTML = `
+
+    <div
+      style="
+        width:min(100%,900px);
+        margin:0 auto;
+      "
+    >
+
+
+      <div
+        style="
+          display:flex;
+          justify-content:space-between;
+          align-items:center;
+          gap:12px;
+          margin-bottom:16px;
+          flex-wrap:wrap;
+        "
+      >
+
+        <button
+          class="secondary-btn"
+          data-retro-back
+        >
+          ← Games
+        </button>
+
+
+        <strong>
+          RETRO CAR RACING
+        </strong>
+
+
+        <button
+          class="secondary-btn"
+          data-retro-new
+        >
+          New Game
+        </button>
+
+      </div>
+
+
+      <div
+        style="
+          width:min(100%,520px);
+          margin:0 auto;
+          padding:18px;
+          border-radius:30px;
+          background:#252b2a;
+          box-shadow:
+            0 25px 70px
+            rgba(0,0,0,.40);
+        "
+      >
+
+
+        <div
+          id="retroCarScreen"
+          style="
+            position:relative;
+            width:100%;
+            aspect-ratio:9/13;
+            overflow:hidden;
+            border:8px solid #414945;
+            border-radius:15px;
+            background:#a8b77a;
+            color:#1d2b1e;
+            font-family:
+              'Courier New',
+              monospace;
+          "
+        >
+
+
+          <div
+            style="
+              position:absolute;
+              z-index:30;
+              top:10px;
+              left:12px;
+              right:12px;
+              display:flex;
+              justify-content:
+                space-between;
+              gap:6px;
+              font-weight:900;
+              font-size:13px;
+            "
+          >
+
+            <span
+              id="retroScore"
+            >
+              SCORE 0000
+            </span>
+
+
+            <span
+              id="retroLevel"
+            >
+              LV 1
+            </span>
+
+
+            <span
+              id="retroHigh"
+            >
+              HI 0000
+            </span>
+
+          </div>
+
+
+          <div
+            id="retroRoad"
+            style="
+              position:absolute;
+              left:11%;
+              right:11%;
+              top:44px;
+              bottom:8px;
+              overflow:hidden;
+              border-left:
+                5px solid #283a25;
+              border-right:
+                5px solid #283a25;
+              background:#8f9e6a;
+            "
+          >
+
+
+            <div
+              style="
+                position:absolute;
+                left:32%;
+                top:0;
+                bottom:0;
+                width:3px;
+                background:
+                  repeating-linear-gradient(
+                    to bottom,
+                    #31422b 0 25px,
+                    transparent 25px 52px
+                  );
+              "
+            ></div>
+
+
+            <div
+              style="
+                position:absolute;
+                left:66%;
+                top:0;
+                bottom:0;
+                width:3px;
+                background:
+                  repeating-linear-gradient(
+                    to bottom,
+                    #31422b 0 25px,
+                    transparent 25px 52px
+                  );
+              "
+            ></div>
+
+
+            <div
+              id="retroPlayer"
+              style="
+                position:absolute;
+                width:42px;
+                height:68px;
+                left:50%;
+                bottom:38px;
+                transform:
+                  translateX(-50%);
+                border:
+                  4px solid #21311e;
+                border-radius:6px;
+                background:#596c4c;
+                z-index:10;
+              "
+            >
+
+
+              <div
+                style="
+                  position:absolute;
+                  top:9px;
+                  left:7px;
+                  right:7px;
+                  height:18px;
+                  border:
+                    3px solid #21311e;
+                  background:#a8b77a;
+                "
+              ></div>
+
+
+              <div
+                style="
+                  position:absolute;
+                  left:-8px;
+                  top:12px;
+                  width:7px;
+                  height:18px;
+                  background:#21311e;
+                "
+              ></div>
+
+
+              <div
+                style="
+                  position:absolute;
+                  right:-8px;
+                  top:12px;
+                  width:7px;
+                  height:18px;
+                  background:#21311e;
+                "
+              ></div>
+
+
+              <div
+                style="
+                  position:absolute;
+                  left:-8px;
+                  bottom:10px;
+                  width:7px;
+                  height:18px;
+                  background:#21311e;
+                "
+              ></div>
+
+
+              <div
+                style="
+                  position:absolute;
+                  right:-8px;
+                  bottom:10px;
+                  width:7px;
+                  height:18px;
+                  background:#21311e;
+                "
+              ></div>
+
+
+            </div>
+
+
+          </div>
+
+
+          <div
+            id="retroMessage"
+            style="
+              position:absolute;
+              z-index:50;
+              inset:0;
+              display:grid;
+              place-items:center;
+              text-align:center;
+              padding:25px;
+              background:
+                rgba(
+                  168,
+                  183,
+                  122,
+                  .92
+                );
+              color:#1d2b1e;
+              font-weight:900;
+              font-size:25px;
+            "
+          >
+
+            <div>
+
+              RETRO CAR
+
+              <br>
+
+              <span
+                style="
+                  font-size:14px;
+                "
+              >
+                Press START
+              </span>
+
+            </div>
+
+          </div>
+
+
+        </div>
+
+
+        <div
+          style="
+            display:grid;
+            grid-template-columns:
+              repeat(3,58px);
+            grid-template-rows:
+              repeat(2,48px);
+            gap:8px;
+            justify-content:center;
+            margin-top:18px;
+          "
+        >
+
+
+          <button
+            data-retro-up
+            style="
+              grid-column:2;
+              grid-row:1;
+              border-radius:12px;
+              background:#404947;
+              color:white;
+              font-size:20px;
+            "
+          >
+            ▲
+          </button>
+
+
+          <button
+            data-retro-left
+            style="
+              grid-column:1;
+              grid-row:2;
+              border-radius:12px;
+              background:#404947;
+              color:white;
+              font-size:20px;
+            "
+          >
+            ◀
+          </button>
+
+
+          <button
+            data-retro-down
+            style="
+              grid-column:2;
+              grid-row:2;
+              border-radius:12px;
+              background:#404947;
+              color:white;
+              font-size:20px;
+            "
+          >
+            ▼
+          </button>
+
+
+          <button
+            data-retro-right
+            style="
+              grid-column:3;
+              grid-row:2;
+              border-radius:12px;
+              background:#404947;
+              color:white;
+              font-size:20px;
+            "
+          >
+            ▶
+          </button>
+
+
+        </div>
+
+
+        <div
+          style="
+            display:flex;
+            justify-content:center;
+            gap:10px;
+            flex-wrap:wrap;
+            margin-top:15px;
+          "
+        >
+
+
+          <button
+            class="primary-btn"
+            data-retro-start
+          >
+            START
+          </button>
+
+
+          <button
+            class="secondary-btn"
+            data-retro-pause
+          >
+            PAUSE
+          </button>
+
+
+        </div>
+
+
+        <p
+          style="
+            margin:
+              14px 0 0;
+            text-align:center;
+            color:#aaa;
+            font-size:12px;
+          "
+        >
+          Keyboard:
+          ← → steer •
+          ↑ accelerate •
+          ↓ brake •
+          Space pause
+        </p>
+
+
+      </div>
+
+
+    </div>
+
+  `;
+
+
+  retroCarState =
+    createRetroCarState();
+
+
+  bindRetroCarControls();
+
+
+  updateRetroCarHUD();
+
+}
+
+
+/* ============================================================
+   BIND CONTROLS
+============================================================ */
+
+function bindRetroCarControls() {
+
+
+  document
+    .querySelector(
+      "[data-retro-back]"
+    )
+    ?.addEventListener(
+      "click",
+      () => {
+
+        stopRetroCar();
+
+        renderGames();
+
+      }
+    );
+
+
+  document
+    .querySelector(
+      "[data-retro-new]"
+    )
+    ?.addEventListener(
+      "click",
+      resetRetroCar
+    );
+
+
+  document
+    .querySelector(
+      "[data-retro-start]"
+    )
+    ?.addEventListener(
+      "click",
+      startRetroCar
+    );
+
+
+  document
+    .querySelector(
+      "[data-retro-pause]"
+    )
+    ?.addEventListener(
+      "click",
+      toggleRetroPause
+    );
+
+
+  document
+    .querySelector(
+      "[data-retro-left]"
+    )
+    ?.addEventListener(
+      "click",
+      () => {
+        moveRetroCar(-1);
+      }
+    );
+
+
+  document
+    .querySelector(
+      "[data-retro-right]"
+    )
+    ?.addEventListener(
+      "click",
+      () => {
+        moveRetroCar(1);
+      }
+    );
+
+
+  document
+    .querySelector(
+      "[data-retro-up]"
+    )
+    ?.addEventListener(
+      "click",
+      speedRetroCarUp
+    );
+
+
+  document
+    .querySelector(
+      "[data-retro-down]"
+    )
+    ?.addEventListener(
+      "click",
+      speedRetroCarDown
+    );
+
+}
+
+
+/* ============================================================
+   START
+============================================================ */
+
+function startRetroCar() {
+
+
+  if (!retroCarState) {
+
+    retroCarState =
+      createRetroCarState();
+
+  }
+
+
+  if (
+    retroCarState.crashed
+  ) {
+
+    resetRetroCar();
+
+  }
+
+
+  retroCarState.running =
+    true;
+
+  retroCarState.paused =
+    false;
+
+
+  const message =
+    document.querySelector(
+      "#retroMessage"
+    );
+
+
+  if (message) {
+
+    message.style.display =
+      "none";
+
+  }
+
+
+  retroCarPreviousTime =
+    performance.now();
+
+
+  cancelAnimationFrame(
+    retroCarAnimation
+  );
+
+
+  retroCarAnimation =
+    requestAnimationFrame(
+      retroCarLoop
+    );
+
+}
+
+
+/* ============================================================
+   STOP
+============================================================ */
+
+function stopRetroCar() {
+
+  if (retroCarState) {
+
+    retroCarState.running =
+      false;
+
+  }
+
+
+  if (retroCarAnimation) {
+
+    cancelAnimationFrame(
+      retroCarAnimation
+    );
+
+  }
+
+
+  retroCarAnimation =
+    null;
+
+}
+
+
+/* ============================================================
+   RESET
+============================================================ */
+
+function resetRetroCar() {
+
+
+  stopRetroCar();
+
+
+  document
+    .querySelectorAll(
+      ".retro-enemy"
+    )
+    .forEach(
+      element => {
+        element.remove();
+      }
+    );
+
+
+  retroCarState =
+    createRetroCarState();
+
+
+  const player =
+    document.querySelector(
+      "#retroPlayer"
+    );
+
+
+  if (player) {
+
+    player.style.left =
+      "50%";
+
+  }
+
+
+  const message =
+    document.querySelector(
+      "#retroMessage"
+    );
+
+
+  if (message) {
+
+    message.style.display =
+      "grid";
+
+
+    message.innerHTML = `
+
+      <div>
+
+        RETRO CAR
+
+        <br>
+
+        <span
+          style="
+            font-size:14px;
+          "
+        >
+          Press START
+        </span>
+
+      </div>
+
+    `;
+
+  }
+
+
+  updateRetroCarHUD();
+
+}
+
+
+/* ============================================================
+   MOVE
+============================================================ */
+
+function moveRetroCar(
+  direction
+) {
+
+  if (!retroCarState) {
+
+    return;
+
+  }
+
+
+  retroCarState.lane =
+    Math.max(
+      0,
+      Math.min(
+        2,
+        retroCarState.lane +
+        direction
+      )
+    );
+
+
+  const positions = [
+    17,
+    50,
+    83
+  ];
+
+
+  const player =
+    document.querySelector(
+      "#retroPlayer"
+    );
+
+
+  if (player) {
+
+    player.style.left =
+      positions[
+        retroCarState.lane
+      ] +
+      "%";
+
+  }
+
+}
+
+
+/* ============================================================
+   SPEED
+============================================================ */
+
+function speedRetroCarUp() {
+
+  if (!retroCarState) {
+
+    return;
+
+  }
+
+
+  retroCarState.speed =
+    Math.min(
+      720,
+      retroCarState.speed +
+      45
+    );
+
+}
+
+
+function speedRetroCarDown() {
+
+  if (!retroCarState) {
+
+    return;
+
+  }
+
+
+  retroCarState.speed =
+    Math.max(
+      180,
+      retroCarState.speed -
+      55
+    );
+
+}
+
+
+/* ============================================================
+   PAUSE
+============================================================ */
+
+function toggleRetroPause() {
+
+
+  if (
+    !retroCarState ||
+    !retroCarState.running
+  ) {
+
+    return;
+
+  }
+
+
+  retroCarState.paused =
+    !retroCarState.paused;
+
+
+  const message =
+    document.querySelector(
+      "#retroMessage"
+    );
+
+
+  if (!message) {
+
+    return;
+
+  }
+
+
+  if (
+    retroCarState.paused
+  ) {
+
+    message.style.display =
+      "grid";
+
+    message.textContent =
+      "PAUSED";
+
+  } else {
+
+    message.style.display =
+      "none";
+
+    retroCarPreviousTime =
+      performance.now();
+
+  }
+
+}
+
+
+/* ============================================================
+   SPAWN ENEMY
+============================================================ */
+
+function spawnRetroEnemy() {
+
+
+  if (!retroCarState) {
+
+    return;
+
+  }
+
+
+  const road =
+    document.querySelector(
+      "#retroRoad"
+    );
+
+
+  if (!road) {
+
+    return;
+
+  }
+
+
+  const lane =
+    Math.floor(
+      Math.random() *
+      3
+    );
+
+
+  const positions = [
+    17,
+    50,
+    83
+  ];
+
+
+  const isTruck =
+    Math.random() <
+    0.17;
+
+
+  const enemy =
+    document.createElement(
+      "div"
+    );
+
+
+  enemy.className =
+    "retro-enemy";
+
+
+  enemy.style.cssText = `
+
+    position:absolute;
+
+    left:
+      ${positions[lane]}%;
+
+    top:-100px;
+
+    transform:
+      translateX(-50%);
+
+    width:
+      ${isTruck ? 50 : 40}px;
+
+    height:
+      ${isTruck ? 88 : 66}px;
+
+    border:
+      4px solid #21311e;
+
+    border-radius:
+      6px;
+
+    background:
+      #78895c;
+
+    z-index:8;
+
+  `;
+
+
+  enemy.innerHTML = `
+
+    <div
+      style="
+        position:absolute;
+        top:9px;
+        left:7px;
+        right:7px;
+        height:18px;
+        border:
+          3px solid #21311e;
+        background:#a8b77a;
+      "
+    ></div>
+
+  `;
+
+
+  road.appendChild(
+    enemy
+  );
+
+
+  retroCarState
+    .enemies
+    .push({
+
+      lane,
+
+      y:
+        -100,
+
+      speed:
+        retroCarState.speed *
+        (
+          .78 +
+          Math.random() *
+          .22
+        ),
+
+      element:
+        enemy
+
+    });
+
+}
+
+
+/* ============================================================
+   COLLISION
+============================================================ */
+
+function retroCollision(
+  enemy
+) {
+
+
+  if (!retroCarState) {
+
+    return false;
+
+  }
+
+
+  if (
+    enemy.lane !==
+    retroCarState.lane
+  ) {
+
+    return false;
+
+  }
+
+
+  const road =
+    document.querySelector(
+      "#retroRoad"
+    );
+
+
+  if (!road) {
+
+    return false;
+
+  }
+
+
+  const h =
+    road.clientHeight;
+
+
+  return (
+
+    enemy.y >
+    h - 145
+
+    &&
+
+    enemy.y <
+    h - 25
+
+  );
+
+}
+
+
+/* ============================================================
+   GAME OVER
+============================================================ */
+
+function retroGameOver() {
+
+
+  retroCarState.running =
+    false;
+
+  retroCarState.crashed =
+    true;
+
+
+  retroCarState.highScore =
+    Math.max(
+
+      retroCarState.highScore,
+
+      retroCarState.score
+
+    );
+
+
+  localStorage.setItem(
+
+    RETRO_CAR_HIGH_KEY,
+
+    retroCarState.highScore
+
+  );
+
+
+  const message =
+    document.querySelector(
+      "#retroMessage"
+    );
+
+
+  if (message) {
+
+    message.style.display =
+      "grid";
+
+
+    message.innerHTML = `
+
+      <div>
+
+        CRASH!
+
+        <br>
+
+        SCORE
+        ${retroCarState.score}
+
+        <br>
+
+        <span
+          style="
+            font-size:14px;
+          "
+        >
+          Press NEW GAME
+        </span>
+
+      </div>
+
+    `;
+
+  }
+
+
+  updateRetroCarHUD();
+
+}
+
+
+/* ============================================================
+   GAME LOOP
+============================================================ */
+
+function retroCarLoop(
+  time
+) {
+
+
+  if (
+    !retroCarState ||
+    !retroCarState.running
+  ) {
+
+    return;
+
+  }
+
+
+  retroCarAnimation =
+    requestAnimationFrame(
+      retroCarLoop
+    );
+
+
+  if (
+    retroCarState.paused
+  ) {
+
+    retroCarPreviousTime =
+      time;
+
+    return;
+
+  }
+
+
+  const delta =
+    Math.min(
+
+      .04,
+
+      (
+        time -
+        retroCarPreviousTime
+      ) /
+      1000
+
+    );
+
+
+  retroCarPreviousTime =
+    time;
+
+
+  retroCarState.distance +=
+
+    retroCarState.speed *
+    delta;
+
+
+  retroCarState.score =
+    Math.floor(
+
+      retroCarState.distance /
+      10
+
+    );
+
+
+  retroCarState.level =
+    Math.min(
+
+      10,
+
+      1 +
+      Math.floor(
+        retroCarState.score /
+        250
+      )
+
+    );
+
+
+  retroCarState.spawnTimer -=
+    delta;
+
+
+  if (
+    retroCarState.spawnTimer <=
+    0
+  ) {
+
+    spawnRetroEnemy();
+
+
+    retroCarState.spawnTimer =
+
+      Math.max(
+
+        .40,
+
+        1.20 -
+        retroCarState.level *
+        .065
+
+      );
+
+  }
+
+
+  const road =
+    document.querySelector(
+      "#retroRoad"
+    );
+
+
+  const roadHeight =
+    road?.clientHeight ||
+    600;
+
+
+  for (
+
+    let i =
+      retroCarState.enemies.length -
+      1;
+
+    i >= 0;
+
+    i--
+
+  ) {
+
+
+    const enemy =
+      retroCarState.enemies[i];
+
+
+    enemy.y +=
+
+      enemy.speed *
+      delta;
+
+
+    enemy.element.style.top =
+      enemy.y +
+      "px";
+
+
+    if (
+      retroCollision(
+        enemy
+      )
+    ) {
+
+      retroGameOver();
+
+      return;
+
+    }
+
+
+    if (
+      enemy.y >
+      roadHeight +
+      120
+    ) {
+
+      enemy.element.remove();
+
+
+      retroCarState
+        .enemies
+        .splice(
+          i,
+          1
+        );
+
+    }
+
+  }
+
+
+  updateRetroCarHUD();
+
+}
+
+
+/* ============================================================
+   HUD
+============================================================ */
+
+function updateRetroCarHUD() {
+
+
+  if (!retroCarState) {
+
+    return;
+
+  }
+
+
+  const score =
+    document.querySelector(
+      "#retroScore"
+    );
+
+  const level =
+    document.querySelector(
+      "#retroLevel"
+    );
+
+  const high =
+    document.querySelector(
+      "#retroHigh"
+    );
+
+
+  if (score) {
+
+    score.textContent =
+
+      "SCORE " +
+
+      String(
+        retroCarState.score
+      ).padStart(
+        4,
+        "0"
+      );
+
+  }
+
+
+  if (level) {
+
+    level.textContent =
+      "LV " +
+      retroCarState.level;
+
+  }
+
+
+  if (high) {
+
+    high.textContent =
+
+      "HI " +
+
+      String(
+
+        Math.max(
+
+          retroCarState.highScore,
+
+          retroCarState.score
+
+        )
+
+      ).padStart(
+        4,
+        "0"
+      );
+
+  }
+
+}
+
+
+/* ============================================================
+   KEYBOARD
+============================================================ */
+
+document.addEventListener(
+
+  "keydown",
+
+  event => {
+
+
+    if (
+      typeof GameCenter ===
+      "undefined" ||
+      GameCenter.current !==
+      "retrocar"
+    ) {
+
+      return;
+
+    }
+
+
+    if (
+      event.key ===
+      "ArrowLeft"
+    ) {
+
+      event.preventDefault();
+
+      moveRetroCar(
+        -1
+      );
+
+    }
+
+
+    if (
+      event.key ===
+      "ArrowRight"
+    ) {
+
+      event.preventDefault();
+
+      moveRetroCar(
+        1
+      );
+
+    }
+
+
+    if (
+      event.key ===
+      "ArrowUp"
+    ) {
+
+      event.preventDefault();
+
+      speedRetroCarUp();
+
+    }
+
+
+    if (
+      event.key ===
+      "ArrowDown"
+    ) {
+
+      event.preventDefault();
+
+      speedRetroCarDown();
+
+    }
+
+
+    if (
+      event.code ===
+      "Space"
+    ) {
+
+      event.preventDefault();
+
+      toggleRetroPause();
+
+    }
+
+  }
+
+);
+
+
+/* ============================================================
+   OPEN RETRO CAR CARD
+============================================================ */
+
+document.addEventListener(
+
+  "click",
+
+  event => {
+
+
+    const button =
+      event.target.closest(
+        '[data-game-open="retrocar"]'
+      );
+
+
+    if (!button) {
+
+      return;
+
+    }
+
+
+    event.preventDefault();
+
+    event.stopImmediatePropagation();
+
+
+    openRetroCar();
+
+  },
+
+  true
+
+);
+
+
+/* ============================================================
+   REMOVE PALS + GUN / ARENA
+============================================================ */
+
+function removeDeletedGames() {
+
+
+  document
+    .querySelectorAll(
+
+      '[data-game-open="pals"],' +
+
+      '[data-game-open="arena"],' +
+
+      '[data-game-open="shooter"]'
+
+    )
+    .forEach(
+      element => {
+        element.remove();
+      }
+    );
+
+}
+
+
+const deletedGamesObserver =
+  new MutationObserver(
+    removeDeletedGames
+  );
+
+
+deletedGamesObserver.observe(
+
+  document.body,
+
+  {
+    childList:
+      true,
+
+    subtree:
+      true
+  }
+
+);
+
+
+removeDeletedGames();
+
+
+/* ============================================================
+   PUBLIC ACCESS
+============================================================ */
+
+window.openRetroCar =
+  openRetroCar;
+
+
+/* ============================================================
+   END
+============================================================ */
