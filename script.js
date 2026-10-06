@@ -1,10 +1,25 @@
-const CHAT_KEY = "galaxy_chats_v6";
-const CURRENT_CHAT_KEY = "galaxy_current_chat_v6";
+/* ============================================================
+   GALAXY
+   Created by Harshavardhan
+
+   - Password: 123
+   - Game Center hidden after refresh
+   - Built-in games only
+   - No external game websites
+   - Cooking game included
+   - Local multilingual AI
+   - Image generation
+   - Motion video generation
+============================================================ */
 
 
-// ============================================================
-// MODEL SOURCES
-// ============================================================
+const CHAT_KEY =
+    "galaxy_chats_v9";
+
+
+const CURRENT_CHAT_KEY =
+    "galaxy_current_chat_v9";
+
 
 const TEXT_MODULE_URL =
     "https://esm.run/@mlc-ai/web-llm";
@@ -15,29 +30,25 @@ const IMAGE_MODULE_URL =
 
 
 
-// ============================================================
-// STATE
-// ============================================================
+/* ============================================================
+   STATE
+============================================================ */
 
 const state = {
 
-    chats:
-        [],
+    chats: [],
 
     currentChatId:
         null,
 
-    /*
-     * IMPORTANT:
-     * Game Center unlock is NEVER stored.
-     *
-     * Refresh GALAXY:
-     * locked again.
-     */
-
     gameCenterUnlocked:
         false,
 
+    activeGame:
+        null,
+
+    gameCleanup:
+        null,
 
     aiEngine:
         null,
@@ -48,13 +59,11 @@ const state = {
     aiModelId:
         null,
 
-
     imageClient:
         null,
 
     imageModelLoaded:
         false,
-
 
     recognition:
         null,
@@ -63,22 +72,22 @@ const state = {
         false,
 
     speaking:
+        false,
+
+    busy:
         false
 
 };
 
 
 
-// ============================================================
-// ELEMENT SHORTCUT
-// ============================================================
+/* ============================================================
+   DOM
+============================================================ */
 
 const $ =
-    id =>
-        document.getElementById(
-            id
-        );
-
+    (id) =>
+        document.getElementById(id);
 
 
 const els = {
@@ -137,6 +146,21 @@ const els = {
     leaveGameCenter:
         $("leaveGameCenter"),
 
+    gamePlayerView:
+        $("gamePlayerView"),
+
+    activeGameArea:
+        $("activeGameArea"),
+
+    activeGameTitle:
+        $("activeGameTitle"),
+
+    restartActiveGame:
+        $("restartActiveGame"),
+
+    closeActiveGame:
+        $("closeActiveGame"),
+
     composerWrap:
         $("composerWrap"),
 
@@ -165,82 +189,69 @@ const els = {
 
 
 
-// ============================================================
-// GAME LIBRARY
-// ============================================================
+/* ============================================================
+   BUILT-IN GAME LIBRARY
+
+   No external game URLs.
+============================================================ */
 
 const GAME_LIBRARY = [
 
-    [
-        "🏎️",
-        "Racing",
-        "Cars, drifting and speed challenges.",
-        "racing games play online"
-    ],
+    {
+        id: "racing",
+        emoji: "🏎️",
+        name: "Galaxy Racing",
+        description:
+            "Dodge the traffic and survive as long as possible."
+    },
 
-    [
-        "⚽",
-        "Football",
-        "Football matches and skill games.",
-        "football games play online"
-    ],
+    {
+        id: "football",
+        emoji: "⚽",
+        name: "Penalty Star",
+        description:
+            "Choose your direction and score past the goalkeeper."
+    },
 
-    [
-        "🐉",
-        "Creature Survival",
-        "Creature collecting and survival worlds.",
-        "creature survival games online"
-    ],
+    {
+        id: "cooking",
+        emoji: "🍳",
+        name: "Galaxy Kitchen",
+        description:
+            "Prepare the customer's order using the correct ingredients."
+    },
 
-    [
-        "🐒",
-        "Mythic Action",
-        "Mythology, warriors and boss battles.",
-        "mythology action games online"
-    ],
+    {
+        id: "puzzle",
+        emoji: "🧩",
+        name: "Number Puzzle",
+        description:
+            "Move the tiles until the numbers are in the correct order."
+    },
 
-    [
-        "🧱",
-        "Block Worlds",
-        "Creative multiplayer worlds and obstacle games.",
-        "block multiplayer games online"
-    ],
+    {
+        id: "memory",
+        emoji: "🧠",
+        name: "Memory Match",
+        description:
+            "Find matching pairs using as few moves as possible."
+    },
 
-    [
-        "👥",
-        "Multiplayer",
-        "Online games with other players.",
-        "multiplayer browser games online"
-    ],
-
-    [
-        "🧩",
-        "Puzzle",
-        "Logic and brain challenges.",
-        "puzzle games play online"
-    ],
-
-    [
-        "🚀",
-        "Space",
-        "Space adventures and cosmic battles.",
-        "space games play online"
-    ],
-
-    [
-        "🗺️",
-        "Adventure",
-        "Quests, exploration and stories.",
-        "adventure games play online"
-    ]
+    {
+        id: "space",
+        emoji: "🚀",
+        name: "Space Defender",
+        description:
+            "Tap the asteroids before they escape."
+    }
 
 ];
 
 
 
-// ============================================================
-// START
-// ============================================================
+/* ============================================================
+   START
+============================================================ */
 
 document.addEventListener(
     "DOMContentLoaded",
@@ -248,11 +259,11 @@ document.addEventListener(
 );
 
 
-
 function initGalaxy() {
 
+
     /*
-     * Game Center ALWAYS starts hidden.
+     * Never save this unlock.
      */
 
     state.gameCenterUnlocked =
@@ -260,7 +271,7 @@ function initGalaxy() {
 
 
     els.gameCenterItem
-        .classList
+        ?.classList
         .add(
             "hidden-game-center"
         );
@@ -268,24 +279,17 @@ function initGalaxy() {
 
     loadChats();
 
-
     ensureCurrentChat();
-
 
     bindEvents();
 
-
     renderRecentChats();
-
 
     renderCurrentChat();
 
-
     renderGameCenter();
 
-
     updateClock();
-
 
     updateGreeting();
 
@@ -302,9 +306,13 @@ function initGalaxy() {
 
 
     setModelStatus(
+
         navigator.gpu
-            ? "Local AI available"
+
+            ? "Ready to download"
+
             : "WebGPU unavailable"
+
     );
 
 
@@ -314,43 +322,49 @@ function initGalaxy() {
 
 
 
-// ============================================================
-// EVENTS
-// ============================================================
+/* ============================================================
+   EVENTS
+============================================================ */
 
 function bindEvents() {
 
 
     els.newChatRow
-        .addEventListener(
+        ?.addEventListener(
             "click",
-            () =>
-                createNewChat()
+            createNewChat
         );
 
 
     els.sendControl
-        .addEventListener(
+        ?.addEventListener(
             "click",
             sendInputMessage
         );
 
 
     els.userInput
-        .addEventListener(
+        ?.addEventListener(
             "input",
             resizeInput
         );
 
 
     els.userInput
-        .addEventListener(
+        ?.addEventListener(
+
             "keydown",
-            event => {
+
+            (event) => {
 
                 if (
-                    event.key === "Enter" &&
+
+                    event.key === "Enter"
+
+                    &&
+
                     !event.shiftKey
+
                 ) {
 
                     event.preventDefault();
@@ -360,6 +374,7 @@ function bindEvents() {
                 }
 
             }
+
         );
 
 
@@ -368,142 +383,161 @@ function bindEvents() {
             ".quick-card"
         )
         .forEach(
-            card => {
+
+            (card) => {
 
                 card.addEventListener(
+
                     "click",
+
                     () => {
 
                         processMessage(
+
                             card.dataset.prompt || "",
+
                             {
-                                source:
-                                    "quick"
+                                source: "quick"
                             }
+
                         );
 
                     }
+
                 );
 
             }
+
         );
 
 
     els.gameCenterItem
-        .addEventListener(
+        ?.addEventListener(
             "click",
             openGameCenter
         );
 
 
     els.leaveGameCenter
-        .addEventListener(
+        ?.addEventListener(
             "click",
             closeGameCenter
         );
 
 
-    els.menuToggle
-        .addEventListener(
+    els.closeActiveGame
+        ?.addEventListener(
             "click",
+            returnToGameCenter
+        );
+
+
+    els.restartActiveGame
+        ?.addEventListener(
+            "click",
+            restartCurrentGame
+        );
+
+
+    els.menuToggle
+        ?.addEventListener(
+
+            "click",
+
             () => {
 
                 els.sidebar
-                    .classList
+                    ?.classList
                     .toggle(
                         "open"
                     );
 
             }
+
         );
 
 
     els.settingsRow
-        .addEventListener(
+        ?.addEventListener(
+
             "click",
+
             () => {
 
                 els.settingsModal
-                    .classList
+                    ?.classList
                     .remove(
                         "hidden-modal"
                     );
 
             }
+
         );
 
 
     els.closeSettings
-        .addEventListener(
+        ?.addEventListener(
+
             "click",
+
             () => {
 
                 els.settingsModal
-                    .classList
+                    ?.classList
                     .add(
                         "hidden-modal"
                     );
 
             }
+
         );
 
 
     els.clearAllChats
-        .addEventListener(
+        ?.addEventListener(
             "click",
             clearEveryChat
         );
 
 
     els.clearRecentText
-        .addEventListener(
+        ?.addEventListener(
             "click",
             clearEveryChat
         );
 
 
     els.restartVoice
-        .addEventListener(
+        ?.addEventListener(
             "click",
             restartVoiceRecognition
-        );
-
-
-    els.settingsModal
-        .addEventListener(
-            "click",
-            event => {
-
-                if (
-                    event.target ===
-                    els.settingsModal
-                ) {
-
-                    els.settingsModal
-                        .classList
-                        .add(
-                            "hidden-modal"
-                        );
-
-                }
-
-            }
         );
 
 }
 
 
 
-// ============================================================
-// SEND MESSAGE
-// ============================================================
+/* ============================================================
+   SEND
+============================================================ */
 
 function sendInputMessage() {
 
+
+    if (
+        state.busy
+    ) {
+
+        return;
+
+    }
+
+
     const text =
         els.userInput
-            .value
-            .trim();
+            ?.value
+            .trim()
+        || "";
 
 
     if (!text) {
@@ -521,58 +555,76 @@ function sendInputMessage() {
 
 
     processMessage(
+
         text,
+
         {
-            source:
-                "typed"
+            source: "typed"
         }
+
     );
 
 }
 
 
 
-// ============================================================
-// MAIN MESSAGE PROCESSOR
-// ============================================================
+/* ============================================================
+   PROCESS MESSAGE
+============================================================ */
 
 async function processMessage(
+
     message,
+
     {
         source = "typed"
     } = {}
+
 ) {
 
 
+    const cleanMessage =
+        String(
+            message || ""
+        )
+        .trim();
+
+
+    if (!cleanMessage) {
+
+        return;
+
+    }
+
+
     addUserMessage(
-        message
+        cleanMessage
     );
 
 
     setStatus(
-        "Thinking..."
+        "Thinking…"
     );
 
 
 
-    /*
-     * ========================================================
-     * SECRET GAME CENTER
-     *
-     * Only TYPED input unlocks it.
-     *
-     * Voice cannot unlock it.
-     * Quick cards cannot unlock it.
-     * ========================================================
-     */
+    /* ========================================================
+       GAME PASSWORD
+
+       Must be typed exactly:
+       123
+
+       Voice cannot unlock it.
+    ======================================================== */
 
     if (
-        source === "typed" &&
-        message
-            .trim()
-            .toLowerCase()
-        ===
-        "harshavardhan"
+
+        source === "typed"
+
+        &&
+
+        cleanMessage === "123"
+
     ) {
 
         unlockGameCenter();
@@ -582,29 +634,31 @@ async function processMessage(
     }
 
 
-
     const lower =
-        message
-            .trim()
+        cleanMessage
             .toLowerCase();
 
 
 
-    /*
-     * GAME CENTER COMMAND
-     */
+    /* ========================================================
+       GAME CENTER COMMANDS
+    ======================================================== */
 
     if (
+
         [
             "game center",
             "game mode",
             "open game center",
             "open game mode"
         ]
+
         .includes(
             lower
         )
+
     ) {
+
 
         if (
             !state.gameCenterUnlocked
@@ -634,9 +688,9 @@ async function processMessage(
 
 
 
-    /*
-     * CREATOR
-     */
+    /* ========================================================
+       CREATOR
+    ======================================================== */
 
     if (
         isCreatorQuestion(
@@ -645,8 +699,11 @@ async function processMessage(
     ) {
 
         respond(
-            "Harshavardhan is the creator of GALAXY.",
+
+            "Harshavardhan is the creator and developer of GALAXY.",
+
             source
+
         );
 
         return;
@@ -655,12 +712,33 @@ async function processMessage(
 
 
 
-    /*
-     * WEATHER
-     *
-     * Don't let the local model invent
-     * live weather.
-     */
+    /* ========================================================
+       LANGUAGES
+    ======================================================== */
+
+    if (
+        isLanguageQuestion(
+            lower
+        )
+    ) {
+
+        respond(
+
+            "GALAXY can work with many languages supported by the downloaded local AI model, including English, Tamil, Hindi, Arabic, French and Spanish.",
+
+            source
+
+        );
+
+        return;
+
+    }
+
+
+
+    /* ========================================================
+       WEATHER
+    ======================================================== */
 
     if (
         isWeatherQuestion(
@@ -669,8 +747,11 @@ async function processMessage(
     ) {
 
         respond(
-            "Live weather needs a weather-data provider. This local-only GALAXY build does not guess current weather.",
+
+            "Live weather data is not connected in this local version of GALAXY, so I will not guess the current weather.",
+
             source
+
         );
 
         return;
@@ -679,13 +760,13 @@ async function processMessage(
 
 
 
-    /*
-     * CALCULATOR
-     */
+    /* ========================================================
+       CALCULATOR
+    ======================================================== */
 
     const calculation =
         calculate(
-            message
+            cleanMessage
         );
 
 
@@ -694,8 +775,11 @@ async function processMessage(
     ) {
 
         respond(
+
             `The answer is ${calculation}.`,
+
             source
+
         );
 
         return;
@@ -704,32 +788,9 @@ async function processMessage(
 
 
 
-    /*
-     * IMAGE GENERATION
-     */
-
-    if (
-        isImageCommand(
-            lower
-        )
-    ) {
-
-        await handleImageGeneration(
-            cleanImagePrompt(
-                message
-            ),
-            source
-        );
-
-        return;
-
-    }
-
-
-
-    /*
-     * VIDEO GENERATION
-     */
+    /* ========================================================
+       VIDEO
+    ======================================================== */
 
     if (
         isVideoCommand(
@@ -738,10 +799,13 @@ async function processMessage(
     ) {
 
         await handleVideoGeneration(
+
             cleanVideoPrompt(
-                message
+                cleanMessage
             ),
+
             source
+
         );
 
         return;
@@ -750,47 +814,72 @@ async function processMessage(
 
 
 
-    /*
-     * EVERYTHING ELSE:
-     *
-     * Real downloadable local AI.
-     */
+    /* ========================================================
+       IMAGE
+    ======================================================== */
+
+    if (
+        isImageCommand(
+            lower
+        )
+    ) {
+
+        await handleImageGeneration(
+
+            cleanImagePrompt(
+                cleanMessage
+            ),
+
+            source
+
+        );
+
+        return;
+
+    }
+
+
+
+    /* ========================================================
+       GENERAL AI
+    ======================================================== */
 
     await answerWithLocalAI(
-        message,
+
+        cleanMessage,
+
         source
+
     );
 
 }
 
 
 
-// ============================================================
-// SECRET GAME CENTER
-// ============================================================
+/* ============================================================
+   UNLOCK GAME CENTER
+============================================================ */
 
 function unlockGameCenter() {
 
-    if (
-        !state.gameCenterUnlocked
-    ) {
 
-        state.gameCenterUnlocked =
-            true;
+    state.gameCenterUnlocked =
+        true;
 
 
-        els.gameCenterItem
-            .classList
-            .remove(
-                "hidden-game-center"
-            );
-
-    }
+    els.gameCenterItem
+        ?.classList
+        .remove(
+            "hidden-game-center"
+        );
 
 
     respond(
-        "🎮 Game Center unlocked. It is now visible in the sidebar.",
+
+        "🎮 Game Center unlocked. It is now available in the sidebar.",
+
         "typed"
+
     );
 
 }
@@ -803,6 +892,7 @@ function unlockGameCenter() {
 
 function openGameCenter() {
 
+
     if (
         !state.gameCenterUnlocked
     ) {
@@ -812,51 +902,93 @@ function openGameCenter() {
     }
 
 
-    els.normalView.style.display =
-        "none";
+    cleanupCurrentGame();
+
+
+    if (
+        els.normalView
+    ) {
+
+        els.normalView.style.display =
+            "none";
+
+    }
+
+
+    els.gamePlayerView
+        ?.classList
+        .remove(
+            "active"
+        );
 
 
     els.gameCenterView
-        .classList
+        ?.classList
         .add(
             "active"
         );
 
 
-    els.composerWrap.style.display =
-        "none";
+    if (
+        els.composerWrap
+    ) {
+
+        els.composerWrap.style.display =
+            "none";
+
+    }
 
 
     setStatus(
         "Game Center"
     );
 
-
-    els.sidebar
-        .classList
-        .remove(
-            "open"
-        );
-
 }
 
 
 
+/* ============================================================
+   LEAVE GAME CENTER
+============================================================ */
+
 function closeGameCenter() {
 
+
+    cleanupCurrentGame();
+
+
     els.gameCenterView
-        .classList
+        ?.classList
         .remove(
             "active"
         );
 
 
-    els.normalView.style.display =
-        "block";
+    els.gamePlayerView
+        ?.classList
+        .remove(
+            "active"
+        );
 
 
-    els.composerWrap.style.display =
-        "block";
+    if (
+        els.normalView
+    ) {
+
+        els.normalView.style.display =
+            "block";
+
+    }
+
+
+    if (
+        els.composerWrap
+    ) {
+
+        els.composerWrap.style.display =
+            "block";
+
+    }
 
 
     renderCurrentChat();
@@ -876,19 +1008,24 @@ function closeGameCenter() {
 
 function renderGameCenter() {
 
+
+    if (
+        !els.gameGrid
+    ) {
+
+        return;
+
+    }
+
+
     els.gameGrid.innerHTML =
         "";
 
 
     GAME_LIBRARY.forEach(
-        (
-            [
-                emoji,
-                name,
-                description,
-                query
-            ]
-        ) => {
+
+        (game) => {
+
 
             const card =
                 document.createElement(
@@ -903,39 +1040,41 @@ function renderGameCenter() {
             card.innerHTML = `
 
                 <div class="game-emoji">
-                    ${emoji}
+                    ${game.emoji}
                 </div>
 
                 <h3>
-                    ${escapeHTML(name)}
+                    ${escapeHTML(game.name)}
                 </h3>
 
                 <p>
-                    ${escapeHTML(description)}
+                    ${escapeHTML(game.description)}
                 </p>
+
+                <div class="play-game-button">
+                    Play
+                </div>
 
             `;
 
 
-            card.addEventListener(
-                "click",
-                () => {
+            card
+                .querySelector(
+                    ".play-game-button"
+                )
+                .addEventListener(
 
-                    window.open(
+                    "click",
 
-                        "https://www.google.com/search?q=" +
-                        encodeURIComponent(
-                            query
-                        ),
+                    () => {
 
-                        "_blank",
+                        launchGame(
+                            game.id
+                        );
 
-                        "noopener,noreferrer"
+                    }
 
-                    );
-
-                }
-            );
+                );
 
 
             els.gameGrid
@@ -944,6 +1083,7 @@ function renderGameCenter() {
                 );
 
         }
+
     );
 
 }
@@ -951,19 +1091,2287 @@ function renderGameCenter() {
 
 
 /* ============================================================
-   LOCAL AI ANSWER
+   LAUNCH GAME
+============================================================ */
+
+function launchGame(
+    gameId
+) {
+
+
+    cleanupCurrentGame();
+
+
+    const game =
+        GAME_LIBRARY.find(
+
+            (item) =>
+                item.id === gameId
+
+        );
+
+
+    if (!game) {
+
+        return;
+
+    }
+
+
+    state.activeGame =
+        gameId;
+
+
+    els.activeGameTitle.textContent =
+        `${game.emoji} ${game.name}`;
+
+
+    els.gameCenterView
+        ?.classList
+        .remove(
+            "active"
+        );
+
+
+    els.gamePlayerView
+        ?.classList
+        .add(
+            "active"
+        );
+
+
+    setStatus(
+        game.name
+    );
+
+
+    switch (
+        gameId
+    ) {
+
+        case "racing":
+
+            startRacingGame();
+
+            break;
+
+
+        case "football":
+
+            startFootballGame();
+
+            break;
+
+
+        case "cooking":
+
+            startCookingGame();
+
+            break;
+
+
+        case "puzzle":
+
+            startPuzzleGame();
+
+            break;
+
+
+        case "memory":
+
+            startMemoryGame();
+
+            break;
+
+
+        case "space":
+
+            startSpaceGame();
+
+            break;
+
+    }
+
+}
+
+
+
+/* ============================================================
+   RETURN TO GAME CENTER
+============================================================ */
+
+function returnToGameCenter() {
+
+
+    cleanupCurrentGame();
+
+
+    els.gamePlayerView
+        ?.classList
+        .remove(
+            "active"
+        );
+
+
+    els.gameCenterView
+        ?.classList
+        .add(
+            "active"
+        );
+
+
+    state.activeGame =
+        null;
+
+
+    setStatus(
+        "Game Center"
+    );
+
+}
+
+
+
+/* ============================================================
+   RESTART GAME
+============================================================ */
+
+function restartCurrentGame() {
+
+
+    if (
+        !state.activeGame
+    ) {
+
+        return;
+
+    }
+
+
+    const gameId =
+        state.activeGame;
+
+
+    cleanupCurrentGame();
+
+
+    state.activeGame =
+        gameId;
+
+
+    launchGame(
+        gameId
+    );
+
+}
+
+
+
+/* ============================================================
+   CLEANUP
+============================================================ */
+
+function cleanupCurrentGame() {
+
+
+    if (
+        typeof state.gameCleanup ===
+        "function"
+    ) {
+
+        try {
+
+            state.gameCleanup();
+
+        }
+
+        catch {
+        }
+
+    }
+
+
+    state.gameCleanup =
+        null;
+
+
+    if (
+        els.activeGameArea
+    ) {
+
+        els.activeGameArea.innerHTML =
+            "";
+
+    }
+
+}
+
+
+
+/* ============================================================
+   RACING GAME
+============================================================ */
+
+function startRacingGame() {
+
+
+    let score =
+        0;
+
+
+    let playerLane =
+        1;
+
+
+    let enemyLane =
+        Math.floor(
+            Math.random() *
+            3
+        );
+
+
+    let enemyY =
+        -80;
+
+
+    let running =
+        true;
+
+
+    els.activeGameArea.innerHTML = `
+
+        <div class="mini-game">
+
+            <div
+                class="game-score"
+                id="raceScore"
+            >
+                Score: 0
+            </div>
+
+            <div class="game-instructions">
+                Use ← and → arrow keys, or the buttons below.
+                Avoid the red car.
+            </div>
+
+            <div
+                class="race-road"
+                id="raceRoad"
+            >
+
+                <div
+                    class="player-car"
+                    id="playerCar"
+                >
+                    🏎️
+                </div>
+
+                <div
+                    class="enemy-car"
+                    id="enemyCar"
+                >
+                    🚗
+                </div>
+
+            </div>
+
+            <div>
+
+                <div
+                    class="game-button"
+                    id="raceLeft"
+                >
+                    ← Left
+                </div>
+
+                <div
+                    class="game-button"
+                    id="raceRight"
+                >
+                    Right →
+                </div>
+
+            </div>
+
+        </div>
+
+    `;
+
+
+    const player =
+        $("playerCar");
+
+
+    const enemy =
+        $("enemyCar");
+
+
+    const scoreText =
+        $("raceScore");
+
+
+    const lanes = [
+        37,
+        116,
+        195
+    ];
+
+
+    function updatePlayer() {
+
+        player.style.left =
+            `${lanes[playerLane]}px`;
+
+    }
+
+
+    function moveLeft() {
+
+        playerLane =
+            Math.max(
+                0,
+                playerLane - 1
+            );
+
+
+        updatePlayer();
+
+    }
+
+
+    function moveRight() {
+
+        playerLane =
+            Math.min(
+                2,
+                playerLane + 1
+            );
+
+
+        updatePlayer();
+
+    }
+
+
+    function keyHandler(
+        event
+    ) {
+
+        if (
+            event.key ===
+            "ArrowLeft"
+        ) {
+
+            moveLeft();
+
+        }
+
+
+        if (
+            event.key ===
+            "ArrowRight"
+        ) {
+
+            moveRight();
+
+        }
+
+    }
+
+
+    document.addEventListener(
+        "keydown",
+        keyHandler
+    );
+
+
+    $("raceLeft")
+        .addEventListener(
+            "click",
+            moveLeft
+        );
+
+
+    $("raceRight")
+        .addEventListener(
+            "click",
+            moveRight
+        );
+
+
+    let previous =
+        performance.now();
+
+
+    function loop(
+        now
+    ) {
+
+
+        if (
+            !running
+        ) {
+
+            return;
+
+        }
+
+
+        const delta =
+            Math.min(
+                35,
+                now - previous
+            );
+
+
+        previous =
+            now;
+
+
+        enemyY +=
+            delta *
+            0.18;
+
+
+        enemy.style.left =
+            `${lanes[enemyLane]}px`;
+
+
+        enemy.style.top =
+            `${enemyY}px`;
+
+
+        if (
+            enemyY >
+            270
+        ) {
+
+
+            if (
+                enemyLane ===
+                playerLane
+            ) {
+
+                running =
+                    false;
+
+
+                scoreText.textContent =
+                    `Crash! Final score: ${score}`;
+
+
+                return;
+
+            }
+
+
+            score +=
+                1;
+
+
+            scoreText.textContent =
+                `Score: ${score}`;
+
+
+            enemyY =
+                -80;
+
+
+            enemyLane =
+                Math.floor(
+                    Math.random() *
+                    3
+                );
+
+        }
+
+
+        requestAnimationFrame(
+            loop
+        );
+
+    }
+
+
+    requestAnimationFrame(
+        loop
+    );
+
+
+    state.gameCleanup =
+        () => {
+
+            running =
+                false;
+
+
+            document.removeEventListener(
+                "keydown",
+                keyHandler
+            );
+
+        };
+
+}
+
+
+
+/* ============================================================
+   FOOTBALL GAME
+============================================================ */
+
+function startFootballGame() {
+
+
+    let goals =
+        0;
+
+
+    let shots =
+        0;
+
+
+    els.activeGameArea.innerHTML = `
+
+        <div class="mini-game">
+
+            <div
+                class="game-score"
+                id="footballScore"
+            >
+                Goals: 0 / 0
+            </div>
+
+            <div class="game-instructions">
+                Choose where to shoot.
+                Try to beat the goalkeeper.
+            </div>
+
+            <div
+                class="goal-area"
+                id="goalArea"
+            >
+
+                <div
+                    class="goalkeeper"
+                    id="goalkeeper"
+                >
+                    🧤
+                </div>
+
+                <div
+                    class="football-ball"
+                    id="footballBall"
+                >
+                    ⚽
+                </div>
+
+            </div>
+
+            <div>
+
+                <div
+                    class="game-button"
+                    data-shot="left"
+                >
+                    Left
+                </div>
+
+                <div
+                    class="game-button"
+                    data-shot="center"
+                >
+                    Center
+                </div>
+
+                <div
+                    class="game-button"
+                    data-shot="right"
+                >
+                    Right
+                </div>
+
+            </div>
+
+        </div>
+
+    `;
+
+
+    const ball =
+        $("footballBall");
+
+
+    const keeper =
+        $("goalkeeper");
+
+
+    const score =
+        $("footballScore");
+
+
+    let locked =
+        false;
+
+
+    document
+        .querySelectorAll(
+            "[data-shot]"
+        )
+        .forEach(
+
+            (button) => {
+
+                button.addEventListener(
+
+                    "click",
+
+                    () => {
+
+
+                        if (
+                            locked
+                        ) {
+
+                            return;
+
+                        }
+
+
+                        locked =
+                            true;
+
+
+                        const shot =
+                            button.dataset.shot;
+
+
+                        const keeperChoice =
+                            [
+                                "left",
+                                "center",
+                                "right"
+                            ][
+                                Math.floor(
+                                    Math.random() *
+                                    3
+                                )
+                            ];
+
+
+                        const positions = {
+
+                            left:
+                                "20%",
+
+                            center:
+                                "50%",
+
+                            right:
+                                "80%"
+
+                        };
+
+
+                        keeper.style.left =
+                            `calc(${positions[keeperChoice]} - 25px)`;
+
+
+                        ball.style.left =
+                            `calc(${positions[shot]} - 18px)`;
+
+
+                        ball.style.bottom =
+                            "170px";
+
+
+                        shots +=
+                            1;
+
+
+                        setTimeout(
+
+                            () => {
+
+
+                                if (
+                                    shot !==
+                                    keeperChoice
+                                ) {
+
+                                    goals +=
+                                        1;
+
+                                }
+
+
+                                score.textContent =
+                                    `Goals: ${goals} / ${shots}`;
+
+
+                                ball.style.left =
+                                    "calc(50% - 18px)";
+
+
+                                ball.style.bottom =
+                                    "-65px";
+
+
+                                keeper.style.left =
+                                    "calc(50% - 25px)";
+
+
+                                locked =
+                                    false;
+
+                            },
+
+                            650
+
+                        );
+
+                    }
+
+                );
+
+            }
+
+        );
+
+
+    state.gameCleanup =
+        () => {};
+
+}
+
+
+
+/* ============================================================
+   COOKING GAME
+============================================================ */
+
+function startCookingGame() {
+
+
+    const recipes = [
+
+        {
+            name:
+                "Cheese Burger",
+
+            emoji:
+                "🍔",
+
+            ingredients:
+                [
+                    "Bread",
+                    "Cheese",
+                    "Patty"
+                ]
+        },
+
+        {
+            name:
+                "Fresh Salad",
+
+            emoji:
+                "🥗",
+
+            ingredients:
+                [
+                    "Lettuce",
+                    "Tomato",
+                    "Carrot"
+                ]
+        },
+
+        {
+            name:
+                "Pizza",
+
+            emoji:
+                "🍕",
+
+            ingredients:
+                [
+                    "Dough",
+                    "Cheese",
+                    "Tomato"
+                ]
+        },
+
+        {
+            name:
+                "Fruit Bowl",
+
+            emoji:
+                "🍓",
+
+            ingredients:
+                [
+                    "Apple",
+                    "Banana",
+                    "Strawberry"
+                ]
+        }
+
+    ];
+
+
+    const allIngredients = [
+
+        ["Bread", "🍞"],
+        ["Cheese", "🧀"],
+        ["Patty", "🥩"],
+        ["Lettuce", "🥬"],
+        ["Tomato", "🍅"],
+        ["Carrot", "🥕"],
+        ["Dough", "🫓"],
+        ["Apple", "🍎"],
+        ["Banana", "🍌"],
+        ["Strawberry", "🍓"]
+
+    ];
+
+
+    let score =
+        0;
+
+
+    let selected =
+        [];
+
+
+    let recipe =
+        randomItem(
+            recipes
+        );
+
+
+    function renderCooking() {
+
+
+        els.activeGameArea.innerHTML = `
+
+            <div class="mini-game kitchen">
+
+                <div
+                    class="game-score"
+                    id="cookScore"
+                >
+                    Chef Score: ${score}
+                </div>
+
+                <div class="order-card">
+
+                    <div style="font-size:34px;">
+                        ${recipe.emoji}
+                    </div>
+
+                    <h3>
+                        Customer wants:
+                        ${recipe.name}
+                    </h3>
+
+                    <div class="game-instructions">
+                        Choose the correct 3 ingredients.
+                    </div>
+
+                </div>
+
+
+                <div class="ingredients">
+
+                    ${
+
+                        shuffle(
+                            [...allIngredients]
+                        )
+
+                        .map(
+
+                            (
+                                [
+                                    name,
+                                    emoji
+                                ]
+                            ) => `
+
+                                <div
+                                    class="ingredient"
+                                    data-ingredient="${name}"
+                                >
+
+                                    <div style="font-size:26px;">
+                                        ${emoji}
+                                    </div>
+
+                                    ${name}
+
+                                </div>
+
+                            `
+
+                        )
+                        .join("")
+
+                    }
+
+                </div>
+
+
+                <div
+                    class="cooking-pot"
+                    id="cookingPot"
+                >
+                    🍲 Your bowl is empty
+                </div>
+
+
+                <div
+                    class="game-button"
+                    id="serveFood"
+                >
+                    Serve Dish
+                </div>
+
+                <div
+                    class="game-button"
+                    id="clearFood"
+                >
+                    Clear
+                </div>
+
+            </div>
+
+        `;
+
+
+        document
+            .querySelectorAll(
+                "[data-ingredient]"
+            )
+            .forEach(
+
+                (item) => {
+
+                    item.addEventListener(
+
+                        "click",
+
+                        () => {
+
+
+                            const ingredient =
+                                item.dataset.ingredient;
+
+
+                            if (
+
+                                selected.includes(
+                                    ingredient
+                                )
+
+                                ||
+
+                                selected.length >=
+                                3
+
+                            ) {
+
+                                return;
+
+                            }
+
+
+                            selected.push(
+                                ingredient
+                            );
+
+
+                            updateCookingPot();
+
+                        }
+
+                    );
+
+                }
+
+            );
+
+
+        $("clearFood")
+            .addEventListener(
+
+                "click",
+
+                () => {
+
+                    selected =
+                        [];
+
+
+                    updateCookingPot();
+
+                }
+
+            );
+
+
+        $("serveFood")
+            .addEventListener(
+
+                "click",
+
+                () => {
+
+
+                    if (
+                        selected.length !==
+                        3
+                    ) {
+
+                        $("cookingPot")
+                            .textContent =
+                            "⚠ Choose exactly 3 ingredients.";
+
+                        return;
+
+                    }
+
+
+                    const correct =
+
+                        [...selected]
+                            .sort()
+                            .join("|")
+
+                        ===
+
+                        [...recipe.ingredients]
+                            .sort()
+                            .join("|");
+
+
+                    if (
+                        correct
+                    ) {
+
+                        score +=
+                            10;
+
+
+                        $("cookingPot")
+                            .textContent =
+                            "✅ Delicious! Customer is happy!";
+
+                    }
+
+                    else {
+
+                        score =
+                            Math.max(
+                                0,
+                                score - 3
+                            );
+
+
+                        $("cookingPot")
+                            .textContent =
+                            "❌ Wrong recipe. Try another order!";
+
+                    }
+
+
+                    setTimeout(
+
+                        () => {
+
+
+                            selected =
+                                [];
+
+
+                            recipe =
+                                randomItem(
+                                    recipes
+                                );
+
+
+                            renderCooking();
+
+                        },
+
+                        1100
+
+                    );
+
+                }
+
+            );
+
+    }
+
+
+    function updateCookingPot() {
+
+
+        const pot =
+            $("cookingPot");
+
+
+        if (
+            !selected.length
+        ) {
+
+            pot.textContent =
+                "🍲 Your bowl is empty";
+
+        }
+
+        else {
+
+            pot.textContent =
+                `🍲 ${selected.join(" + ")}`;
+
+        }
+
+    }
+
+
+    renderCooking();
+
+
+    state.gameCleanup =
+        () => {};
+
+}
+
+
+
+/* ============================================================
+   NUMBER PUZZLE
+============================================================ */
+
+function startPuzzleGame() {
+
+
+    let numbers =
+
+        shuffle(
+            [
+                1, 2, 3,
+                4, 5, 6,
+                7, 8, null
+            ]
+        );
+
+
+    let moves =
+        0;
+
+
+    function render() {
+
+
+        els.activeGameArea.innerHTML = `
+
+            <div class="mini-game">
+
+                <div class="game-score">
+                    Moves: ${moves}
+                </div>
+
+                <div class="game-instructions">
+                    Arrange the numbers from 1 to 8.
+                </div>
+
+                <div
+                    class="puzzle-grid"
+                    id="puzzleGrid"
+                >
+
+                    ${
+
+                        numbers
+                            .map(
+
+                                (
+                                    number,
+                                    index
+                                ) => `
+
+                                    <div
+                                        class="puzzle-cell"
+                                        data-index="${index}"
+                                    >
+
+                                        ${
+                                            number === null
+                                            ?
+                                            ""
+                                            :
+                                            number
+                                        }
+
+                                    </div>
+
+                                `
+
+                            )
+                            .join("")
+
+                    }
+
+                </div>
+
+            </div>
+
+        `;
+
+
+        document
+            .querySelectorAll(
+                ".puzzle-cell"
+            )
+            .forEach(
+
+                (cell) => {
+
+                    cell.addEventListener(
+
+                        "click",
+
+                        () => {
+
+                            movePuzzleTile(
+                                Number(
+                                    cell.dataset.index
+                                )
+                            );
+
+                        }
+
+                    );
+
+                }
+
+            );
+
+    }
+
+
+    function movePuzzleTile(
+        index
+    ) {
+
+
+        const empty =
+            numbers.indexOf(
+                null
+            );
+
+
+        const valid = [
+
+            empty - 1,
+            empty + 1,
+            empty - 3,
+            empty + 3
+
+        ];
+
+
+        if (
+            !valid.includes(
+                index
+            )
+        ) {
+
+            return;
+
+        }
+
+
+        const row1 =
+            Math.floor(
+                empty /
+                3
+            );
+
+
+        const row2 =
+            Math.floor(
+                index /
+                3
+            );
+
+
+        if (
+
+            Math.abs(
+                empty -
+                index
+            ) ===
+            1
+
+            &&
+
+            row1 !==
+            row2
+
+        ) {
+
+            return;
+
+        }
+
+
+        numbers[empty] =
+            numbers[index];
+
+
+        numbers[index] =
+            null;
+
+
+        moves +=
+            1;
+
+
+        const solved =
+
+            numbers
+                .slice(
+                    0,
+                    8
+                )
+                .every(
+
+                    (
+                        value,
+                        i
+                    ) =>
+                        value ===
+                        i + 1
+
+                );
+
+
+        render();
+
+
+        if (
+            solved
+        ) {
+
+            setTimeout(
+
+                () => {
+
+                    alert(
+                        `Puzzle solved in ${moves} moves!`
+                    );
+
+                },
+
+                100
+
+            );
+
+        }
+
+    }
+
+
+    render();
+
+
+    state.gameCleanup =
+        () => {};
+
+}
+
+
+
+/* ============================================================
+   MEMORY GAME
+============================================================ */
+
+function startMemoryGame() {
+
+
+    const values =
+        shuffle(
+
+            [
+                "🚀",
+                "🌙",
+                "⭐",
+                "🪐",
+                "🚀",
+                "🌙",
+                "⭐",
+                "🪐",
+                "🤖",
+                "👾",
+                "🌌",
+                "☄️",
+                "🤖",
+                "👾",
+                "🌌",
+                "☄️"
+            ]
+
+        );
+
+
+    let revealed =
+        [];
+
+
+    let matched =
+        new Set();
+
+
+    let moves =
+        0;
+
+
+    let locked =
+        false;
+
+
+    function render() {
+
+
+        els.activeGameArea.innerHTML = `
+
+            <div class="mini-game">
+
+                <div class="game-score">
+                    Moves: ${moves}
+                    &nbsp; Matches:
+                    ${matched.size / 2}/8
+                </div>
+
+                <div class="game-instructions">
+                    Find all matching pairs.
+                </div>
+
+                <div class="memory-grid">
+
+                    ${
+
+                        values
+                            .map(
+
+                                (
+                                    value,
+                                    index
+                                ) => `
+
+                                    <div
+                                        class="memory-card"
+                                        data-index="${index}"
+                                    >
+
+                                        ${
+                                            revealed.includes(index)
+                                            ||
+                                            matched.has(index)
+
+                                            ?
+
+                                            value
+
+                                            :
+
+                                            "✦"
+                                        }
+
+                                    </div>
+
+                                `
+
+                            )
+                            .join("")
+
+                    }
+
+                </div>
+
+            </div>
+
+        `;
+
+
+        document
+            .querySelectorAll(
+                ".memory-card"
+            )
+            .forEach(
+
+                (card) => {
+
+                    card.addEventListener(
+
+                        "click",
+
+                        () => {
+
+                            flipCard(
+                                Number(
+                                    card.dataset.index
+                                )
+                            );
+
+                        }
+
+                    );
+
+                }
+
+            );
+
+    }
+
+
+    function flipCard(
+        index
+    ) {
+
+
+        if (
+
+            locked
+
+            ||
+
+            matched.has(
+                index
+            )
+
+            ||
+
+            revealed.includes(
+                index
+            )
+
+        ) {
+
+            return;
+
+        }
+
+
+        revealed.push(
+            index
+        );
+
+
+        render();
+
+
+        if (
+            revealed.length ===
+            2
+        ) {
+
+
+            moves +=
+                1;
+
+
+            const [
+                first,
+                second
+            ] =
+                revealed;
+
+
+            if (
+                values[first] ===
+                values[second]
+            ) {
+
+
+                matched.add(
+                    first
+                );
+
+
+                matched.add(
+                    second
+                );
+
+
+                revealed =
+                    [];
+
+
+                render();
+
+
+                if (
+                    matched.size ===
+                    values.length
+                ) {
+
+                    setTimeout(
+
+                        () => {
+
+                            alert(
+                                `You won in ${moves} moves!`
+                            );
+
+                        },
+
+                        200
+
+                    );
+
+                }
+
+            }
+
+            else {
+
+
+                locked =
+                    true;
+
+
+                setTimeout(
+
+                    () => {
+
+                        revealed =
+                            [];
+
+
+                        locked =
+                            false;
+
+
+                        render();
+
+                    },
+
+                    750
+
+                );
+
+            }
+
+        }
+
+    }
+
+
+    render();
+
+
+    state.gameCleanup =
+        () => {};
+
+}
+
+
+
+/* ============================================================
+   SPACE GAME
+============================================================ */
+
+function startSpaceGame() {
+
+
+    let score =
+        0;
+
+
+    let running =
+        true;
+
+
+    els.activeGameArea.innerHTML = `
+
+        <div class="mini-game">
+
+            <div
+                class="game-score"
+                id="spaceScore"
+            >
+                Score: 0
+            </div>
+
+            <div class="game-instructions">
+                Click the asteroids before they disappear.
+            </div>
+
+            <div
+                class="space-game-area"
+                id="spaceGame"
+            >
+
+                <div class="space-ship">
+                    🚀
+                </div>
+
+            </div>
+
+        </div>
+
+    `;
+
+
+    const area =
+        $("spaceGame");
+
+
+    const scoreText =
+        $("spaceScore");
+
+
+    function spawnTarget() {
+
+
+        if (
+            !running
+        ) {
+
+            return;
+
+        }
+
+
+        const target =
+            document.createElement(
+                "div"
+            );
+
+
+        target.className =
+            "space-target";
+
+
+        target.textContent =
+            Math.random() >
+            0.4
+
+            ?
+            "☄️"
+
+            :
+            "👾";
+
+
+        target.style.left =
+            `${Math.random() * 85}%`;
+
+
+        target.style.top =
+            `${Math.random() * 65}%`;
+
+
+        target.addEventListener(
+
+            "click",
+
+            () => {
+
+
+                score +=
+                    1;
+
+
+                scoreText.textContent =
+                    `Score: ${score}`;
+
+
+                target.remove();
+
+            }
+
+        );
+
+
+        area.appendChild(
+            target
+        );
+
+
+        setTimeout(
+
+            () => {
+
+                target.remove();
+
+            },
+
+            1400
+
+        );
+
+    }
+
+
+    const timer =
+        setInterval(
+            spawnTarget,
+            800
+        );
+
+
+    state.gameCleanup =
+        () => {
+
+            running =
+                false;
+
+
+            clearInterval(
+                timer
+            );
+
+        };
+
+}
+
+
+
+/* ============================================================
+   HELPERS FOR GAMES
+============================================================ */
+
+function randomItem(
+    array
+) {
+
+    return array[
+        Math.floor(
+            Math.random() *
+            array.length
+        )
+    ];
+
+}
+
+
+function shuffle(
+    array
+) {
+
+
+    for (
+        let i =
+            array.length - 1;
+
+        i > 0;
+
+        i--
+    ) {
+
+
+        const j =
+            Math.floor(
+                Math.random() *
+                (
+                    i + 1
+                )
+            );
+
+
+        [
+            array[i],
+            array[j]
+        ] = [
+
+            array[j],
+            array[i]
+
+        ];
+
+    }
+
+
+    return array;
+
+}
+
+
+
+/* ============================================================
+   CREATOR
+============================================================ */
+
+function isCreatorQuestion(
+    text
+) {
+
+
+    return [
+
+        "who created you",
+        "who made you",
+        "who built you",
+        "who developed you",
+        "who is your creator",
+        "who created galaxy",
+        "who made galaxy"
+
+    ]
+    .some(
+
+        (phrase) =>
+            text.includes(
+                phrase
+            )
+
+    );
+
+}
+
+
+
+/* ============================================================
+   LANGUAGE
+============================================================ */
+
+function isLanguageQuestion(
+    text
+) {
+
+
+    return (
+
+        text.includes(
+            "do you know tamil"
+        )
+
+        ||
+
+        text.includes(
+            "can you speak tamil"
+        )
+
+        ||
+
+        text.includes(
+            "how many languages"
+        )
+
+        ||
+
+        text.includes(
+            "how many langueages"
+        )
+
+        ||
+
+        text.includes(
+            "what languages"
+        )
+
+    );
+
+}
+
+
+
+/* ============================================================
+   WEATHER
+============================================================ */
+
+function isWeatherQuestion(
+    text
+) {
+
+
+    return (
+
+        /\b(weather|temperature|forecast|weather today)\b/i
+            .test(
+                text
+            )
+
+    );
+
+}
+
+
+
+/* ============================================================
+   CALCULATOR
+============================================================ */
+
+function calculate(
+    message
+) {
+
+
+    const expression =
+        message
+
+            .toLowerCase()
+
+            .replace(
+                /^what is\s+/,
+                ""
+            )
+
+            .replace(
+                /^calculate\s+/,
+                ""
+            )
+
+            .replace(
+                /×/g,
+                "*"
+            )
+
+            .replace(
+                /÷/g,
+                "/"
+            )
+
+            .trim();
+
+
+    if (
+
+        !expression
+
+        ||
+
+        !/^[0-9+\-*/().%\s]+$/
+            .test(
+                expression
+            )
+
+    ) {
+
+        return null;
+
+    }
+
+
+    try {
+
+
+        const result =
+            Function(
+
+                `"use strict";
+                 return (${expression});`
+
+            )();
+
+
+        return (
+
+            typeof result ===
+            "number"
+
+            &&
+
+            Number.isFinite(
+                result
+            )
+
+        )
+
+        ?
+
+        result
+
+        :
+
+        null;
+
+    }
+
+    catch {
+
+        return null;
+
+    }
+
+}
+
+
+
+/* ============================================================
+   IMAGE DETECTION
+============================================================ */
+
+function isImageCommand(
+    text
+) {
+
+
+    return (
+
+        /^(create|generate|make|draw|paint|design|show)\b/i
+            .test(
+                text
+            )
+
+        &&
+
+        /\b(image|picture|photo|wallpaper|poster|artwork|illustration)\b/i
+            .test(
+                text
+            )
+
+    )
+
+    ||
+
+    /^draw\b/i
+        .test(
+            text
+        );
+
+}
+
+
+function cleanImagePrompt(
+    text
+) {
+
+
+    return text
+
+        .replace(
+            /^(create|generate|make|draw|paint|design|show)\s+/i,
+            ""
+        )
+
+        .replace(
+            /^(an?|the)\s+/i,
+            ""
+        )
+
+        .replace(
+            /\b(image|picture|photo|wallpaper|poster|artwork|illustration)\b/gi,
+            ""
+        )
+
+        .replace(
+            /^\s*of\s+/i,
+            ""
+        )
+
+        .replace(
+            /\s+/g,
+            " "
+        )
+
+        .trim()
+
+        ||
+
+        "a beautiful cinematic scene";
+
+}
+
+
+
+/* ============================================================
+   VIDEO DETECTION
+============================================================ */
+
+function isVideoCommand(
+    text
+) {
+
+
+    return (
+
+        /^(create|generate|make|design|show)\b/i
+            .test(
+                text
+            )
+
+        &&
+
+        /\b(video|movie|clip|animation)\b/i
+            .test(
+                text
+            )
+
+    );
+
+}
+
+
+function cleanVideoPrompt(
+    text
+) {
+
+
+    return text
+
+        .replace(
+            /^(create|generate|make|design|show)\s+/i,
+            ""
+        )
+
+        .replace(
+            /^(an?|the)\s+/i,
+            ""
+        )
+
+        .replace(
+            /\b(video|movie|clip|animation)\b/gi,
+            ""
+        )
+
+        .replace(
+            /^\s*of\s+/i,
+            ""
+        )
+
+        .replace(
+            /\s+/g,
+            " "
+        )
+
+        .trim()
+
+        ||
+
+        "a cinematic futuristic scene";
+
+}
+
+
+
+/* ============================================================
+   LOCAL AI
 ============================================================ */
 
 async function answerWithLocalAI(
+
     message,
+
     source
+
 ) {
+
 
     let live =
         null;
 
 
+    state.busy =
+        true;
+
+
     try {
+
 
         live =
             createLiveAssistantBubble(
@@ -973,13 +3381,15 @@ async function answerWithLocalAI(
 
         const engine =
             await getAIEngine(
-                label => {
 
-                    live.update(
+                (label) => {
+
+                    live?.update(
                         label
                     );
 
                 }
+
             );
 
 
@@ -988,16 +3398,9 @@ async function answerWithLocalAI(
         );
 
 
-
         const chat =
             getCurrentChat();
 
-
-
-        /*
-         * Send recent chat history
-         * so follow-up questions work.
-         */
 
         const history =
             (
@@ -1006,42 +3409,46 @@ async function answerWithLocalAI(
             )
 
             .filter(
-                m =>
-                    m.type ===
+
+                (item) =>
+                    item.type ===
                     "text"
+
             )
 
             .slice(
-                -14
+                -16
             )
 
             .map(
-                m => ({
+
+                (item) => ({
 
                     role:
-                        m.role,
+                        item.role,
 
                     content:
-                        m.content
+                        item.content
 
                 })
+
             );
 
 
-
         const systemPrompt =
-`You are GALAXY, a helpful multilingual assistant created by Harshavardhan.
+`You are GALAXY, a helpful multilingual AI assistant created by Harshavardhan.
 
-Respond in the same language the user uses unless they ask for another language.
+Answer in the same language as the user's latest message unless they request another language.
 
-You can answer in Tamil, English, Hindi, Arabic, French and other languages supported by your model.
+If the user writes Tamil, answer naturally in Tamil.
 
-Be accurate, helpful and clear.
+You can answer in English, Tamil, Hindi, Arabic, French, Spanish and other languages supported by your local model.
+
+Be accurate, clear and helpful.
 
 If anyone asks who created GALAXY, say Harshavardhan created GALAXY.
 
-Do not claim to have live weather or live web access unless a tool actually provides it.`;
-
+Do not pretend you have live internet, live weather or private data when you do not.`;
 
 
         const stream =
@@ -1073,15 +3480,13 @@ Do not claim to have live weather or live web access unless a tool actually prov
                         0.65,
 
                     max_tokens:
-                        1000
+                        1200
 
                 });
 
 
-
         let output =
             "";
-
 
 
         for await (
@@ -1089,33 +3494,40 @@ Do not claim to have live weather or live web access unless a tool actually prov
             of stream
         ) {
 
+
             output +=
+
                 chunk
                     ?.choices
                     ?.[0]
                     ?.delta
                     ?.content
+
                 ||
+
                 "";
 
 
             live.update(
+
                 output ||
+
                 "Thinking…"
+
             );
 
         }
 
 
-
         live.remove();
 
 
-
         const finalText =
-            output.trim() ||
-            "I couldn't generate an answer.";
+            output.trim()
 
+            ||
+
+            "I could not generate an answer.";
 
 
         addAssistantMessage(
@@ -1129,8 +3541,7 @@ Do not claim to have live weather or live web access unless a tool actually prov
 
 
         if (
-            source ===
-            "voice"
+            source === "voice"
         ) {
 
             speakText(
@@ -1145,32 +3556,29 @@ Do not claim to have live weather or live web access unless a tool actually prov
         error
     ) {
 
-        if (
-            live
-        ) {
-
-            live.remove();
-
-        }
-
 
         console.error(
             error
         );
 
 
-        const message =
-            navigator.gpu
+        live?.remove();
 
-            ?
-            "I couldn't load the local AI model on this device. Try refreshing, using a recent Chrome or Edge browser, and make sure hardware acceleration is enabled."
 
-            :
-            "This browser does not provide WebGPU, so the downloadable local AI cannot run here. Try a recent WebGPU-capable browser.";
+        const fallback =
+            offlineFallback(
+                message
+            );
 
 
         addAssistantMessage(
-            message
+
+            fallback
+
+            ||
+
+            "The local AI could not start. Use a recent WebGPU-capable Chrome or Edge browser and allow the model download to finish."
+
         );
 
 
@@ -1178,17 +3586,12 @@ Do not claim to have live weather or live web access unless a tool actually prov
             "AI unavailable"
         );
 
+    }
 
-        if (
-            source ===
-            "voice"
-        ) {
+    finally {
 
-            speakText(
-                message
-            );
-
-        }
+        state.busy =
+            false;
 
     }
 
@@ -1197,12 +3600,13 @@ Do not claim to have live weather or live web access unless a tool actually prov
 
 
 /* ============================================================
-   DOWNLOAD / LOAD LOCAL AI
+   AI MODEL
 ============================================================ */
 
 async function getAIEngine(
     onProgress
 ) {
+
 
     if (
         state.aiEngine
@@ -1218,37 +3622,21 @@ async function getAIEngine(
     ) {
 
         throw new Error(
-            "WEBGPU unavailable"
+            "WebGPU unavailable"
         );
 
     }
 
-
-
-    /*
-     * Another call may already
-     * be downloading the model.
-     */
 
     while (
         state.aiLoading
     ) {
 
         await delay(
-            100
+            150
         );
 
     }
-
-
-    if (
-        state.aiEngine
-    ) {
-
-        return state.aiEngine;
-
-    }
-
 
 
     state.aiLoading =
@@ -1257,16 +3645,12 @@ async function getAIEngine(
 
     try {
 
+
         const webllm =
             await import(
                 TEXT_MODULE_URL
             );
 
-
-        /*
-         * Automatically use a stronger
-         * model on more capable devices.
-         */
 
         const memory =
             Number(
@@ -1276,31 +3660,32 @@ async function getAIEngine(
 
 
         const candidates =
+
             memory >= 8
 
             ?
+
             [
 
-                "Qwen2.5-3B-Instruct-q4f16_1-MLC",
+                "Llama-3.2-3B-Instruct-q4f16_1-MLC",
 
-                "Qwen2.5-1.5B-Instruct-q4f16_1-MLC"
+                "Llama-3.2-1B-Instruct-q4f16_1-MLC"
 
             ]
 
             :
+
             [
 
-                "Qwen2.5-1.5B-Instruct-q4f16_1-MLC",
+                "Llama-3.2-1B-Instruct-q4f16_1-MLC",
 
-                "Qwen2.5-0.5B-Instruct-q4f16_1-MLC"
+                "Llama-3.2-1B-Instruct-q4f32_1-MLC"
 
             ];
 
 
-
         let lastError =
             null;
-
 
 
         for (
@@ -1308,16 +3693,12 @@ async function getAIEngine(
             of candidates
         ) {
 
+
             try {
+
 
                 state.aiModelId =
                     modelId;
-
-
-                setModelStatus(
-                    "Downloading local AI…"
-                );
-
 
 
                 state.aiEngine =
@@ -1329,31 +3710,38 @@ async function getAIEngine(
                             {
 
                                 initProgressCallback:
-                                    report => {
+
+                                    (report) => {
+
 
                                         const percent =
+
                                             typeof report.progress ===
                                             "number"
 
                                             ?
+
                                             Math.round(
                                                 report.progress *
                                                 100
                                             )
 
                                             :
+
                                             null;
 
 
                                         const label =
-                                            percent !==
-                                            null
+
+                                            percent !== null
 
                                             ?
+
                                             `Downloading AI ${percent}%`
 
                                             :
-                                            "Loading local AI…";
+
+                                            "Loading AI…";
 
 
                                         setStatus(
@@ -1366,15 +3754,9 @@ async function getAIEngine(
                                         );
 
 
-                                        if (
-                                            onProgress
-                                        ) {
-
-                                            onProgress(
-                                                label
-                                            );
-
-                                        }
+                                        onProgress?.(
+                                            label
+                                        );
 
                                     }
 
@@ -1390,10 +3772,12 @@ async function getAIEngine(
                     )
 
                     ?
+
                     "Local AI · 3B"
 
                     :
-                    "Local AI · Lite"
+
+                    "Local AI · 1B"
 
                 );
 
@@ -1405,6 +3789,7 @@ async function getAIEngine(
             catch (
                 error
             ) {
+
 
                 lastError =
                     error;
@@ -1418,12 +3803,7 @@ async function getAIEngine(
         }
 
 
-        throw (
-            lastError ||
-            new Error(
-                "AI model load failed"
-            )
-        );
+        throw lastError;
 
     }
 
@@ -1439,186 +3819,43 @@ async function getAIEngine(
 
 
 /* ============================================================
-   IMAGE COMMAND RECOGNITION
-
-   These now work:
-
-   create a modern city picture
-
-   generate an image of a dragon
-
-   make a futuristic car photo
-
-   draw a space station
-============================================================ */
-
-function isImageCommand(
-    text
-) {
-
-    const mediaWord =
-        /\b(image|picture|photo|wallpaper|poster|artwork|illustration)\b/i
-        .test(
-            text
-        );
-
-
-    const createWord =
-        /^(create|generate|make|draw|paint|design)\b/i
-        .test(
-            text
-        );
-
-
-    return (
-
-        /^draw\b/i.test(
-            text
-        )
-
-        ||
-
-        (
-            mediaWord &&
-            createWord
-        )
-
-    );
-
-}
-
-
-
-function cleanImagePrompt(
-    text
-) {
-
-    return text
-
-        .replace(
-            /^(create|generate|make|design|paint)\s+(an?\s+)?/i,
-            ""
-        )
-
-        .replace(
-            /^draw\s+/i,
-            ""
-        )
-
-        .replace(
-            /\b(image|picture|photo|wallpaper|poster|artwork|illustration)\b/gi,
-            ""
-        )
-
-        .replace(
-            /^of\s+/i,
-            ""
-        )
-
-        .replace(
-            /\s+/g,
-            " "
-        )
-
-        .trim()
-
-        ||
-
-        "a beautiful futuristic scene";
-
-}
-
-
-
-/* ============================================================
-   VIDEO COMMAND
-============================================================ */
-
-function isVideoCommand(
-    text
-) {
-
-    return (
-
-        /^(create|generate|make|design)\b/i
-        .test(
-            text
-        )
-
-        &&
-
-        /\b(video|movie|clip|animation)\b/i
-        .test(
-            text
-        )
-
-    );
-
-}
-
-
-
-function cleanVideoPrompt(
-    text
-) {
-
-    return text
-
-        .replace(
-            /^(create|generate|make|design)\s+(a\s+)?/i,
-            ""
-        )
-
-        .replace(
-            /\b(video|movie|clip|animation)\b/gi,
-            ""
-        )
-
-        .replace(
-            /^of\s+/i,
-            ""
-        )
-
-        .replace(
-            /\s+/g,
-            " "
-        )
-
-        .trim()
-
-        ||
-
-        "a cinematic futuristic scene";
-
-}
-
-
-
-/* ============================================================
    IMAGE GENERATION
 ============================================================ */
 
 async function handleImageGeneration(
+
     prompt,
+
     source
+
 ) {
 
-    const live =
-        createLiveAssistantBubble(
-            "Preparing image generator…"
-        );
+
+    let live =
+        null;
+
+
+    state.busy =
+        true;
 
 
     try {
 
-        const blob =
+
+        live =
+            createLiveAssistantBubble(
+                "Preparing image generator…"
+            );
+
+
+        const imageBlob =
             await generateImageBlob(
 
                 prompt,
 
-                label => {
+                (label) => {
 
-                    live.update(
+                    live?.update(
                         label
                     );
 
@@ -1630,16 +3867,14 @@ async function handleImageGeneration(
         live.remove();
 
 
-
-        /*
-         * Save image in IndexedDB so it
-         * can remain in that conversation.
-         */
-
         const mediaId =
             await saveMediaBlob(
-                blob,
+
+                imageBlob,
+
+                imageBlob.type ||
                 "image/png"
+
             );
 
 
@@ -1666,38 +3901,20 @@ async function handleImageGeneration(
             "Ready"
         );
 
-
-        if (
-            source ===
-            "voice"
-        ) {
-
-            speakText(
-                "Your image is ready."
-            );
-
-        }
-
     }
 
     catch (
         error
     ) {
 
-        live.remove();
 
-
-        console.error(
-            error
-        );
-
-
-        const message =
-            "Image generation could not run on this device. It needs WebGPU and enough GPU memory. The first use also downloads the image model.";
+        live?.remove();
 
 
         addAssistantMessage(
-            message
+
+            "Image generation could not run on this device. It requires WebGPU and enough GPU memory."
+
         );
 
 
@@ -1705,17 +3922,12 @@ async function handleImageGeneration(
             "Image unavailable"
         );
 
+    }
 
-        if (
-            source ===
-            "voice"
-        ) {
+    finally {
 
-            speakText(
-                message
-            );
-
-        }
+        state.busy =
+            false;
 
     }
 
@@ -1724,16 +3936,22 @@ async function handleImageGeneration(
 
 
 /* ============================================================
-   DOWNLOAD / LOAD IMAGE MODEL
+   IMAGE MODEL
 ============================================================ */
 
 async function getImageClient(
     onProgress
 ) {
 
+
     if (
-        state.imageClient &&
+
+        state.imageClient
+
+        &&
+
         state.imageModelLoaded
+
     ) {
 
         return state.imageClient;
@@ -1741,35 +3959,20 @@ async function getImageClient(
     }
 
 
-    if (
-        !navigator.gpu
-    ) {
-
-        throw new Error(
-            "WEBGPU unavailable"
+    const module =
+        await import(
+            IMAGE_MODULE_URL
         );
 
-    }
 
+    state.imageClient =
+        state.imageClient
 
+        ||
 
-    if (
-        !state.imageClient
-    ) {
-
-        const module =
-            await import(
-                IMAGE_MODULE_URL
-            );
-
-
-        state.imageClient =
-            module
-                .Txt2ImgWorkerClient
-                .createDefault();
-
-    }
-
+        module
+            .Txt2ImgWorkerClient
+            .createDefault();
 
 
     const capabilities =
@@ -1777,17 +3980,15 @@ async function getImageClient(
             .detect();
 
 
-
     if (
         !capabilities.webgpu
     ) {
 
         throw new Error(
-            "WebGPU unavailable for image generation"
+            "WebGPU unavailable"
         );
 
     }
-
 
 
     const loadResult =
@@ -1805,23 +4006,16 @@ async function getImageClient(
 
                 },
 
-                progress => {
-
-                    const percent =
-                        progress?.pct !=
-                        null
-
-                        ?
-                        ` ${Math.round(
-                            progress.pct
-                        )}%`
-
-                        :
-                        "";
+                (progress) => {
 
 
                     const label =
-                        `${progress?.message || "Downloading image model"}${percent}`;
+
+                        progress?.message
+
+                        ||
+
+                        "Downloading image model…";
 
 
                     setStatus(
@@ -1829,20 +4023,13 @@ async function getImageClient(
                     );
 
 
-                    if (
-                        onProgress
-                    ) {
-
-                        onProgress(
-                            label
-                        );
-
-                    }
+                    onProgress?.(
+                        label
+                    );
 
                 }
 
             );
-
 
 
     if (
@@ -1850,12 +4037,10 @@ async function getImageClient(
     ) {
 
         throw new Error(
-            loadResult?.message ||
-            "Image model load failed"
+            "Image model failed"
         );
 
     }
-
 
 
     state.imageModelLoaded =
@@ -1873,20 +4058,17 @@ async function getImageClient(
 ============================================================ */
 
 async function generateImageBlob(
+
     prompt,
+
     onProgress
+
 ) {
+
 
     const client =
         await getImageClient(
             onProgress
-        );
-
-
-    const seed =
-        Math.floor(
-            Math.random() *
-            2000000000
         );
 
 
@@ -1899,7 +4081,10 @@ async function generateImageBlob(
                     prompt,
 
                 seed:
-                    seed,
+                    Math.floor(
+                        Math.random() *
+                        2_000_000_000
+                    ),
 
                 width:
                     512,
@@ -1909,32 +4094,24 @@ async function generateImageBlob(
 
             },
 
-            event => {
+            (event) => {
+
 
                 const label =
                     event?.phase
 
                     ?
+
                     `Generating image · ${event.phase}`
 
                     :
+
                     "Generating image…";
 
 
-                setStatus(
+                onProgress?.(
                     label
                 );
-
-
-                if (
-                    onProgress
-                ) {
-
-                    onProgress(
-                        label
-                    );
-
-                }
 
             },
 
@@ -1944,26 +4121,24 @@ async function generateImageBlob(
                     "queue",
 
                 debounceMs:
-                    0
+                    100
 
             }
 
         );
 
 
-
     const result =
         await job.promise;
 
 
-
     if (
-        !result?.ok ||
+        !result?.ok
+        ||
         !result.blob
     ) {
 
         throw new Error(
-            result?.message ||
             "Image generation failed"
         );
 
@@ -1977,48 +4152,43 @@ async function generateImageBlob(
 
 
 /* ============================================================
-   VIDEO GENERATION
-
-   IMPORTANT:
-
-   This creates a REAL playable local
-   WebM video.
-
-   Process:
-
-   text
-      ↓
-   AI image
-      ↓
-   animated canvas
-      ↓
-   WebM video
-
-   This is not full cinematic
-   video diffusion.
+   VIDEO
 ============================================================ */
 
 async function handleVideoGeneration(
+
     prompt,
+
     source
+
 ) {
 
-    const live =
-        createLiveAssistantBubble(
-            "Creating local AI video…"
-        );
+
+    let live =
+        null;
+
+
+    state.busy =
+        true;
 
 
     try {
+
+
+        live =
+            createLiveAssistantBubble(
+                "Preparing AI scene…"
+            );
+
 
         const imageBlob =
             await generateImageBlob(
 
                 prompt,
 
-                label => {
+                (label) => {
 
-                    live.update(
+                    live?.update(
                         label
                     );
 
@@ -2028,21 +4198,17 @@ async function handleVideoGeneration(
 
 
         live.update(
-            "Animating the generated scene…"
+            "Creating motion video…"
         );
-
 
 
         const videoBlob =
             await createMotionVideo(
-                imageBlob,
-                prompt
+                imageBlob
             );
 
 
-
         live.remove();
-
 
 
         const mediaId =
@@ -2050,18 +4216,16 @@ async function handleVideoGeneration(
 
                 videoBlob,
 
-                videoBlob.type ||
                 "video/webm"
 
             );
-
 
 
         addMessage(
 
             "assistant",
 
-            `Generated local motion video: ${prompt}`,
+            `Generated motion video: ${prompt}`,
 
             {
 
@@ -2080,38 +4244,20 @@ async function handleVideoGeneration(
             "Ready"
         );
 
-
-        if (
-            source ===
-            "voice"
-        ) {
-
-            speakText(
-                "Your video is ready."
-            );
-
-        }
-
     }
 
     catch (
         error
     ) {
 
-        live.remove();
 
-
-        console.error(
-            error
-        );
-
-
-        const message =
-            "Video generation could not run on this device. This three-file build creates a short local motion video from an AI-generated image; it is not a full cinematic text-to-video diffusion model.";
+        live?.remove();
 
 
         addAssistantMessage(
-            message
+
+            "The video could not be created. GALAXY currently makes a short motion video from an AI-generated image."
+
         );
 
 
@@ -2119,17 +4265,12 @@ async function handleVideoGeneration(
             "Video unavailable"
         );
 
+    }
 
-        if (
-            source ===
-            "voice"
-        ) {
+    finally {
 
-            speakText(
-                message
-            );
-
-        }
+        state.busy =
+            false;
 
     }
 
@@ -2138,31 +4279,18 @@ async function handleVideoGeneration(
 
 
 /* ============================================================
-   CREATE PLAYABLE VIDEO
+   MOTION VIDEO
 ============================================================ */
 
 async function createMotionVideo(
-    imageBlob,
-    prompt
+    imageBlob
 ) {
-
-    if (
-        !window.MediaRecorder
-    ) {
-
-        throw new Error(
-            "MediaRecorder unsupported"
-        );
-
-    }
-
 
 
     const bitmap =
         await createImageBitmap(
             imageBlob
         );
-
 
 
     const canvas =
@@ -2179,60 +4307,22 @@ async function createMotionVideo(
         432;
 
 
-
     const ctx =
         canvas.getContext(
             "2d"
         );
 
 
-    const fps =
-        30;
-
-
-    const durationMs =
-        6000;
-
-
-
     const stream =
         canvas.captureStream(
-            fps
+            30
         );
-
-
-
-    const mime =
-        MediaRecorder
-            .isTypeSupported(
-                "video/webm;codecs=vp9"
-            )
-
-        ?
-        "video/webm;codecs=vp9"
-
-        :
-        "video/webm";
-
 
 
     const recorder =
         new MediaRecorder(
-
-            stream,
-
-            {
-
-                mimeType:
-                    mime,
-
-                videoBitsPerSecond:
-                    4000000
-
-            }
-
+            stream
         );
-
 
 
     const chunks =
@@ -2240,7 +4330,7 @@ async function createMotionVideo(
 
 
     recorder.ondataavailable =
-        event => {
+        (event) => {
 
             if (
                 event.data.size
@@ -2255,39 +4345,37 @@ async function createMotionVideo(
         };
 
 
-
     const stopped =
         new Promise(
-            resolve => {
+
+            (resolve) => {
 
                 recorder.onstop =
                     resolve;
 
             }
+
         );
 
 
-
-    recorder.start(
-        250
-    );
-
+    recorder.start();
 
 
     const start =
         performance.now();
 
 
-
     await new Promise(
-        resolve => {
+
+        (resolve) => {
 
 
             function frame(
                 now
             ) {
 
-                const t =
+
+                const progress =
                     Math.min(
 
                         1,
@@ -2298,104 +4386,26 @@ async function createMotionVideo(
                         )
 
                         /
-                        durationMs
+
+                        6000
 
                     );
 
 
-
-                /*
-                 * Slow cinematic zoom.
-                 */
-
                 const scale =
                     1.02 +
-                    t *
+                    progress *
                     0.12;
 
 
-
-                const sourceRatio =
+                const sw =
                     bitmap.width /
-                    bitmap.height;
-
-
-                const targetRatio =
-                    canvas.width /
-                    canvas.height;
-
-
-
-                let sw =
-                    bitmap.width;
-
-
-                let sh =
-                    bitmap.height;
-
-
-
-                if (
-                    sourceRatio >
-                    targetRatio
-                ) {
-
-                    sw =
-                        sh *
-                        targetRatio;
-
-                }
-
-                else {
-
-                    sh =
-                        sw /
-                        targetRatio;
-
-                }
-
-
-
-                sw /=
                     scale;
 
 
-                sh /=
+                const sh =
+                    bitmap.height /
                     scale;
-
-
-
-                const driftX =
-                    Math.sin(
-                        t *
-                        Math.PI
-                    )
-                    *
-                    bitmap.width
-                    *
-                    0.02;
-
-
-
-                const sx =
-                    (
-                        bitmap.width -
-                        sw
-                    )
-                    /
-                    2
-                    +
-                    driftX;
-
-
-                const sy =
-                    (
-                        bitmap.height -
-                        sh
-                    )
-                    /
-                    2;
-
 
 
                 ctx.clearRect(
@@ -2406,159 +4416,34 @@ async function createMotionVideo(
                 );
 
 
-
                 ctx.drawImage(
 
                     bitmap,
 
-                    sx,
-                    sy,
+                    (
+                        bitmap.width -
+                        sw
+                    ) / 2,
+
+                    (
+                        bitmap.height -
+                        sh
+                    ) / 2,
+
                     sw,
                     sh,
 
                     0,
                     0,
+
                     canvas.width,
                     canvas.height
 
                 );
-
-
-
-                /*
-                 * Cinematic tint.
-                 */
-
-                const gradient =
-                    ctx.createLinearGradient(
-
-                        0,
-                        0,
-                        0,
-                        canvas.height
-
-                    );
-
-
-                gradient.addColorStop(
-                    0,
-                    "rgba(15,0,40,0.05)"
-                );
-
-
-                gradient.addColorStop(
-                    1,
-                    "rgba(0,0,15,0.28)"
-                );
-
-
-                ctx.fillStyle =
-                    gradient;
-
-
-                ctx.fillRect(
-
-                    0,
-                    0,
-                    canvas.width,
-                    canvas.height
-
-                );
-
-
-
-                /*
-                 * Moving light particles.
-                 */
-
-                for (
-                    let i = 0;
-                    i < 22;
-                    i++
-                ) {
-
-                    const x =
-                        (
-                            i *
-                            97
-                            +
-                            t *
-                            220
-                            *
-                            (
-                                1 +
-                                (
-                                    i %
-                                    3
-                                )
-                            )
-                        )
-                        %
-                        canvas.width;
-
-
-                    const y =
-                        (
-                            i *
-                            53
-                            +
-                            Math.sin(
-                                t *
-                                6
-                                +
-                                i
-                            )
-                            *
-                            24
-                            +
-                            canvas.height
-                        )
-                        %
-                        canvas.height;
-
-
-                    ctx.fillStyle =
-                        `rgba(210,190,255,${
-                            0.12 +
-                            (
-                                i %
-                                4
-                            )
-                            *
-                            0.04
-                        })`;
-
-
-                    ctx.beginPath();
-
-
-                    ctx.arc(
-
-                        x,
-                        y,
-
-                        1 +
-                        (
-                            i %
-                            2
-                        ),
-
-                        0,
-
-                        Math.PI *
-                        2
-
-                    );
-
-
-                    ctx.fill();
-
-                }
-
 
 
                 if (
-                    t <
+                    progress <
                     1
                 ) {
 
@@ -2582,8 +4467,8 @@ async function createMotionVideo(
             );
 
         }
-    );
 
+    );
 
 
     recorder.stop();
@@ -2595,14 +4480,13 @@ async function createMotionVideo(
     bitmap.close();
 
 
-
     return new Blob(
 
         chunks,
 
         {
             type:
-                mime
+                "video/webm"
         }
 
     );
@@ -2612,166 +4496,47 @@ async function createMotionVideo(
 
 
 /* ============================================================
-   CREATOR
+   FALLBACK
 ============================================================ */
 
-function isCreatorQuestion(
-    text
-) {
-
-    return [
-
-        "who created you",
-
-        "who made you",
-
-        "who built you",
-
-        "who developed you",
-
-        "who is your creator",
-
-        "who created galaxy",
-
-        "who made galaxy",
-
-        "creator of galaxy"
-
-    ]
-
-    .some(
-        phrase =>
-            text.includes(
-                phrase
-            )
-    );
-
-}
-
-
-
-/* ============================================================
-   WEATHER
-============================================================ */
-
-function isWeatherQuestion(
-    text
-) {
-
-    return (
-        /\b(weather|temperature|forecast|rain today|weather today)\b/i
-        .test(
-            text
-        )
-    );
-
-}
-
-
-
-/* ============================================================
-   CALCULATOR
-============================================================ */
-
-function calculate(
+function offlineFallback(
     message
 ) {
 
-    const expression =
-        message
-
-        .toLowerCase()
-
-        .replace(
-            /^what is\s+/,
-            ""
-        )
-
-        .replace(
-            /^calculate\s+/,
-            ""
-        )
-
-        .replace(
-            /×/g,
-            "*"
-        )
-
-        .replace(
-            /÷/g,
-            "/"
-        )
-
-        .replace(
-            /\bx\b/g,
-            "*"
-        )
-
-        .trim();
-
-
 
     if (
-        !expression ||
-        !/^[0-9+\-*/().%\s]+$/
-        .test(
-            expression
-        )
+        /[\u0B80-\u0BFF]/
+            .test(
+                message
+            )
     ) {
 
-        return null;
-
-    }
-
-
-
-    try {
-
-        const result =
-            Function(
-                `"use strict";return (${expression})`
-            )();
-
-
         return (
-
-            typeof result ===
-                "number"
-
-            &&
-
-            Number.isFinite(
-                result
-            )
-
-        )
-
-        ?
-        result
-
-        :
-        null;
+            "ஆம், GALAXY தமிழைப் புரிந்துகொள்ள முயலும். உள்ளூர் AI மாதிரி பதிவிறக்கம் செய்யப்பட்டால் தமிழில் விரிவாக பதிலளிக்க முடியும்."
+        );
 
     }
 
-    catch {
 
-        return null;
-
-    }
+    return null;
 
 }
 
 
 
 /* ============================================================
-   RESPOND
+   RESPONSE
 ============================================================ */
 
 function respond(
+
     text,
-    source = "typed"
+
+    source =
+        "typed"
+
 ) {
+
 
     addAssistantMessage(
         text
@@ -2804,20 +4569,28 @@ function respond(
 
 function loadChats() {
 
+
     try {
 
+
         state.chats =
+
             JSON.parse(
+
                 localStorage.getItem(
                     CHAT_KEY
                 )
+
             )
+
             ||
+
             [];
 
     }
 
     catch {
+
 
         state.chats =
             [];
@@ -2826,17 +4599,20 @@ function loadChats() {
 
 
     state.currentChatId =
+
         localStorage.getItem(
             CURRENT_CHAT_KEY
         )
+
         ||
+
         null;
 
 }
 
 
-
 function saveChats() {
+
 
     localStorage.setItem(
 
@@ -2873,6 +4649,7 @@ function saveChats() {
 
 function ensureCurrentChat() {
 
+
     if (
         !state.chats.length
     ) {
@@ -2887,43 +4664,37 @@ function ensureCurrentChat() {
 
 
     if (
+
         !state.chats.some(
-            chat =>
+
+            (chat) =>
                 chat.id ===
                 state.currentChatId
+
         )
+
     ) {
 
         state.currentChatId =
             state.chats[0].id;
-
-
-        saveChats();
 
     }
 
 }
 
 
-
 function createNewChat(
     silent = false
 ) {
 
+
     const chat = {
 
         id:
-            `chat_${Date.now()}_${
-                Math.random()
-                    .toString(36)
-                    .slice(2, 7)
-            }`,
+            `chat_${Date.now()}`,
 
         title:
             "New conversation",
-
-        createdAt:
-            Date.now(),
 
         updatedAt:
             Date.now(),
@@ -2951,7 +4722,6 @@ function createNewChat(
 
     renderRecentChats();
 
-
     renderCurrentChat();
 
 
@@ -2959,7 +4729,8 @@ function createNewChat(
         !silent
     ) {
 
-        els.userInput.focus();
+        els.userInput
+            ?.focus();
 
     }
 
@@ -2968,17 +4739,20 @@ function createNewChat(
 
 
 /* ============================================================
-   CURRENT CHAT
+   MESSAGES
 ============================================================ */
 
 function getCurrentChat() {
 
+
     return (
 
         state.chats.find(
-            chat =>
+
+            (chat) =>
                 chat.id ===
                 state.currentChatId
+
         )
 
         ||
@@ -2990,16 +4764,11 @@ function getCurrentChat() {
 }
 
 
-
-/* ============================================================
-   ADD MESSAGES
-============================================================ */
-
 function addUserMessage(
     content
 ) {
 
-    return addMessage(
+    addMessage(
         "user",
         content
     );
@@ -3007,12 +4776,11 @@ function addUserMessage(
 }
 
 
-
 function addAssistantMessage(
     content
 ) {
 
-    return addMessage(
+    addMessage(
         "assistant",
         content
     );
@@ -3020,12 +4788,16 @@ function addAssistantMessage(
 }
 
 
-
 function addMessage(
+
     role,
+
     content,
+
     extra = {}
+
 ) {
+
 
     const chat =
         getCurrentChat();
@@ -3033,20 +4805,12 @@ function addMessage(
 
     if (!chat) {
 
-        return null;
+        return;
 
     }
 
 
-
-    const message = {
-
-        id:
-            `msg_${Date.now()}_${
-                Math.random()
-                    .toString(36)
-                    .slice(2, 6)
-            }`,
+    chat.messages.push({
 
         role:
             role,
@@ -3065,33 +4829,36 @@ function addMessage(
         createdAt:
             Date.now()
 
-    };
-
-
-
-    chat.messages.push(
-        message
-    );
-
+    });
 
 
     if (
-        role ===
-            "user"
+
+        role === "user"
 
         &&
 
         chat.title ===
-            "New conversation"
+        "New conversation"
+
     ) {
 
         chat.title =
-            createTitle(
-                content
-            );
+            content === "123"
+
+            ?
+
+            "Galaxy access"
+
+            :
+
+            content
+                .slice(
+                    0,
+                    34
+                );
 
     }
-
 
 
     chat.updatedAt =
@@ -3100,78 +4867,9 @@ function addMessage(
 
     saveChats();
 
-
     renderRecentChats();
 
-
     renderCurrentChat();
-
-
-    return message;
-
-}
-
-
-
-/* ============================================================
-   CHAT TITLE
-============================================================ */
-
-function createTitle(
-    content
-) {
-
-    /*
-     * Do not show secret word
-     * as recent chat title.
-     */
-
-    if (
-        content
-            .trim()
-            .toLowerCase()
-
-        ===
-
-        "harshavardhan"
-    ) {
-
-        return (
-            "Galaxy access"
-        );
-
-    }
-
-
-    const clean =
-        content
-
-        .replace(
-            /\s+/g,
-            " "
-        )
-
-        .trim();
-
-
-    return (
-
-        clean.length >
-        34
-
-        ?
-        `${clean.slice(
-            0,
-            34
-        )}…`
-
-        :
-        (
-            clean ||
-            "New conversation"
-        )
-
-    );
 
 }
 
@@ -3183,25 +4881,24 @@ function createTitle(
 
 function renderRecentChats() {
 
+
+    if (
+        !els.recentChats
+    ) {
+
+        return;
+
+    }
+
+
     els.recentChats.innerHTML =
         "";
 
 
-    [
-        ...state.chats
-    ]
+    state.chats.forEach(
 
-    .sort(
-        (
-            a,
-            b
-        ) =>
-            b.updatedAt -
-            a.updatedAt
-    )
+        (chat) => {
 
-    .forEach(
-        chat => {
 
             const item =
                 document.createElement(
@@ -3210,21 +4907,14 @@ function renderRecentChats() {
 
 
             item.className =
-                `recent-item${
-                    chat.id ===
-                    state.currentChatId
-                    ?
-                    " active"
-                    :
-                    ""
-                }`;
+                "recent-item";
 
 
             item.innerHTML = `
 
                 <div class="chat-icon"></div>
 
-                <div class="recent-content">
+                <div>
 
                     <div class="recent-title">
                         ${escapeHTML(chat.title)}
@@ -3239,10 +4929,12 @@ function renderRecentChats() {
             `;
 
 
-
             item.addEventListener(
+
                 "click",
+
                 () => {
+
 
                     state.currentChatId =
                         chat.id;
@@ -3250,42 +4942,30 @@ function renderRecentChats() {
 
                     saveChats();
 
-
                     closeGameCenter();
-
-
-                    renderRecentChats();
-
 
                     renderCurrentChat();
 
-
-                    els.sidebar
-                        .classList
-                        .remove(
-                            "open"
-                        );
+                    renderRecentChats();
 
                 }
+
             );
 
 
-
-            /*
-             * RIGHT CLICK =
-             * DELETE CHAT
-             */
-
             item.addEventListener(
+
                 "contextmenu",
-                event => {
+
+                (event) => {
+
 
                     event.preventDefault();
 
 
                     if (
                         confirm(
-                            `Delete "${chat.title}"?`
+                            "Delete this conversation?"
                         )
                     ) {
 
@@ -3296,15 +4976,16 @@ function renderRecentChats() {
                     }
 
                 }
+
             );
 
 
-            els.recentChats
-                .appendChild(
-                    item
-                );
+            els.recentChats.appendChild(
+                item
+            );
 
         }
+
     );
 
 }
@@ -3312,19 +4993,21 @@ function renderRecentChats() {
 
 
 /* ============================================================
-   DELETE CHAT
+   DELETE
 ============================================================ */
 
 function deleteChat(
     id
 ) {
 
+
     state.chats =
-        state.chats
-        .filter(
-            chat =>
+        state.chats.filter(
+
+            (chat) =>
                 chat.id !==
                 id
+
         );
 
 
@@ -3336,50 +5019,30 @@ function deleteChat(
             null;
 
 
-        localStorage
-            .removeItem(
-                CURRENT_CHAT_KEY
-            );
-
-
         createNewChat(
             true
         );
-
 
         return;
 
     }
 
 
-    if (
-        state.currentChatId ===
-        id
-    ) {
-
-        state.currentChatId =
-            state.chats[0].id;
-
-    }
+    state.currentChatId =
+        state.chats[0].id;
 
 
     saveChats();
 
-
     renderRecentChats();
-
 
     renderCurrentChat();
 
 }
 
 
-
-/* ============================================================
-   CLEAR ALL
-============================================================ */
-
 function clearEveryChat() {
+
 
     if (
         !confirm(
@@ -3392,16 +5055,14 @@ function clearEveryChat() {
     }
 
 
-    localStorage
-        .removeItem(
-            CHAT_KEY
-        );
+    localStorage.removeItem(
+        CHAT_KEY
+    );
 
 
-    localStorage
-        .removeItem(
-            CURRENT_CHAT_KEY
-        );
+    localStorage.removeItem(
+        CURRENT_CHAT_KEY
+    );
 
 
     state.chats =
@@ -3416,13 +5077,6 @@ function clearEveryChat() {
         true
     );
 
-
-    els.settingsModal
-        .classList
-        .add(
-            "hidden-modal"
-        );
-
 }
 
 
@@ -3433,6 +5087,7 @@ function clearEveryChat() {
 
 function renderCurrentChat() {
 
+
     const chat =
         getCurrentChat();
 
@@ -3442,9 +5097,15 @@ function renderCurrentChat() {
 
 
     if (
-        !chat ||
+
+        !chat
+
+        ||
+
         !chat.messages.length
+
     ) {
+
 
         els.heroArea.style.display =
             "flex";
@@ -3473,202 +5134,117 @@ function renderCurrentChat() {
         );
 
 
-    chat.messages
-        .forEach(
-            message => {
+    chat.messages.forEach(
 
-                els.chatArea
-                    .appendChild(
-                        makeMessageElement(
-                            message
-                        )
+        (message) => {
+
+
+            const row =
+                document.createElement(
+                    "div"
+                );
+
+
+            row.className =
+                `message-row ${message.role}`;
+
+
+            row.innerHTML = `
+
+                <div class="message-avatar">
+                    ${
+                        message.role ===
+                        "assistant"
+                        ?
+                        "G"
+                        :
+                        "U"
+                    }
+                </div>
+
+                <div class="message-bubble">
+
+                    <div class="message-name">
+                        ${
+                            message.role ===
+                            "assistant"
+                            ?
+                            "GALAXY"
+                            :
+                            "You"
+                        }
+                    </div>
+
+                    <div class="message-text">
+                        ${escapeHTML(message.content)}
+                    </div>
+
+                </div>
+
+            `;
+
+
+            if (
+                message.mediaId
+            ) {
+
+
+                const holder =
+                    document.createElement(
+                        "div"
                     );
 
+
+                holder.className =
+                    "media-holder";
+
+
+                row
+                    .querySelector(
+                        ".message-bubble"
+                    )
+                    .appendChild(
+                        holder
+                    );
+
+
+                restoreMedia(
+
+                    message.mediaId,
+
+                    message.type,
+
+                    holder
+
+                );
+
             }
-        );
 
 
-    requestAnimationFrame(
-        () => {
-
-            els.chatArea.scrollTop =
-                els.chatArea.scrollHeight;
-
-        }
-    );
-
-}
-
-
-
-/* ============================================================
-   MESSAGE ELEMENT
-============================================================ */
-
-function makeMessageElement(
-    message
-) {
-
-    const row =
-        document.createElement(
-            "div"
-        );
-
-
-    row.className =
-        `message-row ${message.role}`;
-
-
-
-    const avatar =
-        document.createElement(
-            "div"
-        );
-
-
-    avatar.className =
-        "message-avatar";
-
-
-    avatar.textContent =
-        message.role ===
-        "assistant"
-        ?
-        "G"
-        :
-        "U";
-
-
-
-    const bubble =
-        document.createElement(
-            "div"
-        );
-
-
-    bubble.className =
-        "message-bubble";
-
-
-
-    const name =
-        document.createElement(
-            "div"
-        );
-
-
-    name.className =
-        "message-name";
-
-
-    name.textContent =
-        message.role ===
-        "assistant"
-
-        ?
-        "GALAXY"
-
-        :
-        "You";
-
-
-
-    const text =
-        document.createElement(
-            "div"
-        );
-
-
-    text.className =
-        "message-text";
-
-
-    text.textContent =
-        message.content;
-
-
-
-    bubble.append(
-        name,
-        text
-    );
-
-
-
-    /*
-     * RESTORE GENERATED MEDIA
-     */
-
-    if (
-
-        (
-            message.type ===
-            "image"
-
-            ||
-
-            message.type ===
-            "video"
-        )
-
-        &&
-
-        message.mediaId
-
-    ) {
-
-        const holder =
-            document.createElement(
-                "div"
+            els.chatArea.appendChild(
+                row
             );
 
+        }
 
-        holder.className =
-            "media-holder";
-
-
-        holder.textContent =
-            "Loading saved media…";
-
-
-        bubble.appendChild(
-            holder
-        );
-
-
-        restoreMedia(
-
-            message.mediaId,
-
-            message.type,
-
-            holder
-
-        );
-
-    }
-
-
-
-    row.append(
-        avatar,
-        bubble
     );
 
 
-    return row;
+    els.chatArea.scrollTop =
+        els.chatArea.scrollHeight;
 
 }
 
 
 
 /* ============================================================
-   STREAMING MESSAGE
+   LIVE MESSAGE
 ============================================================ */
 
 function createLiveAssistantBubble(
-    initialText
+    text
 ) {
+
 
     els.heroArea.style.display =
         "none";
@@ -3681,7 +5257,6 @@ function createLiveAssistantBubble(
         );
 
 
-
     const row =
         document.createElement(
             "div"
@@ -3689,7 +5264,7 @@ function createLiveAssistantBubble(
 
 
     row.className =
-        "message-row assistant live-message";
+        "message-row assistant";
 
 
     row.innerHTML = `
@@ -3712,24 +5287,19 @@ function createLiveAssistantBubble(
     `;
 
 
-    const text =
+    const message =
         row.querySelector(
             ".message-text"
         );
 
 
-    text.textContent =
-        initialText;
+    message.textContent =
+        text;
 
 
-    els.chatArea
-        .appendChild(
-            row
-        );
-
-
-    els.chatArea.scrollTop =
-        els.chatArea.scrollHeight;
+    els.chatArea.appendChild(
+        row
+    );
 
 
     return {
@@ -3738,15 +5308,10 @@ function createLiveAssistantBubble(
             value
         ) {
 
-            text.textContent =
+            message.textContent =
                 value;
 
-
-            els.chatArea.scrollTop =
-                els.chatArea.scrollHeight;
-
         },
-
 
         remove() {
 
@@ -3766,29 +5331,13 @@ function createLiveAssistantBubble(
 
 function updateClock() {
 
+
     const now =
         new Date();
 
 
     els.clockTime.textContent =
-        now.toLocaleTimeString(
-
-            [],
-
-            {
-
-                hour:
-                    "2-digit",
-
-                minute:
-                    "2-digit",
-
-                second:
-                    "2-digit"
-
-            }
-
-        );
+        now.toLocaleTimeString();
 
 
     els.clockDate.textContent =
@@ -3817,12 +5366,8 @@ function updateClock() {
 }
 
 
-
-/* ============================================================
-   GREETING
-============================================================ */
-
 function updateGreeting() {
+
 
     const hour =
         new Date()
@@ -3831,19 +5376,24 @@ function updateGreeting() {
 
     els.greetingText.textContent =
 
-        hour < 12
+        hour <
+        12
 
         ?
+
         "Good morning"
 
         :
 
-        hour < 17
+        hour <
+        17
 
         ?
+
         "Good afternoon"
 
         :
+
         "Good evening";
 
 }
@@ -3855,18 +5405,23 @@ function updateGreeting() {
 ============================================================ */
 
 function setStatus(
-    text
+    value
 ) {
 
-    els.statusText.textContent =
-        text;
+    if (
+        els.statusText
+    ) {
+
+        els.statusText.textContent =
+            value;
+
+    }
 
 }
 
 
-
 function setModelStatus(
-    text
+    value
 ) {
 
     if (
@@ -3874,7 +5429,7 @@ function setModelStatus(
     ) {
 
         els.modelStatus.textContent =
-            text;
+            value;
 
     }
 
@@ -3883,10 +5438,11 @@ function setModelStatus(
 
 
 /* ============================================================
-   INPUT RESIZE
+   INPUT
 ============================================================ */
 
 function resizeInput() {
+
 
     els.userInput.style.height =
         "auto";
@@ -3903,113 +5459,15 @@ function resizeInput() {
 
 
 /* ============================================================
-   RELATIVE TIME
-============================================================ */
-
-function relativeTime(
-    time
-) {
-
-    const difference =
-        Date.now() -
-        time;
-
-
-    const minutes =
-        Math.floor(
-            difference /
-            60000
-        );
-
-
-    const hours =
-        Math.floor(
-            difference /
-            3600000
-        );
-
-
-    const days =
-        Math.floor(
-            difference /
-            86400000
-        );
-
-
-    if (
-        minutes <
-        1
-    ) {
-
-        return (
-            "Just now"
-        );
-
-    }
-
-
-    if (
-        minutes <
-        60
-    ) {
-
-        return (
-            `${minutes} min ago`
-        );
-
-    }
-
-
-    if (
-        hours <
-        24
-    ) {
-
-        return (
-            `${hours} hr ago`
-        );
-
-    }
-
-
-    return (
-
-        days ===
-        1
-
-        ?
-        "Yesterday"
-
-        :
-        `${days} days ago`
-
-    );
-
-}
-
-
-
-/* ============================================================
-   VOICE WAKE WORD
-
-   Say:
-   Galaxy explain gravity
-
-   Galaxy தமிழ் தெரியுமா
-
-   Galaxy create an image of a city
+   VOICE
 ============================================================ */
 
 function prepareVoiceActivation() {
 
-    /*
-     * Browsers normally need one
-     * click/key interaction before
-     * asking microphone permission.
-     */
 
-    const start =
+    const begin =
         () => {
+
 
             if (
                 !state.voiceStarted
@@ -4020,48 +5478,31 @@ function prepareVoiceActivation() {
             }
 
 
-            document
-                .removeEventListener(
-                    "click",
-                    start
-                );
-
-
-            document
-                .removeEventListener(
-                    "keydown",
-                    start
-                );
+            document.removeEventListener(
+                "click",
+                begin
+            );
 
         };
 
 
-    document
-        .addEventListener(
-            "click",
-            start
-        );
-
-
-    document
-        .addEventListener(
-            "keydown",
-            start
-        );
+    document.addEventListener(
+        "click",
+        begin
+    );
 
 }
 
 
-
-/* ============================================================
-   START VOICE
-============================================================ */
-
 function startVoiceRecognition() {
 
+
     const Recognition =
+
         window.SpeechRecognition
+
         ||
+
         window.webkitSpeechRecognition;
 
 
@@ -4069,17 +5510,9 @@ function startVoiceRecognition() {
         !Recognition
     ) {
 
-        setStatus(
-            "Voice unavailable"
-        );
-
         return;
 
     }
-
-
-    state.voiceStarted =
-        true;
 
 
     const recognition =
@@ -4090,8 +5523,8 @@ function startVoiceRecognition() {
         recognition;
 
 
-    recognition.lang =
-        "en-US";
+    state.voiceStarted =
+        true;
 
 
     recognition.continuous =
@@ -4102,36 +5535,37 @@ function startVoiceRecognition() {
         false;
 
 
-
-    recognition.onstart =
-        () => {
-
-            els.voiceIndicator
-                .classList
-                .add(
-                    "listening"
-                );
-
-
-            if (
-                !state.speaking
-            ) {
-
-                setStatus(
-                    'Listening for "Galaxy"…'
-                );
-
-            }
-
-        };
-
+    recognition.lang =
+        navigator.language ||
+        "en-US";
 
 
     recognition.onresult =
-        event => {
+        (event) => {
+
+
+            const transcript =
+                event
+                    .results[
+                        event.results.length -
+                        1
+                    ][0]
+                    .transcript;
+
+
+            const lower =
+                transcript
+                    .toLowerCase();
+
+
+            const index =
+                lower.indexOf(
+                    "galaxy"
+                );
+
 
             if (
-                state.speaking
+                index === -1
             ) {
 
                 return;
@@ -4139,109 +5573,55 @@ function startVoiceRecognition() {
             }
 
 
-            for (
-                let i =
-                    event.resultIndex;
-
-                i <
-                    event.results.length;
-
-                i++
-            ) {
-
-                if (
-                    !event
-                        .results[i]
-                        .isFinal
-                ) {
-
-                    continue;
-
-                }
-
-
-                handleVoiceCommand(
-                    event
-                        .results[i][0]
-                        .transcript
-                        .trim()
-                );
-
-            }
-
-        };
-
-
-
-    recognition.onerror =
-        () => {
-
-            els.voiceIndicator
-                .classList
-                .remove(
-                    "listening"
-                );
+            const command =
+                transcript
+                    .slice(
+                        index +
+                        6
+                    )
+                    .trim();
 
 
             if (
-                !state.speaking
+                command
             ) {
 
-                setStatus(
-                    "Ready"
+                processMessage(
+
+                    command,
+
+                    {
+                        source:
+                            "voice"
+                    }
+
                 );
 
             }
 
         };
-
 
 
     recognition.onend =
         () => {
 
-            els.voiceIndicator
-                .classList
-                .remove(
-                    "listening"
-                );
-
 
             if (
-                !state.speaking
+                state.voiceStarted
             ) {
 
-                setStatus(
-                    "Ready"
-                );
+                try {
 
-            }
+                    recognition.start();
 
+                }
 
-            if (
-                !state.speaking
-            ) {
-
-                setTimeout(
-                    () => {
-
-                        try {
-
-                            recognition.start();
-
-                        }
-
-                        catch {
-                        }
-
-                    },
-                    1000
-                );
+                catch {
+                }
 
             }
 
         };
-
 
 
     try {
@@ -4251,117 +5631,22 @@ function startVoiceRecognition() {
     }
 
     catch {
-
-        setStatus(
-            "Ready"
-        );
-
     }
 
 }
 
-
-
-/* ============================================================
-   VOICE COMMAND
-============================================================ */
-
-function handleVoiceCommand(
-    transcript
-) {
-
-    const lower =
-        transcript
-            .toLowerCase();
-
-
-    const index =
-        lower.indexOf(
-            "galaxy"
-        );
-
-
-    if (
-        index ===
-        -1
-    ) {
-
-        return;
-
-    }
-
-
-    let command =
-        transcript
-
-        .slice(
-            index +
-            "galaxy".length
-        )
-
-        .trim()
-
-        .replace(
-            /^[,.:;!\-\s]+/,
-            ""
-        );
-
-
-    if (
-        !command
-    ) {
-
-        setStatus(
-            "Galaxy heard you"
-        );
-
-        return;
-
-    }
-
-
-
-    /*
-     * IMPORTANT:
-     *
-     * Voice source CANNOT unlock
-     * hidden Game Center.
-     */
-
-    processMessage(
-
-        command,
-
-        {
-            source:
-                "voice"
-        }
-
-    );
-
-}
-
-
-
-/* ============================================================
-   RESTART VOICE
-============================================================ */
 
 function restartVoiceRecognition() {
 
-    if (
+
+    try {
+
         state.recognition
-    ) {
+            ?.stop();
 
-        try {
+    }
 
-            state.recognition.stop();
-
-        }
-
-        catch {
-        }
-
+    catch {
     }
 
 
@@ -4374,24 +5659,13 @@ function restartVoiceRecognition() {
         500
     );
 
-
-    els.settingsModal
-        .classList
-        .add(
-            "hidden-modal"
-        );
-
 }
 
-
-
-/* ============================================================
-   GALAXY SPEAKS
-============================================================ */
 
 function speakText(
     text
 ) {
+
 
     if (
         !window.speechSynthesis
@@ -4402,76 +5676,14 @@ function speakText(
     }
 
 
-    state.speaking =
-        true;
-
-
-    if (
-        state.recognition
-    ) {
-
-        try {
-
-            state.recognition.stop();
-
-        }
-
-        catch {
-        }
-
-    }
-
-
-    speechSynthesis.cancel();
-
-
-
-    const utterance =
+    const speech =
         new SpeechSynthesisUtterance(
             text
         );
 
 
-    utterance.rate =
-        1;
-
-
-
-    utterance.onend =
-        () => {
-
-            state.speaking =
-                false;
-
-
-            setTimeout(
-                () => {
-
-                    if (
-                        state.voiceStarted &&
-                        state.recognition
-                    ) {
-
-                        try {
-
-                            state.recognition.start();
-
-                        }
-
-                        catch {
-                        }
-
-                    }
-
-                },
-                600
-            );
-
-        };
-
-
     speechSynthesis.speak(
-        utterance
+        speech
     );
 
 }
@@ -4479,49 +5691,57 @@ function speakText(
 
 
 /* ============================================================
-   INDEXEDDB MEDIA STORAGE
+   MEDIA STORAGE
 ============================================================ */
 
 function openMediaDB() {
 
+
     return new Promise(
+
         (
             resolve,
             reject
         ) => {
 
+
             const request =
                 indexedDB.open(
-                    "galaxy_media_v1",
+
+                    "galaxy_media_v3",
+
                     1
+
                 );
 
 
             request.onupgradeneeded =
                 () => {
 
-                    const db =
-                        request.result;
-
 
                     if (
-                        !db
+
+                        !request
+                            .result
                             .objectStoreNames
                             .contains(
                                 "media"
                             )
+
                     ) {
 
-                        db.createObjectStore(
+                        request
+                            .result
+                            .createObjectStore(
 
-                            "media",
+                                "media",
 
-                            {
-                                keyPath:
-                                    "id"
-                            }
+                                {
+                                    keyPath:
+                                        "id"
+                                }
 
-                        );
+                            );
 
                     }
 
@@ -4529,101 +5749,76 @@ function openMediaDB() {
 
 
             request.onsuccess =
-                () => {
-
+                () =>
                     resolve(
                         request.result
                     );
 
-                };
-
 
             request.onerror =
-                () => {
-
+                () =>
                     reject(
                         request.error
                     );
 
-                };
-
         }
+
     );
 
 }
 
-
-
-/* ============================================================
-   SAVE MEDIA
-============================================================ */
 
 async function saveMediaBlob(
     blob,
     mime
 ) {
 
+
     const id =
-        `media_${Date.now()}_${
-            Math.random()
-                .toString(36)
-                .slice(2, 7)
-        }`;
+        `media_${Date.now()}_${Math.random()}`;
 
 
     const db =
         await openMediaDB();
 
 
+    const tx =
+        db.transaction(
+
+            "media",
+
+            "readwrite"
+
+        );
+
+
+    tx
+        .objectStore(
+            "media"
+        )
+        .put({
+
+            id:
+                id,
+
+            blob:
+                blob,
+
+            mime:
+                mime
+
+        });
+
 
     await new Promise(
-        (
-            resolve,
-            reject
-        ) => {
 
-            const transaction =
-                db.transaction(
-                    "media",
-                    "readwrite"
-                );
+        (resolve) => {
 
-
-            transaction
-                .objectStore(
-                    "media"
-                )
-                .put({
-
-                    id:
-                        id,
-
-                    blob:
-                        blob,
-
-                    mime:
-                        mime,
-
-                    createdAt:
-                        Date.now()
-
-                });
-
-
-            transaction.oncomplete =
+            tx.oncomplete =
                 resolve;
 
-
-            transaction.onerror =
-                () => {
-
-                    reject(
-                        transaction.error
-                    );
-
-                };
-
         }
+
     );
 
 
@@ -4635,245 +5830,201 @@ async function saveMediaBlob(
 }
 
 
+async function restoreMedia(
 
-/* ============================================================
-   GET MEDIA
-============================================================ */
+    id,
 
-async function getMediaBlob(
-    id
+    type,
+
+    holder
+
 ) {
+
 
     const db =
         await openMediaDB();
 
 
-    const result =
-        await new Promise(
-            (
-                resolve,
-                reject
-            ) => {
+    const tx =
+        db.transaction(
 
-                const transaction =
-                    db.transaction(
-                        "media",
-                        "readonly"
-                    );
+            "media",
 
+            "readonly"
 
-                const request =
-                    transaction
-
-                    .objectStore(
-                        "media"
-                    )
-
-                    .get(
-                        id
-                    );
-
-
-                request.onsuccess =
-                    () => {
-
-                        resolve(
-                            request.result ||
-                            null
-                        );
-
-                    };
-
-
-                request.onerror =
-                    () => {
-
-                        reject(
-                            request.error
-                        );
-
-                    };
-
-            }
         );
 
 
-    db.close();
-
-
-    return result;
-
-}
-
-
-
-/* ============================================================
-   RESTORE SAVED IMAGE / VIDEO
-============================================================ */
-
-async function restoreMedia(
-    mediaId,
-    type,
-    holder
-) {
-
-    try {
-
-        const record =
-            await getMediaBlob(
-                mediaId
+    const request =
+        tx
+            .objectStore(
+                "media"
+            )
+            .get(
+                id
             );
 
 
-        if (
-            !record?.blob
-        ) {
-
-            holder.textContent =
-                "Saved media is unavailable.";
-
-            return;
-
-        }
+    request.onsuccess =
+        () => {
 
 
-        const url =
-            URL.createObjectURL(
-                record.blob
-            );
+            if (
+                !request.result
+            ) {
+
+                return;
+
+            }
 
 
-        holder.textContent =
-            "";
-
-
-        if (
-            type ===
-            "image"
-        ) {
-
-            const image =
-                document.createElement(
-                    "img"
+            const url =
+                URL.createObjectURL(
+                    request.result.blob
                 );
 
 
-            image.className =
-                "generated-media generated-image";
-
-
-            image.src =
-                url;
-
-
-            image.alt =
-                "GALAXY generated image";
-
-
-            holder.appendChild(
-                image
-            );
-
-        }
-
-        else {
-
-            const video =
+            const element =
                 document.createElement(
+
+                    type === "video"
+
+                    ?
+
                     "video"
+
+                    :
+
+                    "img"
+
                 );
 
 
-            video.className =
-                "generated-media generated-video";
-
-
-            video.src =
+            element.src =
                 url;
 
 
-            video.controls =
-                true;
+            element.className =
+                "generated-media";
 
 
-            video.playsInline =
-                true;
+            if (
+                type === "video"
+            ) {
+
+                element.controls =
+                    true;
+
+            }
 
 
             holder.appendChild(
-                video
+                element
             );
 
-        }
-
-    }
-
-    catch {
-
-        holder.textContent =
-            "Saved media is unavailable.";
-
-    }
+        };
 
 }
 
 
 
 /* ============================================================
-   SAFE HTML
+   UTILS
 ============================================================ */
 
 function escapeHTML(
     value
 ) {
 
+
     return String(
         value
     )
 
-    .replaceAll(
-        "&",
-        "&amp;"
-    )
+        .replaceAll(
+            "&",
+            "&amp;"
+        )
 
-    .replaceAll(
-        "<",
-        "&lt;"
-    )
+        .replaceAll(
+            "<",
+            "&lt;"
+        )
 
-    .replaceAll(
-        ">",
-        "&gt;"
-    )
+        .replaceAll(
+            ">",
+            "&gt;"
+        )
 
-    .replaceAll(
-        '"',
-        "&quot;"
-    )
-
-    .replaceAll(
-        "'",
-        "&#039;"
-    );
+        .replaceAll(
+            '"',
+            "&quot;"
+        );
 
 }
 
 
-
-/* ============================================================
-   DELAY
-============================================================ */
-
-function delay(
-    milliseconds
+function relativeTime(
+    time
 ) {
 
+
+    const minutes =
+        Math.floor(
+
+            (
+                Date.now() -
+                time
+            )
+
+            /
+
+            60000
+
+        );
+
+
+    if (
+        minutes <
+        1
+    ) {
+
+        return "Just now";
+
+    }
+
+
+    if (
+        minutes <
+        60
+    ) {
+
+        return `${minutes} min ago`;
+
+    }
+
+
+    return new Date(
+        time
+    )
+    .toLocaleDateString();
+
+}
+
+
+function delay(
+    ms
+) {
+
+
     return new Promise(
-        resolve =>
+
+        (resolve) =>
             setTimeout(
                 resolve,
-                milliseconds
+                ms
             )
+
     );
 
 }
