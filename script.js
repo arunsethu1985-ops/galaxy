@@ -1,36 +1,23 @@
-/* ============================================================
-   GALAXY
-   Created by Harshavardhan
-
-   SECRET GAME CENTER RULE:
-
-   1. Game Center starts HIDDEN.
-   2. User must type exactly:
-          harshavardhan
-   3. Game Center appears in the sidebar.
-   4. Unlock is NOT saved to localStorage.
-   5. Refresh / close / reopen GALAXY:
-          Game Center becomes hidden again.
-============================================================ */
+const CHAT_KEY = "galaxy_chats_v6";
+const CURRENT_CHAT_KEY = "galaxy_current_chat_v6";
 
 
+// ============================================================
+// MODEL SOURCES
+// ============================================================
 
-/* ============================================================
-   STORAGE
-============================================================ */
-
-const CHAT_STORAGE =
-    "galaxy_chat_history_v4";
+const TEXT_MODULE_URL =
+    "https://esm.run/@mlc-ai/web-llm";
 
 
-const CURRENT_CHAT_STORAGE =
-    "galaxy_current_chat_v4";
+const IMAGE_MODULE_URL =
+    "https://cdn.jsdelivr.net/npm/web-txt2img@0.3.1/+esm";
 
 
 
-/* ============================================================
-   STATE
-============================================================ */
+// ============================================================
+// STATE
+// ============================================================
 
 const state = {
 
@@ -42,340 +29,241 @@ const state = {
 
     /*
      * IMPORTANT:
-     * This is intentionally NOT saved.
+     * Game Center unlock is NEVER stored.
+     *
+     * Refresh GALAXY:
+     * locked again.
      */
 
     gameCenterUnlocked:
         false,
 
+
+    aiEngine:
+        null,
+
+    aiLoading:
+        false,
+
+    aiModelId:
+        null,
+
+
+    imageClient:
+        null,
+
+    imageModelLoaded:
+        false,
+
+
     recognition:
         null,
 
     voiceStarted:
+        false,
+
+    speaking:
         false
 
 };
 
 
 
-/* ============================================================
-   ELEMENTS
-============================================================ */
+// ============================================================
+// ELEMENT SHORTCUT
+// ============================================================
 
-const sidebar =
-    document.getElementById(
-        "sidebar"
-    );
-
-
-const recentChats =
-    document.getElementById(
-        "recentChats"
-    );
-
-
-const newChatRow =
-    document.getElementById(
-        "newChatRow"
-    );
-
-
-const clearRecentText =
-    document.getElementById(
-        "clearRecentText"
-    );
-
-
-const userInput =
-    document.getElementById(
-        "userInput"
-    );
-
-
-const sendControl =
-    document.getElementById(
-        "sendControl"
-    );
-
-
-const heroArea =
-    document.getElementById(
-        "heroArea"
-    );
-
-
-const chatArea =
-    document.getElementById(
-        "chatArea"
-    );
-
-
-const normalView =
-    document.getElementById(
-        "normalView"
-    );
-
-
-const gameCenterView =
-    document.getElementById(
-        "gameCenterView"
-    );
-
-
-const gameCenterItem =
-    document.getElementById(
-        "gameCenterItem"
-    );
-
-
-const gameGrid =
-    document.getElementById(
-        "gameGrid"
-    );
-
-
-const leaveGameCenter =
-    document.getElementById(
-        "leaveGameCenter"
-    );
-
-
-const statusText =
-    document.getElementById(
-        "statusText"
-    );
-
-
-const voiceIndicator =
-    document.getElementById(
-        "voiceIndicator"
-    );
-
-
-const menuToggle =
-    document.getElementById(
-        "menuToggle"
-    );
-
-
-const settingsRow =
-    document.getElementById(
-        "settingsRow"
-    );
-
-
-const settingsModal =
-    document.getElementById(
-        "settingsModal"
-    );
-
-
-const clearAllChats =
-    document.getElementById(
-        "clearAllChats"
-    );
-
-
-const restartVoice =
-    document.getElementById(
-        "restartVoice"
-    );
-
-
-const closeSettings =
-    document.getElementById(
-        "closeSettings"
-    );
+const $ =
+    id =>
+        document.getElementById(
+            id
+        );
 
 
 
-/* ============================================================
-   GAME LIBRARY
-============================================================ */
+const els = {
+
+    sidebar:
+        $("sidebar"),
+
+    newChatRow:
+        $("newChatRow"),
+
+    gameCenterItem:
+        $("gameCenterItem"),
+
+    recentChats:
+        $("recentChats"),
+
+    clearRecentText:
+        $("clearRecentText"),
+
+    settingsRow:
+        $("settingsRow"),
+
+    menuToggle:
+        $("menuToggle"),
+
+    statusText:
+        $("statusText"),
+
+    modelStatus:
+        $("modelStatus"),
+
+    clockTime:
+        $("clockTime"),
+
+    clockDate:
+        $("clockDate"),
+
+    greetingText:
+        $("greetingText"),
+
+    heroArea:
+        $("heroArea"),
+
+    chatArea:
+        $("chatArea"),
+
+    normalView:
+        $("normalView"),
+
+    gameCenterView:
+        $("gameCenterView"),
+
+    gameGrid:
+        $("gameGrid"),
+
+    leaveGameCenter:
+        $("leaveGameCenter"),
+
+    composerWrap:
+        $("composerWrap"),
+
+    userInput:
+        $("userInput"),
+
+    voiceIndicator:
+        $("voiceIndicator"),
+
+    sendControl:
+        $("sendControl"),
+
+    settingsModal:
+        $("settingsModal"),
+
+    clearAllChats:
+        $("clearAllChats"),
+
+    restartVoice:
+        $("restartVoice"),
+
+    closeSettings:
+        $("closeSettings")
+
+};
+
+
+
+// ============================================================
+// GAME LIBRARY
+// ============================================================
 
 const GAME_LIBRARY = [
 
-    {
+    [
+        "🏎️",
+        "Racing",
+        "Cars, drifting and speed challenges.",
+        "racing games play online"
+    ],
 
-        emoji:
-            "🏎️",
+    [
+        "⚽",
+        "Football",
+        "Football matches and skill games.",
+        "football games play online"
+    ],
 
-        name:
-            "Racing",
+    [
+        "🐉",
+        "Creature Survival",
+        "Creature collecting and survival worlds.",
+        "creature survival games online"
+    ],
 
-        description:
-            "Cars, speed, drifting and racing challenges.",
+    [
+        "🐒",
+        "Mythic Action",
+        "Mythology, warriors and boss battles.",
+        "mythology action games online"
+    ],
 
-        search:
-            "racing games play online"
+    [
+        "🧱",
+        "Block Worlds",
+        "Creative multiplayer worlds and obstacle games.",
+        "block multiplayer games online"
+    ],
 
-    },
+    [
+        "👥",
+        "Multiplayer",
+        "Online games with other players.",
+        "multiplayer browser games online"
+    ],
 
+    [
+        "🧩",
+        "Puzzle",
+        "Logic and brain challenges.",
+        "puzzle games play online"
+    ],
 
-    {
+    [
+        "🚀",
+        "Space",
+        "Space adventures and cosmic battles.",
+        "space games play online"
+    ],
 
-        emoji:
-            "⚽",
-
-        name:
-            "Football",
-
-        description:
-            "Football matches, penalties and tournaments.",
-
-        search:
-            "football games play online"
-
-    },
-
-
-    {
-
-        emoji:
-            "🐉",
-
-        name:
-            "Creature Survival",
-
-        description:
-            "Explore worlds, creatures and survival adventures.",
-
-        search:
-            "creature survival games online"
-
-    },
-
-
-    {
-
-        emoji:
-            "🐒",
-
-        name:
-            "Mythic Action",
-
-        description:
-            "Mythical warriors, bosses and ancient worlds.",
-
-        search:
-            "mythology action games online"
-
-    },
-
-
-    {
-
-        emoji:
-            "🧱",
-
-        name:
-            "Block Worlds",
-
-        description:
-            "Creative worlds, multiplayer and obstacle games.",
-
-        search:
-            "block multiplayer games online"
-
-    },
-
-
-    {
-
-        emoji:
-            "🧩",
-
-        name:
-            "Puzzle",
-
-        description:
-            "Logic, brain games and challenging puzzles.",
-
-        search:
-            "puzzle games play online"
-
-    },
-
-
-    {
-
-        emoji:
-            "👥",
-
-        name:
-            "Multiplayer",
-
-        description:
-            "Play online with other players.",
-
-        search:
-            "multiplayer browser games online"
-
-    },
-
-
-    {
-
-        emoji:
-            "🚀",
-
-        name:
-            "Space",
-
-        description:
-            "Space adventures, ships and cosmic battles.",
-
-        search:
-            "space games play online"
-
-    },
-
-
-    {
-
-        emoji:
-            "🗺️",
-
-        name:
-            "Adventure",
-
-        description:
-            "Explore new worlds, quests and mysteries.",
-
-        search:
-            "adventure games play online"
-
-    }
+    [
+        "🗺️",
+        "Adventure",
+        "Quests, exploration and stories.",
+        "adventure games play online"
+    ]
 
 ];
 
 
 
-/* ============================================================
-   START
-============================================================ */
+// ============================================================
+// START
+// ============================================================
 
 document.addEventListener(
     "DOMContentLoaded",
-    initialiseGalaxy
+    initGalaxy
 );
 
 
 
-function initialiseGalaxy() {
+function initGalaxy() {
 
     /*
-     * ALWAYS LOCK GAME CENTER
-     * ON EVERY PAGE LOAD.
+     * Game Center ALWAYS starts hidden.
      */
 
     state.gameCenterUnlocked =
         false;
 
 
-    gameCenterItem.classList.add(
-        "hidden-game-center"
-    );
+    els.gameCenterItem
+        .classList
+        .add(
+            "hidden-game-center"
+        );
 
 
     loadChats();
@@ -399,17 +287,24 @@ function initialiseGalaxy() {
     updateClock();
 
 
+    updateGreeting();
+
+
     setInterval(
         updateClock,
         1000
     );
 
 
-    updateGreeting();
-
-
     setStatus(
         "Ready"
+    );
+
+
+    setModelStatus(
+        navigator.gpu
+            ? "Local AI available"
+            : "WebGPU unavailable"
     );
 
 
@@ -419,49 +314,53 @@ function initialiseGalaxy() {
 
 
 
-/* ============================================================
-   EVENTS
-============================================================ */
+// ============================================================
+// EVENTS
+// ============================================================
 
 function bindEvents() {
 
 
-    newChatRow.addEventListener(
-        "click",
-        createNewChat
-    );
+    els.newChatRow
+        .addEventListener(
+            "click",
+            () =>
+                createNewChat()
+        );
 
 
-    sendControl.addEventListener(
-        "click",
-        sendInputMessage
-    );
+    els.sendControl
+        .addEventListener(
+            "click",
+            sendInputMessage
+        );
 
 
-    userInput.addEventListener(
-        "keydown",
-        event => {
+    els.userInput
+        .addEventListener(
+            "input",
+            resizeInput
+        );
 
-            if (
-                event.key ===
-                    "Enter" &&
-                !event.shiftKey
-            ) {
 
-                event.preventDefault();
+    els.userInput
+        .addEventListener(
+            "keydown",
+            event => {
 
-                sendInputMessage();
+                if (
+                    event.key === "Enter" &&
+                    !event.shiftKey
+                ) {
+
+                    event.preventDefault();
+
+                    sendInputMessage();
+
+                }
 
             }
-
-        }
-    );
-
-
-    userInput.addEventListener(
-        "input",
-        resizeInput
-    );
+        );
 
 
     document
@@ -475,12 +374,12 @@ function bindEvents() {
                     "click",
                     () => {
 
-                        const prompt =
-                            card.dataset.prompt;
-
-
                         processMessage(
-                            prompt
+                            card.dataset.prompt || "",
+                            {
+                                source:
+                                    "quick"
+                            }
                         );
 
                     }
@@ -490,95 +389,142 @@ function bindEvents() {
         );
 
 
-    gameCenterItem.addEventListener(
-        "click",
-        openGameCenter
-    );
+    els.gameCenterItem
+        .addEventListener(
+            "click",
+            openGameCenter
+        );
 
 
-    leaveGameCenter.addEventListener(
-        "click",
-        closeGameCenter
-    );
+    els.leaveGameCenter
+        .addEventListener(
+            "click",
+            closeGameCenter
+        );
 
 
-    menuToggle.addEventListener(
-        "click",
-        () => {
+    els.menuToggle
+        .addEventListener(
+            "click",
+            () => {
 
-            sidebar
-                .classList
-                .toggle(
-                    "open"
-                );
+                els.sidebar
+                    .classList
+                    .toggle(
+                        "open"
+                    );
 
-        }
-    );
-
-
-    settingsRow.addEventListener(
-        "click",
-        () => {
-
-            settingsModal
-                .classList
-                .remove(
-                    "hidden-modal"
-                );
-
-        }
-    );
+            }
+        );
 
 
-    closeSettings.addEventListener(
-        "click",
-        () => {
+    els.settingsRow
+        .addEventListener(
+            "click",
+            () => {
 
-            settingsModal
-                .classList
-                .add(
-                    "hidden-modal"
-                );
+                els.settingsModal
+                    .classList
+                    .remove(
+                        "hidden-modal"
+                    );
 
-        }
-    );
-
-
-    clearAllChats.addEventListener(
-        "click",
-        clearEveryChat
-    );
+            }
+        );
 
 
-    clearRecentText.addEventListener(
-        "click",
-        clearEveryChat
-    );
+    els.closeSettings
+        .addEventListener(
+            "click",
+            () => {
 
-
-    restartVoice.addEventListener(
-        "click",
-        restartVoiceRecognition
-    );
-
-
-    settingsModal.addEventListener(
-        "click",
-        event => {
-
-            if (
-                event.target ===
-                settingsModal
-            ) {
-
-                settingsModal
+                els.settingsModal
                     .classList
                     .add(
                         "hidden-modal"
                     );
 
             }
+        );
 
+
+    els.clearAllChats
+        .addEventListener(
+            "click",
+            clearEveryChat
+        );
+
+
+    els.clearRecentText
+        .addEventListener(
+            "click",
+            clearEveryChat
+        );
+
+
+    els.restartVoice
+        .addEventListener(
+            "click",
+            restartVoiceRecognition
+        );
+
+
+    els.settingsModal
+        .addEventListener(
+            "click",
+            event => {
+
+                if (
+                    event.target ===
+                    els.settingsModal
+                ) {
+
+                    els.settingsModal
+                        .classList
+                        .add(
+                            "hidden-modal"
+                        );
+
+                }
+
+            }
+        );
+
+}
+
+
+
+// ============================================================
+// SEND MESSAGE
+// ============================================================
+
+function sendInputMessage() {
+
+    const text =
+        els.userInput
+            .value
+            .trim();
+
+
+    if (!text) {
+
+        return;
+
+    }
+
+
+    els.userInput.value =
+        "";
+
+
+    resizeInput();
+
+
+    processMessage(
+        text,
+        {
+            source:
+                "typed"
         }
     );
 
@@ -586,96 +532,273 @@ function bindEvents() {
 
 
 
-/* ============================================================
-   SECRET GAME CENTER UNLOCK
-============================================================ */
+// ============================================================
+// MAIN MESSAGE PROCESSOR
+// ============================================================
 
-function checkSecretGameUnlock(
-    message
+async function processMessage(
+    message,
+    {
+        source = "typed"
+    } = {}
 ) {
 
-    /*
-     * EXACT PASSWORD:
-     * harshavardhan
-     */
 
-    if (
+    addUserMessage(
         message
-            .trim()
-            .toLowerCase()
-        !==
-        "harshavardhan"
-    ) {
-
-        return false;
-
-    }
-
-
-    /*
-     * Already unlocked during
-     * this page session.
-     */
-
-    if (
-        state.gameCenterUnlocked
-    ) {
-
-        addAssistantMessage(
-            "🎮 Game Center is already unlocked."
-        );
-
-
-        return true;
-
-    }
-
-
-    state.gameCenterUnlocked =
-        true;
-
-
-    /*
-     * Reveal sidebar item.
-     */
-
-    gameCenterItem
-        .classList
-        .remove(
-            "hidden-game-center"
-        );
-
-
-    addAssistantMessage(
-        "🎮 Game Center unlocked.\n\nGame Center is now available in the sidebar."
     );
 
 
     setStatus(
-        "Game Center unlocked"
+        "Thinking..."
     );
 
 
-    setTimeout(
-        () => {
 
-            setStatus(
-                "Ready"
+    /*
+     * ========================================================
+     * SECRET GAME CENTER
+     *
+     * Only TYPED input unlocks it.
+     *
+     * Voice cannot unlock it.
+     * Quick cards cannot unlock it.
+     * ========================================================
+     */
+
+    if (
+        source === "typed" &&
+        message
+            .trim()
+            .toLowerCase()
+        ===
+        "harshavardhan"
+    ) {
+
+        unlockGameCenter();
+
+        return;
+
+    }
+
+
+
+    const lower =
+        message
+            .trim()
+            .toLowerCase();
+
+
+
+    /*
+     * GAME CENTER COMMAND
+     */
+
+    if (
+        [
+            "game center",
+            "game mode",
+            "open game center",
+            "open game mode"
+        ]
+        .includes(
+            lower
+        )
+    ) {
+
+        if (
+            !state.gameCenterUnlocked
+        ) {
+
+            respond(
+                "🔒 Game Center is hidden.",
+                source
             );
 
-        },
-        1800
+            return;
+
+        }
+
+
+        respond(
+            "Opening Game Center.",
+            source
+        );
+
+
+        openGameCenter();
+
+        return;
+
+    }
+
+
+
+    /*
+     * CREATOR
+     */
+
+    if (
+        isCreatorQuestion(
+            lower
+        )
+    ) {
+
+        respond(
+            "Harshavardhan is the creator of GALAXY.",
+            source
+        );
+
+        return;
+
+    }
+
+
+
+    /*
+     * WEATHER
+     *
+     * Don't let the local model invent
+     * live weather.
+     */
+
+    if (
+        isWeatherQuestion(
+            lower
+        )
+    ) {
+
+        respond(
+            "Live weather needs a weather-data provider. This local-only GALAXY build does not guess current weather.",
+            source
+        );
+
+        return;
+
+    }
+
+
+
+    /*
+     * CALCULATOR
+     */
+
+    const calculation =
+        calculate(
+            message
+        );
+
+
+    if (
+        calculation !== null
+    ) {
+
+        respond(
+            `The answer is ${calculation}.`,
+            source
+        );
+
+        return;
+
+    }
+
+
+
+    /*
+     * IMAGE GENERATION
+     */
+
+    if (
+        isImageCommand(
+            lower
+        )
+    ) {
+
+        await handleImageGeneration(
+            cleanImagePrompt(
+                message
+            ),
+            source
+        );
+
+        return;
+
+    }
+
+
+
+    /*
+     * VIDEO GENERATION
+     */
+
+    if (
+        isVideoCommand(
+            lower
+        )
+    ) {
+
+        await handleVideoGeneration(
+            cleanVideoPrompt(
+                message
+            ),
+            source
+        );
+
+        return;
+
+    }
+
+
+
+    /*
+     * EVERYTHING ELSE:
+     *
+     * Real downloadable local AI.
+     */
+
+    await answerWithLocalAI(
+        message,
+        source
     );
 
+}
 
-    return true;
+
+
+// ============================================================
+// SECRET GAME CENTER
+// ============================================================
+
+function unlockGameCenter() {
+
+    if (
+        !state.gameCenterUnlocked
+    ) {
+
+        state.gameCenterUnlocked =
+            true;
+
+
+        els.gameCenterItem
+            .classList
+            .remove(
+                "hidden-game-center"
+            );
+
+    }
+
+
+    respond(
+        "🎮 Game Center unlocked. It is now visible in the sidebar.",
+        "typed"
+    );
 
 }
 
 
 
 /* ============================================================
-   OPEN GAME CENTER
+   GAME CENTER
 ============================================================ */
 
 function openGameCenter() {
@@ -689,28 +812,18 @@ function openGameCenter() {
     }
 
 
-    normalView.style.display =
+    els.normalView.style.display =
         "none";
 
 
-    gameCenterView
+    els.gameCenterView
         .classList
         .add(
             "active"
         );
 
 
-    /*
-     * Hide chat composer while
-     * Game Center is open.
-     */
-
-    document
-        .getElementById(
-            "composerWrap"
-        )
-        .style
-        .display =
+    els.composerWrap.style.display =
         "none";
 
 
@@ -719,37 +832,30 @@ function openGameCenter() {
     );
 
 
-    sidebar.classList.remove(
-        "open"
-    );
+    els.sidebar
+        .classList
+        .remove(
+            "open"
+        );
 
 }
 
 
 
-/* ============================================================
-   CLOSE GAME CENTER
-============================================================ */
-
 function closeGameCenter() {
 
-    gameCenterView
+    els.gameCenterView
         .classList
         .remove(
             "active"
         );
 
 
-    normalView.style.display =
+    els.normalView.style.display =
         "block";
 
 
-    document
-        .getElementById(
-            "composerWrap"
-        )
-        .style
-        .display =
+    els.composerWrap.style.display =
         "block";
 
 
@@ -765,17 +871,24 @@ function closeGameCenter() {
 
 
 /* ============================================================
-   RENDER GAME CENTER
+   GAME CARDS
 ============================================================ */
 
 function renderGameCenter() {
 
-    gameGrid.innerHTML =
+    els.gameGrid.innerHTML =
         "";
 
 
     GAME_LIBRARY.forEach(
-        game => {
+        (
+            [
+                emoji,
+                name,
+                description,
+                query
+            ]
+        ) => {
 
             const card =
                 document.createElement(
@@ -790,49 +903,45 @@ function renderGameCenter() {
             card.innerHTML = `
 
                 <div class="game-emoji">
-                    ${game.emoji}
+                    ${emoji}
                 </div>
 
                 <h3>
-                    ${escapeHTML(game.name)}
+                    ${escapeHTML(name)}
                 </h3>
 
                 <p>
-                    ${escapeHTML(game.description)}
+                    ${escapeHTML(description)}
                 </p>
 
             `;
 
 
-            /*
-             * Open online search for
-             * matching games.
-             */
-
             card.addEventListener(
                 "click",
                 () => {
 
-                    const url =
+                    window.open(
+
                         "https://www.google.com/search?q=" +
                         encodeURIComponent(
-                            game.search
-                        );
+                            query
+                        ),
 
-
-                    window.open(
-                        url,
                         "_blank",
+
                         "noopener,noreferrer"
+
                     );
 
                 }
             );
 
 
-            gameGrid.appendChild(
-                card
-            );
+            els.gameGrid
+                .appendChild(
+                    card
+                );
 
         }
     );
@@ -842,585 +951,536 @@ function renderGameCenter() {
 
 
 /* ============================================================
-   SEND INPUT
+   LOCAL AI ANSWER
 ============================================================ */
 
-function sendInputMessage() {
-
-    const text =
-        userInput
-            .value
-            .trim();
-
-
-    if (!text) {
-
-        return;
-
-    }
-
-
-    userInput.value =
-        "";
-
-
-    resizeInput();
-
-
-    processMessage(
-        text
-    );
-
-}
-
-
-
-/* ============================================================
-   PROCESS MESSAGE
-============================================================ */
-
-async function processMessage(
-    message
+async function answerWithLocalAI(
+    message,
+    source
 ) {
 
-    /*
-     * Save user message.
-     */
-
-    addUserMessage(
-        message
-    );
+    let live =
+        null;
 
 
-    setStatus(
-        "Thinking..."
-    );
+    try {
+
+        live =
+            createLiveAssistantBubble(
+                "Preparing local AI…"
+            );
 
 
-    await delay(
-        180
-    );
+        const engine =
+            await getAIEngine(
+                label => {
+
+                    live.update(
+                        label
+                    );
+
+                }
+            );
 
 
-    /*
-     * SECRET GAME CENTER
-     */
+        live.update(
+            "Thinking…"
+        );
 
-    if (
-        checkSecretGameUnlock(
-            message
-        )
-    ) {
 
-        return;
+
+        const chat =
+            getCurrentChat();
+
+
+
+        /*
+         * Send recent chat history
+         * so follow-up questions work.
+         */
+
+        const history =
+            (
+                chat?.messages ||
+                []
+            )
+
+            .filter(
+                m =>
+                    m.type ===
+                    "text"
+            )
+
+            .slice(
+                -14
+            )
+
+            .map(
+                m => ({
+
+                    role:
+                        m.role,
+
+                    content:
+                        m.content
+
+                })
+            );
+
+
+
+        const systemPrompt =
+`You are GALAXY, a helpful multilingual assistant created by Harshavardhan.
+
+Respond in the same language the user uses unless they ask for another language.
+
+You can answer in Tamil, English, Hindi, Arabic, French and other languages supported by your model.
+
+Be accurate, helpful and clear.
+
+If anyone asks who created GALAXY, say Harshavardhan created GALAXY.
+
+Do not claim to have live weather or live web access unless a tool actually provides it.`;
+
+
+
+        const stream =
+            await engine
+                .chat
+                .completions
+                .create({
+
+                    messages: [
+
+                        {
+
+                            role:
+                                "system",
+
+                            content:
+                                systemPrompt
+
+                        },
+
+                        ...history
+
+                    ],
+
+                    stream:
+                        true,
+
+                    temperature:
+                        0.65,
+
+                    max_tokens:
+                        1000
+
+                });
+
+
+
+        let output =
+            "";
+
+
+
+        for await (
+            const chunk
+            of stream
+        ) {
+
+            output +=
+                chunk
+                    ?.choices
+                    ?.[0]
+                    ?.delta
+                    ?.content
+                ||
+                "";
+
+
+            live.update(
+                output ||
+                "Thinking…"
+            );
+
+        }
+
+
+
+        live.remove();
+
+
+
+        const finalText =
+            output.trim() ||
+            "I couldn't generate an answer.";
+
+
+
+        addAssistantMessage(
+            finalText
+        );
+
+
+        setStatus(
+            "Ready"
+        );
+
+
+        if (
+            source ===
+            "voice"
+        ) {
+
+            speakText(
+                finalText
+            );
+
+        }
 
     }
 
-
-    const text =
-        message
-            .toLowerCase()
-            .trim();
-
-
-
-    /*
-     * USER TRIES GAME CENTER
-     * BEFORE UNLOCK
-     */
-
-    if (
-        text ===
-            "game center" ||
-        text ===
-            "game mode" ||
-        text ===
-            "open game center"
+    catch (
+        error
     ) {
 
         if (
-            !state.gameCenterUnlocked
+            live
         ) {
 
-            addAssistantMessage(
-                "🔒 Game Center is currently hidden."
-            );
-
-
-            setStatus(
-                "Ready"
-            );
-
-
-            return;
+            live.remove();
 
         }
 
 
-        addAssistantMessage(
-            "Opening Game Center."
+        console.error(
+            error
         );
 
 
-        openGameCenter();
+        const message =
+            navigator.gpu
 
+            ?
+            "I couldn't load the local AI model on this device. Try refreshing, using a recent Chrome or Edge browser, and make sure hardware acceleration is enabled."
 
-        return;
-
-    }
-
-
-
-    /*
-     * CREATOR
-     */
-
-    if (
-        isCreatorQuestion(
-            text
-        )
-    ) {
-
-        addAssistantMessage(
-            "Harshavardhan is the creator of GALAXY."
-        );
-
-
-        setStatus(
-            "Ready"
-        );
-
-
-        return;
-
-    }
-
-
-
-    /*
-     * IMAGE GENERATION PROMPT
-     */
-
-    if (
-        isImageCommand(
-            text
-        )
-    ) {
-
-        const prompt =
-            cleanImagePrompt(
-                message
-            );
+            :
+            "This browser does not provide WebGPU, so the downloadable local AI cannot run here. Try a recent WebGPU-capable browser.";
 
 
         addAssistantMessage(
-`🎨 IMAGE GENERATION
-
-Prompt:
-${prompt}
-
-GALAXY recognized your image request.
-
-This GitHub + Vercel-only version does not contain a true AI image model yet. The prompt system is ready so a generator can be connected later without changing the main interface.`
-        );
-
-
-        setStatus(
-            "Ready"
-        );
-
-
-        return;
-
-    }
-
-
-
-    /*
-     * VIDEO GENERATION PROMPT
-     */
-
-    if (
-        isVideoCommand(
-            text
-        )
-    ) {
-
-        const prompt =
-            cleanVideoPrompt(
-                message
-            );
-
-
-        addAssistantMessage(
-`🎬 VIDEO GENERATION
-
-Prompt:
-${prompt}
-
-GALAXY recognized your video request.
-
-The interface is ready for video generation, but true AI text-to-video requires a video model that is not included in this GitHub + Vercel-only frontend.`
-        );
-
-
-        setStatus(
-            "Ready"
-        );
-
-
-        return;
-
-    }
-
-
-
-    /*
-     * CALCULATOR
-     */
-
-    const result =
-        calculate(
             message
         );
 
 
-    if (
-        result !== null
-    ) {
-
-        addAssistantMessage(
-            `The answer is ${result}.`
-        );
-
-
         setStatus(
-            "Ready"
+            "AI unavailable"
         );
 
 
-        return;
+        if (
+            source ===
+            "voice"
+        ) {
+
+            speakText(
+                message
+            );
+
+        }
 
     }
-
-
-
-    /*
-     * BUILT-IN GALAXY ANSWER
-     */
-
-    const answer =
-        generateGalaxyAnswer(
-            message
-        );
-
-
-    addAssistantMessage(
-        answer
-    );
-
-
-    setStatus(
-        "Ready"
-    );
 
 }
 
 
 
 /* ============================================================
-   CREATOR QUESTION
+   DOWNLOAD / LOAD LOCAL AI
 ============================================================ */
 
-function isCreatorQuestion(
-    text
+async function getAIEngine(
+    onProgress
 ) {
 
-    const phrases = [
+    if (
+        state.aiEngine
+    ) {
 
-        "who created you",
+        return state.aiEngine;
 
-        "who made you",
-
-        "who built you",
-
-        "who developed you",
-
-        "who is your creator",
-
-        "who created galaxy",
-
-        "who made galaxy",
-
-        "creator of galaxy",
-
-        "who is harshavardhan"
-
-    ];
+    }
 
 
-    return phrases.some(
-        phrase =>
-            text.includes(
-                phrase
+    if (
+        !navigator.gpu
+    ) {
+
+        throw new Error(
+            "WEBGPU unavailable"
+        );
+
+    }
+
+
+
+    /*
+     * Another call may already
+     * be downloading the model.
+     */
+
+    while (
+        state.aiLoading
+    ) {
+
+        await delay(
+            100
+        );
+
+    }
+
+
+    if (
+        state.aiEngine
+    ) {
+
+        return state.aiEngine;
+
+    }
+
+
+
+    state.aiLoading =
+        true;
+
+
+    try {
+
+        const webllm =
+            await import(
+                TEXT_MODULE_URL
+            );
+
+
+        /*
+         * Automatically use a stronger
+         * model on more capable devices.
+         */
+
+        const memory =
+            Number(
+                navigator.deviceMemory ||
+                4
+            );
+
+
+        const candidates =
+            memory >= 8
+
+            ?
+            [
+
+                "Qwen2.5-3B-Instruct-q4f16_1-MLC",
+
+                "Qwen2.5-1.5B-Instruct-q4f16_1-MLC"
+
+            ]
+
+            :
+            [
+
+                "Qwen2.5-1.5B-Instruct-q4f16_1-MLC",
+
+                "Qwen2.5-0.5B-Instruct-q4f16_1-MLC"
+
+            ];
+
+
+
+        let lastError =
+            null;
+
+
+
+        for (
+            const modelId
+            of candidates
+        ) {
+
+            try {
+
+                state.aiModelId =
+                    modelId;
+
+
+                setModelStatus(
+                    "Downloading local AI…"
+                );
+
+
+
+                state.aiEngine =
+                    await webllm
+                        .CreateMLCEngine(
+
+                            modelId,
+
+                            {
+
+                                initProgressCallback:
+                                    report => {
+
+                                        const percent =
+                                            typeof report.progress ===
+                                            "number"
+
+                                            ?
+                                            Math.round(
+                                                report.progress *
+                                                100
+                                            )
+
+                                            :
+                                            null;
+
+
+                                        const label =
+                                            percent !==
+                                            null
+
+                                            ?
+                                            `Downloading AI ${percent}%`
+
+                                            :
+                                            "Loading local AI…";
+
+
+                                        setStatus(
+                                            label
+                                        );
+
+
+                                        setModelStatus(
+                                            label
+                                        );
+
+
+                                        if (
+                                            onProgress
+                                        ) {
+
+                                            onProgress(
+                                                label
+                                            );
+
+                                        }
+
+                                    }
+
+                            }
+
+                        );
+
+
+                setModelStatus(
+
+                    modelId.includes(
+                        "3B"
+                    )
+
+                    ?
+                    "Local AI · 3B"
+
+                    :
+                    "Local AI · Lite"
+
+                );
+
+
+                return state.aiEngine;
+
+            }
+
+            catch (
+                error
+            ) {
+
+                lastError =
+                    error;
+
+
+                state.aiEngine =
+                    null;
+
+            }
+
+        }
+
+
+        throw (
+            lastError ||
+            new Error(
+                "AI model load failed"
             )
-    );
+        );
+
+    }
+
+    finally {
+
+        state.aiLoading =
+            false;
+
+    }
 
 }
 
 
 
 /* ============================================================
-   BUILT-IN ASSISTANT
-============================================================ */
+   IMAGE COMMAND RECOGNITION
 
-function generateGalaxyAnswer(
-    message
-) {
+   These now work:
 
-    const text =
-        message
-            .toLowerCase()
-            .trim();
+   create a modern city picture
 
+   generate an image of a dragon
 
+   make a futuristic car photo
 
-    if (
-        ["hello", "hi", "hey"]
-        .includes(
-            text
-        )
-    ) {
-
-        return (
-            "Hello! I'm GALAXY. What can I help you with?"
-        );
-
-    }
-
-
-
-    if (
-        text.includes(
-            "what is ai"
-        )
-    ) {
-
-        return (
-            "AI means Artificial Intelligence. It is technology that allows computers to perform tasks such as understanding language, recognizing patterns, solving problems and generating content."
-        );
-
-    }
-
-
-
-    if (
-        text.includes(
-            "space"
-        )
-    ) {
-
-        return (
-            "Space is the enormous region beyond Earth's atmosphere. It contains stars, planets, moons, galaxies, nebulae, black holes and many other objects."
-        );
-
-    }
-
-
-
-    if (
-        text.includes(
-            "black hole"
-        )
-    ) {
-
-        return (
-            "A black hole is a region of space where gravity is so strong that even light cannot escape once it crosses the event horizon."
-        );
-
-    }
-
-
-
-    if (
-        text.includes(
-            "javascript"
-        )
-    ) {
-
-        return (
-            "JavaScript is a programming language used to make websites interactive. GALAXY itself uses JavaScript for chats, Game Center, voice commands and interface logic."
-        );
-
-    }
-
-
-
-    if (
-        text.includes(
-            "html"
-        )
-    ) {
-
-        return (
-            "HTML provides the structure of a webpage. It defines things such as headings, text, sections, images and input areas."
-        );
-
-    }
-
-
-
-    if (
-        text.includes(
-            "css"
-        )
-    ) {
-
-        return (
-            "CSS controls how websites look, including colors, layouts, spacing, fonts, responsive design and animations."
-        );
-
-    }
-
-
-
-    if (
-        text.includes(
-            "write a story"
-        ) ||
-        text.includes(
-            "tell me a story"
-        )
-    ) {
-
-        return (
-`The Last Star
-
-Far beyond Earth, a young explorer discovered a tiny purple star floating alone in darkness. It was the final light of an ancient galaxy.
-
-When the explorer touched it, thousands of forgotten worlds appeared around him.
-
-The star had not been waiting to die.
-
-It had been waiting for someone to begin again.`
-        );
-
-    }
-
-
-
-    if (
-        text.includes(
-            "weather"
-        )
-    ) {
-
-        return (
-            "This version of GALAXY is running without an external weather service, so it cannot retrieve live weather yet."
-        );
-
-    }
-
-
-
-    if (
-        text.includes(
-            "what can you do"
-        )
-    ) {
-
-        return (
-`I can currently help with:
-
-• built-in questions
-• calculations
-• stories
-• recent conversations
-• voice wake-word commands
-• image-generation prompts
-• video-generation prompts
-• a hidden Game Center
-• game discovery
-
-GALAXY was created by Harshavardhan.`
-        );
-
-    }
-
-
-
-    if (
-        text.includes(
-            "time"
-        )
-    ) {
-
-        return (
-            `The current time is ${new Date().toLocaleTimeString()}.`
-        );
-
-    }
-
-
-
-    if (
-        text.includes(
-            "date"
-        )
-    ) {
-
-        return (
-            `Today's date is ${new Date().toLocaleDateString()}.`
-        );
-
-    }
-
-
-
-    return (
-`I received your question.
-
-This current GALAXY version runs without an external AI service, so my general knowledge is limited to the capabilities programmed into the website.
-
-Try questions about AI, space, HTML, CSS, JavaScript, calculations or stories.`
-    );
-
-}
-
-
-
-/* ============================================================
-   IMAGE COMMAND
+   draw a space station
 ============================================================ */
 
 function isImageCommand(
     text
 ) {
 
+    const mediaWord =
+        /\b(image|picture|photo|wallpaper|poster|artwork|illustration)\b/i
+        .test(
+            text
+        );
+
+
+    const createWord =
+        /^(create|generate|make|draw|paint|design)\b/i
+        .test(
+            text
+        );
+
+
     return (
 
-        text.startsWith(
-            "create image"
-        ) ||
+        /^draw\b/i.test(
+            text
+        )
 
-        text.startsWith(
-            "create an image"
-        ) ||
+        ||
 
-        text.startsWith(
-            "generate image"
-        ) ||
-
-        text.startsWith(
-            "generate an image"
-        ) ||
-
-        text.startsWith(
-            "make image"
-        ) ||
-
-        text.startsWith(
-            "draw "
+        (
+            mediaWord &&
+            createWord
         )
 
     );
@@ -1436,27 +1496,7 @@ function cleanImagePrompt(
     return text
 
         .replace(
-            /^create an image of\s+/i,
-            ""
-        )
-
-        .replace(
-            /^create image of\s+/i,
-            ""
-        )
-
-        .replace(
-            /^generate an image of\s+/i,
-            ""
-        )
-
-        .replace(
-            /^generate image of\s+/i,
-            ""
-        )
-
-        .replace(
-            /^make image of\s+/i,
+            /^(create|generate|make|design|paint)\s+(an?\s+)?/i,
             ""
         )
 
@@ -1465,7 +1505,26 @@ function cleanImagePrompt(
             ""
         )
 
-        .trim();
+        .replace(
+            /\b(image|picture|photo|wallpaper|poster|artwork|illustration)\b/gi,
+            ""
+        )
+
+        .replace(
+            /^of\s+/i,
+            ""
+        )
+
+        .replace(
+            /\s+/g,
+            " "
+        )
+
+        .trim()
+
+        ||
+
+        "a beautiful futuristic scene";
 
 }
 
@@ -1481,24 +1540,16 @@ function isVideoCommand(
 
     return (
 
-        text.startsWith(
-            "create video"
-        ) ||
+        /^(create|generate|make|design)\b/i
+        .test(
+            text
+        )
 
-        text.startsWith(
-            "create a video"
-        ) ||
+        &&
 
-        text.startsWith(
-            "generate video"
-        ) ||
-
-        text.startsWith(
-            "generate a video"
-        ) ||
-
-        text.startsWith(
-            "make video"
+        /\b(video|movie|clip|animation)\b/i
+        .test(
+            text
         )
 
     );
@@ -1514,31 +1565,1105 @@ function cleanVideoPrompt(
     return text
 
         .replace(
-            /^create a video of\s+/i,
+            /^(create|generate|make|design)\s+(a\s+)?/i,
             ""
         )
 
         .replace(
-            /^create video of\s+/i,
+            /\b(video|movie|clip|animation)\b/gi,
             ""
         )
 
         .replace(
-            /^generate a video of\s+/i,
+            /^of\s+/i,
             ""
         )
 
         .replace(
-            /^generate video of\s+/i,
-            ""
+            /\s+/g,
+            " "
         )
 
-        .replace(
-            /^make video of\s+/i,
-            ""
-        )
+        .trim()
 
-        .trim();
+        ||
+
+        "a cinematic futuristic scene";
+
+}
+
+
+
+/* ============================================================
+   IMAGE GENERATION
+============================================================ */
+
+async function handleImageGeneration(
+    prompt,
+    source
+) {
+
+    const live =
+        createLiveAssistantBubble(
+            "Preparing image generator…"
+        );
+
+
+    try {
+
+        const blob =
+            await generateImageBlob(
+
+                prompt,
+
+                label => {
+
+                    live.update(
+                        label
+                    );
+
+                }
+
+            );
+
+
+        live.remove();
+
+
+
+        /*
+         * Save image in IndexedDB so it
+         * can remain in that conversation.
+         */
+
+        const mediaId =
+            await saveMediaBlob(
+                blob,
+                "image/png"
+            );
+
+
+        addMessage(
+
+            "assistant",
+
+            `Generated image: ${prompt}`,
+
+            {
+
+                type:
+                    "image",
+
+                mediaId:
+                    mediaId
+
+            }
+
+        );
+
+
+        setStatus(
+            "Ready"
+        );
+
+
+        if (
+            source ===
+            "voice"
+        ) {
+
+            speakText(
+                "Your image is ready."
+            );
+
+        }
+
+    }
+
+    catch (
+        error
+    ) {
+
+        live.remove();
+
+
+        console.error(
+            error
+        );
+
+
+        const message =
+            "Image generation could not run on this device. It needs WebGPU and enough GPU memory. The first use also downloads the image model.";
+
+
+        addAssistantMessage(
+            message
+        );
+
+
+        setStatus(
+            "Image unavailable"
+        );
+
+
+        if (
+            source ===
+            "voice"
+        ) {
+
+            speakText(
+                message
+            );
+
+        }
+
+    }
+
+}
+
+
+
+/* ============================================================
+   DOWNLOAD / LOAD IMAGE MODEL
+============================================================ */
+
+async function getImageClient(
+    onProgress
+) {
+
+    if (
+        state.imageClient &&
+        state.imageModelLoaded
+    ) {
+
+        return state.imageClient;
+
+    }
+
+
+    if (
+        !navigator.gpu
+    ) {
+
+        throw new Error(
+            "WEBGPU unavailable"
+        );
+
+    }
+
+
+
+    if (
+        !state.imageClient
+    ) {
+
+        const module =
+            await import(
+                IMAGE_MODULE_URL
+            );
+
+
+        state.imageClient =
+            module
+                .Txt2ImgWorkerClient
+                .createDefault();
+
+    }
+
+
+
+    const capabilities =
+        await state.imageClient
+            .detect();
+
+
+
+    if (
+        !capabilities.webgpu
+    ) {
+
+        throw new Error(
+            "WebGPU unavailable for image generation"
+        );
+
+    }
+
+
+
+    const loadResult =
+        await state.imageClient
+            .load(
+
+                "sd-turbo",
+
+                {
+
+                    backendPreference:
+                        [
+                            "webgpu"
+                        ]
+
+                },
+
+                progress => {
+
+                    const percent =
+                        progress?.pct !=
+                        null
+
+                        ?
+                        ` ${Math.round(
+                            progress.pct
+                        )}%`
+
+                        :
+                        "";
+
+
+                    const label =
+                        `${progress?.message || "Downloading image model"}${percent}`;
+
+
+                    setStatus(
+                        label
+                    );
+
+
+                    if (
+                        onProgress
+                    ) {
+
+                        onProgress(
+                            label
+                        );
+
+                    }
+
+                }
+
+            );
+
+
+
+    if (
+        !loadResult?.ok
+    ) {
+
+        throw new Error(
+            loadResult?.message ||
+            "Image model load failed"
+        );
+
+    }
+
+
+
+    state.imageModelLoaded =
+        true;
+
+
+    return state.imageClient;
+
+}
+
+
+
+/* ============================================================
+   GENERATE IMAGE BLOB
+============================================================ */
+
+async function generateImageBlob(
+    prompt,
+    onProgress
+) {
+
+    const client =
+        await getImageClient(
+            onProgress
+        );
+
+
+    const seed =
+        Math.floor(
+            Math.random() *
+            2000000000
+        );
+
+
+    const job =
+        client.generate(
+
+            {
+
+                prompt:
+                    prompt,
+
+                seed:
+                    seed,
+
+                width:
+                    512,
+
+                height:
+                    512
+
+            },
+
+            event => {
+
+                const label =
+                    event?.phase
+
+                    ?
+                    `Generating image · ${event.phase}`
+
+                    :
+                    "Generating image…";
+
+
+                setStatus(
+                    label
+                );
+
+
+                if (
+                    onProgress
+                ) {
+
+                    onProgress(
+                        label
+                    );
+
+                }
+
+            },
+
+            {
+
+                busyPolicy:
+                    "queue",
+
+                debounceMs:
+                    0
+
+            }
+
+        );
+
+
+
+    const result =
+        await job.promise;
+
+
+
+    if (
+        !result?.ok ||
+        !result.blob
+    ) {
+
+        throw new Error(
+            result?.message ||
+            "Image generation failed"
+        );
+
+    }
+
+
+    return result.blob;
+
+}
+
+
+
+/* ============================================================
+   VIDEO GENERATION
+
+   IMPORTANT:
+
+   This creates a REAL playable local
+   WebM video.
+
+   Process:
+
+   text
+      ↓
+   AI image
+      ↓
+   animated canvas
+      ↓
+   WebM video
+
+   This is not full cinematic
+   video diffusion.
+============================================================ */
+
+async function handleVideoGeneration(
+    prompt,
+    source
+) {
+
+    const live =
+        createLiveAssistantBubble(
+            "Creating local AI video…"
+        );
+
+
+    try {
+
+        const imageBlob =
+            await generateImageBlob(
+
+                prompt,
+
+                label => {
+
+                    live.update(
+                        label
+                    );
+
+                }
+
+            );
+
+
+        live.update(
+            "Animating the generated scene…"
+        );
+
+
+
+        const videoBlob =
+            await createMotionVideo(
+                imageBlob,
+                prompt
+            );
+
+
+
+        live.remove();
+
+
+
+        const mediaId =
+            await saveMediaBlob(
+
+                videoBlob,
+
+                videoBlob.type ||
+                "video/webm"
+
+            );
+
+
+
+        addMessage(
+
+            "assistant",
+
+            `Generated local motion video: ${prompt}`,
+
+            {
+
+                type:
+                    "video",
+
+                mediaId:
+                    mediaId
+
+            }
+
+        );
+
+
+        setStatus(
+            "Ready"
+        );
+
+
+        if (
+            source ===
+            "voice"
+        ) {
+
+            speakText(
+                "Your video is ready."
+            );
+
+        }
+
+    }
+
+    catch (
+        error
+    ) {
+
+        live.remove();
+
+
+        console.error(
+            error
+        );
+
+
+        const message =
+            "Video generation could not run on this device. This three-file build creates a short local motion video from an AI-generated image; it is not a full cinematic text-to-video diffusion model.";
+
+
+        addAssistantMessage(
+            message
+        );
+
+
+        setStatus(
+            "Video unavailable"
+        );
+
+
+        if (
+            source ===
+            "voice"
+        ) {
+
+            speakText(
+                message
+            );
+
+        }
+
+    }
+
+}
+
+
+
+/* ============================================================
+   CREATE PLAYABLE VIDEO
+============================================================ */
+
+async function createMotionVideo(
+    imageBlob,
+    prompt
+) {
+
+    if (
+        !window.MediaRecorder
+    ) {
+
+        throw new Error(
+            "MediaRecorder unsupported"
+        );
+
+    }
+
+
+
+    const bitmap =
+        await createImageBitmap(
+            imageBlob
+        );
+
+
+
+    const canvas =
+        document.createElement(
+            "canvas"
+        );
+
+
+    canvas.width =
+        768;
+
+
+    canvas.height =
+        432;
+
+
+
+    const ctx =
+        canvas.getContext(
+            "2d"
+        );
+
+
+    const fps =
+        30;
+
+
+    const durationMs =
+        6000;
+
+
+
+    const stream =
+        canvas.captureStream(
+            fps
+        );
+
+
+
+    const mime =
+        MediaRecorder
+            .isTypeSupported(
+                "video/webm;codecs=vp9"
+            )
+
+        ?
+        "video/webm;codecs=vp9"
+
+        :
+        "video/webm";
+
+
+
+    const recorder =
+        new MediaRecorder(
+
+            stream,
+
+            {
+
+                mimeType:
+                    mime,
+
+                videoBitsPerSecond:
+                    4000000
+
+            }
+
+        );
+
+
+
+    const chunks =
+        [];
+
+
+    recorder.ondataavailable =
+        event => {
+
+            if (
+                event.data.size
+            ) {
+
+                chunks.push(
+                    event.data
+                );
+
+            }
+
+        };
+
+
+
+    const stopped =
+        new Promise(
+            resolve => {
+
+                recorder.onstop =
+                    resolve;
+
+            }
+        );
+
+
+
+    recorder.start(
+        250
+    );
+
+
+
+    const start =
+        performance.now();
+
+
+
+    await new Promise(
+        resolve => {
+
+
+            function frame(
+                now
+            ) {
+
+                const t =
+                    Math.min(
+
+                        1,
+
+                        (
+                            now -
+                            start
+                        )
+
+                        /
+                        durationMs
+
+                    );
+
+
+
+                /*
+                 * Slow cinematic zoom.
+                 */
+
+                const scale =
+                    1.02 +
+                    t *
+                    0.12;
+
+
+
+                const sourceRatio =
+                    bitmap.width /
+                    bitmap.height;
+
+
+                const targetRatio =
+                    canvas.width /
+                    canvas.height;
+
+
+
+                let sw =
+                    bitmap.width;
+
+
+                let sh =
+                    bitmap.height;
+
+
+
+                if (
+                    sourceRatio >
+                    targetRatio
+                ) {
+
+                    sw =
+                        sh *
+                        targetRatio;
+
+                }
+
+                else {
+
+                    sh =
+                        sw /
+                        targetRatio;
+
+                }
+
+
+
+                sw /=
+                    scale;
+
+
+                sh /=
+                    scale;
+
+
+
+                const driftX =
+                    Math.sin(
+                        t *
+                        Math.PI
+                    )
+                    *
+                    bitmap.width
+                    *
+                    0.02;
+
+
+
+                const sx =
+                    (
+                        bitmap.width -
+                        sw
+                    )
+                    /
+                    2
+                    +
+                    driftX;
+
+
+                const sy =
+                    (
+                        bitmap.height -
+                        sh
+                    )
+                    /
+                    2;
+
+
+
+                ctx.clearRect(
+                    0,
+                    0,
+                    canvas.width,
+                    canvas.height
+                );
+
+
+
+                ctx.drawImage(
+
+                    bitmap,
+
+                    sx,
+                    sy,
+                    sw,
+                    sh,
+
+                    0,
+                    0,
+                    canvas.width,
+                    canvas.height
+
+                );
+
+
+
+                /*
+                 * Cinematic tint.
+                 */
+
+                const gradient =
+                    ctx.createLinearGradient(
+
+                        0,
+                        0,
+                        0,
+                        canvas.height
+
+                    );
+
+
+                gradient.addColorStop(
+                    0,
+                    "rgba(15,0,40,0.05)"
+                );
+
+
+                gradient.addColorStop(
+                    1,
+                    "rgba(0,0,15,0.28)"
+                );
+
+
+                ctx.fillStyle =
+                    gradient;
+
+
+                ctx.fillRect(
+
+                    0,
+                    0,
+                    canvas.width,
+                    canvas.height
+
+                );
+
+
+
+                /*
+                 * Moving light particles.
+                 */
+
+                for (
+                    let i = 0;
+                    i < 22;
+                    i++
+                ) {
+
+                    const x =
+                        (
+                            i *
+                            97
+                            +
+                            t *
+                            220
+                            *
+                            (
+                                1 +
+                                (
+                                    i %
+                                    3
+                                )
+                            )
+                        )
+                        %
+                        canvas.width;
+
+
+                    const y =
+                        (
+                            i *
+                            53
+                            +
+                            Math.sin(
+                                t *
+                                6
+                                +
+                                i
+                            )
+                            *
+                            24
+                            +
+                            canvas.height
+                        )
+                        %
+                        canvas.height;
+
+
+                    ctx.fillStyle =
+                        `rgba(210,190,255,${
+                            0.12 +
+                            (
+                                i %
+                                4
+                            )
+                            *
+                            0.04
+                        })`;
+
+
+                    ctx.beginPath();
+
+
+                    ctx.arc(
+
+                        x,
+                        y,
+
+                        1 +
+                        (
+                            i %
+                            2
+                        ),
+
+                        0,
+
+                        Math.PI *
+                        2
+
+                    );
+
+
+                    ctx.fill();
+
+                }
+
+
+
+                if (
+                    t <
+                    1
+                ) {
+
+                    requestAnimationFrame(
+                        frame
+                    );
+
+                }
+
+                else {
+
+                    resolve();
+
+                }
+
+            }
+
+
+            requestAnimationFrame(
+                frame
+            );
+
+        }
+    );
+
+
+
+    recorder.stop();
+
+
+    await stopped;
+
+
+    bitmap.close();
+
+
+
+    return new Blob(
+
+        chunks,
+
+        {
+            type:
+                mime
+        }
+
+    );
+
+}
+
+
+
+/* ============================================================
+   CREATOR
+============================================================ */
+
+function isCreatorQuestion(
+    text
+) {
+
+    return [
+
+        "who created you",
+
+        "who made you",
+
+        "who built you",
+
+        "who developed you",
+
+        "who is your creator",
+
+        "who created galaxy",
+
+        "who made galaxy",
+
+        "creator of galaxy"
+
+    ]
+
+    .some(
+        phrase =>
+            text.includes(
+                phrase
+            )
+    );
+
+}
+
+
+
+/* ============================================================
+   WEATHER
+============================================================ */
+
+function isWeatherQuestion(
+    text
+) {
+
+    return (
+        /\b(weather|temperature|forecast|rain today|weather today)\b/i
+        .test(
+            text
+        )
+    );
 
 }
 
@@ -1552,42 +2677,44 @@ function calculate(
     message
 ) {
 
-    let expression =
+    const expression =
         message
 
-            .toLowerCase()
+        .toLowerCase()
 
-            .replace(
-                /^what is\s+/,
-                ""
-            )
+        .replace(
+            /^what is\s+/,
+            ""
+        )
 
-            .replace(
-                /^calculate\s+/,
-                ""
-            )
+        .replace(
+            /^calculate\s+/,
+            ""
+        )
 
-            .replace(
-                /×/g,
-                "*"
-            )
+        .replace(
+            /×/g,
+            "*"
+        )
 
-            .replace(
-                /÷/g,
-                "/"
-            )
+        .replace(
+            /÷/g,
+            "/"
+        )
 
-            .replace(
-                /\bx\b/g,
-                "*"
-            )
+        .replace(
+            /\bx\b/g,
+            "*"
+        )
 
-            .trim();
+        .trim();
+
 
 
     if (
         !expression ||
-        !/^[0-9+\-*/().%\s]+$/.test(
+        !/^[0-9+\-*/().%\s]+$/
+        .test(
             expression
         )
     ) {
@@ -1595,6 +2722,7 @@ function calculate(
         return null;
 
     }
+
 
 
     try {
@@ -1605,17 +2733,24 @@ function calculate(
             )();
 
 
-        if (
+        return (
+
             typeof result ===
-                "number" &&
+                "number"
+
+            &&
+
             Number.isFinite(
                 result
             )
-        ) {
 
-            return result;
+        )
 
-        }
+        ?
+        result
+
+        :
+        null;
 
     }
 
@@ -1625,15 +2760,46 @@ function calculate(
 
     }
 
+}
 
-    return null;
+
+
+/* ============================================================
+   RESPOND
+============================================================ */
+
+function respond(
+    text,
+    source = "typed"
+) {
+
+    addAssistantMessage(
+        text
+    );
+
+
+    setStatus(
+        "Ready"
+    );
+
+
+    if (
+        source ===
+        "voice"
+    ) {
+
+        speakText(
+            text
+        );
+
+    }
 
 }
 
 
 
 /* ============================================================
-   CHAT SYSTEM
+   CHAT STORAGE
 ============================================================ */
 
 function loadChats() {
@@ -1643,9 +2809,10 @@ function loadChats() {
         state.chats =
             JSON.parse(
                 localStorage.getItem(
-                    CHAT_STORAGE
+                    CHAT_KEY
                 )
-            ) ||
+            )
+            ||
             [];
 
     }
@@ -1660,8 +2827,10 @@ function loadChats() {
 
     state.currentChatId =
         localStorage.getItem(
-            CURRENT_CHAT_STORAGE
-        );
+            CURRENT_CHAT_KEY
+        )
+        ||
+        null;
 
 }
 
@@ -1670,10 +2839,13 @@ function loadChats() {
 function saveChats() {
 
     localStorage.setItem(
-        CHAT_STORAGE,
+
+        CHAT_KEY,
+
         JSON.stringify(
             state.chats
         )
+
     );
 
 
@@ -1682,8 +2854,11 @@ function saveChats() {
     ) {
 
         localStorage.setItem(
-            CURRENT_CHAT_STORAGE,
+
+            CURRENT_CHAT_KEY,
+
             state.currentChatId
+
         );
 
     }
@@ -1693,35 +2868,31 @@ function saveChats() {
 
 
 /* ============================================================
-   CURRENT CHAT
+   CHAT CREATION
 ============================================================ */
 
 function ensureCurrentChat() {
 
-    const exists =
-        state.chats.some(
-            chat =>
-                chat.id ===
-                state.currentChatId
-        );
-
-
     if (
-        state.chats.length ===
-        0
+        !state.chats.length
     ) {
 
         createNewChat(
             true
         );
 
-
         return;
 
     }
 
 
-    if (!exists) {
+    if (
+        !state.chats.some(
+            chat =>
+                chat.id ===
+                state.currentChatId
+        )
+    ) {
 
         state.currentChatId =
             state.chats[0].id;
@@ -1735,10 +2906,6 @@ function ensureCurrentChat() {
 
 
 
-/* ============================================================
-   NEW CHAT
-============================================================ */
-
 function createNewChat(
     silent = false
 ) {
@@ -1746,12 +2913,11 @@ function createNewChat(
     const chat = {
 
         id:
-            "chat_" +
-            Date.now() +
-            "_" +
-            Math.random()
-                .toString(36)
-                .slice(2, 6),
+            `chat_${Date.now()}_${
+                Math.random()
+                    .toString(36)
+                    .slice(2, 7)
+            }`,
 
         title:
             "New conversation",
@@ -1793,7 +2959,7 @@ function createNewChat(
         !silent
     ) {
 
-        userInput.focus();
+        els.userInput.focus();
 
     }
 
@@ -1802,14 +2968,38 @@ function createNewChat(
 
 
 /* ============================================================
-   ADD MESSAGE
+   CURRENT CHAT
+============================================================ */
+
+function getCurrentChat() {
+
+    return (
+
+        state.chats.find(
+            chat =>
+                chat.id ===
+                state.currentChatId
+        )
+
+        ||
+
+        null
+
+    );
+
+}
+
+
+
+/* ============================================================
+   ADD MESSAGES
 ============================================================ */
 
 function addUserMessage(
     content
 ) {
 
-    addMessage(
+    return addMessage(
         "user",
         content
     );
@@ -1822,7 +3012,7 @@ function addAssistantMessage(
     content
 ) {
 
-    addMessage(
+    return addMessage(
         "assistant",
         content
     );
@@ -1833,7 +3023,8 @@ function addAssistantMessage(
 
 function addMessage(
     role,
-    content
+    content,
+    extra = {}
 ) {
 
     const chat =
@@ -1842,16 +3033,20 @@ function addMessage(
 
     if (!chat) {
 
-        return;
+        return null;
 
     }
 
 
-    chat.messages.push({
+
+    const message = {
 
         id:
-            "message_" +
-            Date.now(),
+            `msg_${Date.now()}_${
+                Math.random()
+                    .toString(36)
+                    .slice(2, 6)
+            }`,
 
         role:
             role,
@@ -1859,15 +3054,33 @@ function addMessage(
         content:
             content,
 
-        time:
+        type:
+            extra.type ||
+            "text",
+
+        mediaId:
+            extra.mediaId ||
+            null,
+
+        createdAt:
             Date.now()
 
-    });
+    };
+
+
+
+    chat.messages.push(
+        message
+    );
+
 
 
     if (
         role ===
-            "user" &&
+            "user"
+
+        &&
+
         chat.title ===
             "New conversation"
     ) {
@@ -1878,6 +3091,7 @@ function addMessage(
             );
 
     }
+
 
 
     chat.updatedAt =
@@ -1892,21 +3106,8 @@ function addMessage(
 
     renderCurrentChat();
 
-}
 
-
-
-/* ============================================================
-   GET CHAT
-============================================================ */
-
-function getCurrentChat() {
-
-    return state.chats.find(
-        chat =>
-            chat.id ===
-            state.currentChatId
-    );
+    return message;
 
 }
 
@@ -1921,15 +3122,17 @@ function createTitle(
 ) {
 
     /*
-     * Don't reveal secret word
-     * in sidebar history.
+     * Do not show secret word
+     * as recent chat title.
      */
 
     if (
         content
             .trim()
             .toLowerCase()
+
         ===
+
         "harshavardhan"
     ) {
 
@@ -1940,34 +3143,34 @@ function createTitle(
     }
 
 
-    const cleaned =
+    const clean =
         content
-            .replace(
-                /\s+/g,
-                " "
-            )
-            .trim();
 
+        .replace(
+            /\s+/g,
+            " "
+        )
 
-    if (
-        cleaned.length >
-        31
-    ) {
-
-        return (
-            cleaned.slice(
-                0,
-                31
-            ) +
-            "..."
-        );
-
-    }
+        .trim();
 
 
     return (
-        cleaned ||
-        "New conversation"
+
+        clean.length >
+        34
+
+        ?
+        `${clean.slice(
+            0,
+            34
+        )}…`
+
+        :
+        (
+            clean ||
+            "New conversation"
+        )
+
     );
 
 }
@@ -1980,23 +3183,24 @@ function createTitle(
 
 function renderRecentChats() {
 
-    recentChats.innerHTML =
+    els.recentChats.innerHTML =
         "";
 
 
-    const ordered =
-        [...state.chats]
-        .sort(
-            (
-                a,
-                b
-            ) =>
-                b.updatedAt -
-                a.updatedAt
-        );
+    [
+        ...state.chats
+    ]
 
+    .sort(
+        (
+            a,
+            b
+        ) =>
+            b.updatedAt -
+            a.updatedAt
+    )
 
-    ordered.forEach(
+    .forEach(
         chat => {
 
             const item =
@@ -2006,19 +3210,14 @@ function renderRecentChats() {
 
 
             item.className =
-                "recent-item";
-
-
-            if (
-                chat.id ===
-                state.currentChatId
-            ) {
-
-                item.classList.add(
-                    "active"
-                );
-
-            }
+                `recent-item${
+                    chat.id ===
+                    state.currentChatId
+                    ?
+                    " active"
+                    :
+                    ""
+                }`;
 
 
             item.innerHTML = `
@@ -2038,6 +3237,7 @@ function renderRecentChats() {
                 </div>
 
             `;
+
 
 
             item.addEventListener(
@@ -2060,16 +3260,20 @@ function renderRecentChats() {
                     renderCurrentChat();
 
 
-                    sidebar.classList.remove(
-                        "open"
-                    );
+                    els.sidebar
+                        .classList
+                        .remove(
+                            "open"
+                        );
 
                 }
             );
 
 
+
             /*
-             * RIGHT CLICK DELETE
+             * RIGHT CLICK =
+             * DELETE CHAT
              */
 
             item.addEventListener(
@@ -2079,14 +3283,10 @@ function renderRecentChats() {
                     event.preventDefault();
 
 
-                    const confirmed =
+                    if (
                         confirm(
                             `Delete "${chat.title}"?`
-                        );
-
-
-                    if (
-                        confirmed
+                        )
                     ) {
 
                         deleteChat(
@@ -2099,9 +3299,10 @@ function renderRecentChats() {
             );
 
 
-            recentChats.appendChild(
-                item
-            );
+            els.recentChats
+                .appendChild(
+                    item
+                );
 
         }
     );
@@ -2119,7 +3320,8 @@ function deleteChat(
 ) {
 
     state.chats =
-        state.chats.filter(
+        state.chats
+        .filter(
             chat =>
                 chat.id !==
                 id
@@ -2127,17 +3329,17 @@ function deleteChat(
 
 
     if (
-        state.chats.length ===
-        0
+        !state.chats.length
     ) {
 
         state.currentChatId =
             null;
 
 
-        localStorage.removeItem(
-            CURRENT_CHAT_STORAGE
-        );
+        localStorage
+            .removeItem(
+                CURRENT_CHAT_KEY
+            );
 
 
         createNewChat(
@@ -2174,7 +3376,7 @@ function deleteChat(
 
 
 /* ============================================================
-   CLEAR EVERYTHING
+   CLEAR ALL
 ============================================================ */
 
 function clearEveryChat() {
@@ -2190,14 +3392,16 @@ function clearEveryChat() {
     }
 
 
-    localStorage.removeItem(
-        CHAT_STORAGE
-    );
+    localStorage
+        .removeItem(
+            CHAT_KEY
+        );
 
 
-    localStorage.removeItem(
-        CURRENT_CHAT_STORAGE
-    );
+    localStorage
+        .removeItem(
+            CURRENT_CHAT_KEY
+        );
 
 
     state.chats =
@@ -2213,7 +3417,7 @@ function clearEveryChat() {
     );
 
 
-    settingsModal
+    els.settingsModal
         .classList
         .add(
             "hidden-modal"
@@ -2224,7 +3428,7 @@ function clearEveryChat() {
 
 
 /* ============================================================
-   RENDER CURRENT CHAT
+   RENDER CHAT
 ============================================================ */
 
 function renderCurrentChat() {
@@ -2233,23 +3437,24 @@ function renderCurrentChat() {
         getCurrentChat();
 
 
-    chatArea.innerHTML =
+    els.chatArea.innerHTML =
         "";
 
 
     if (
         !chat ||
-        chat.messages.length ===
-            0
+        !chat.messages.length
     ) {
 
-        heroArea.style.display =
+        els.heroArea.style.display =
             "flex";
 
 
-        chatArea.classList.remove(
-            "active"
-        );
+        els.chatArea
+            .classList
+            .remove(
+                "active"
+            );
 
 
         return;
@@ -2257,33 +3462,37 @@ function renderCurrentChat() {
     }
 
 
-    heroArea.style.display =
+    els.heroArea.style.display =
         "none";
 
 
-    chatArea.classList.add(
-        "active"
-    );
+    els.chatArea
+        .classList
+        .add(
+            "active"
+        );
 
 
-    chat.messages.forEach(
-        message => {
+    chat.messages
+        .forEach(
+            message => {
 
-            chatArea.appendChild(
-                makeMessageElement(
-                    message
-                )
-            );
+                els.chatArea
+                    .appendChild(
+                        makeMessageElement(
+                            message
+                        )
+                    );
 
-        }
-    );
+            }
+        );
 
 
     requestAnimationFrame(
         () => {
 
-            chatArea.scrollTop =
-                chatArea.scrollHeight;
+            els.chatArea.scrollTop =
+                els.chatArea.scrollHeight;
 
         }
     );
@@ -2310,6 +3519,7 @@ function makeMessageElement(
         `message-row ${message.role}`;
 
 
+
     const avatar =
         document.createElement(
             "div"
@@ -2322,9 +3532,12 @@ function makeMessageElement(
 
     avatar.textContent =
         message.role ===
-            "assistant"
-        ? "G"
-        : "U";
+        "assistant"
+        ?
+        "G"
+        :
+        "U";
+
 
 
     const bubble =
@@ -2335,6 +3548,7 @@ function makeMessageElement(
 
     bubble.className =
         "message-bubble";
+
 
 
     const name =
@@ -2349,9 +3563,14 @@ function makeMessageElement(
 
     name.textContent =
         message.role ===
-            "assistant"
-        ? "GALAXY"
-        : "You";
+        "assistant"
+
+        ?
+        "GALAXY"
+
+        :
+        "You";
+
 
 
     const text =
@@ -2368,27 +3587,174 @@ function makeMessageElement(
         message.content;
 
 
-    bubble.appendChild(
-        name
-    );
 
-
-    bubble.appendChild(
+    bubble.append(
+        name,
         text
     );
 
 
-    row.appendChild(
-        avatar
-    );
+
+    /*
+     * RESTORE GENERATED MEDIA
+     */
+
+    if (
+
+        (
+            message.type ===
+            "image"
+
+            ||
+
+            message.type ===
+            "video"
+        )
+
+        &&
+
+        message.mediaId
+
+    ) {
+
+        const holder =
+            document.createElement(
+                "div"
+            );
 
 
-    row.appendChild(
+        holder.className =
+            "media-holder";
+
+
+        holder.textContent =
+            "Loading saved media…";
+
+
+        bubble.appendChild(
+            holder
+        );
+
+
+        restoreMedia(
+
+            message.mediaId,
+
+            message.type,
+
+            holder
+
+        );
+
+    }
+
+
+
+    row.append(
+        avatar,
         bubble
     );
 
 
     return row;
+
+}
+
+
+
+/* ============================================================
+   STREAMING MESSAGE
+============================================================ */
+
+function createLiveAssistantBubble(
+    initialText
+) {
+
+    els.heroArea.style.display =
+        "none";
+
+
+    els.chatArea
+        .classList
+        .add(
+            "active"
+        );
+
+
+
+    const row =
+        document.createElement(
+            "div"
+        );
+
+
+    row.className =
+        "message-row assistant live-message";
+
+
+    row.innerHTML = `
+
+        <div class="message-avatar">
+            G
+        </div>
+
+        <div class="message-bubble">
+
+            <div class="message-name">
+                GALAXY
+            </div>
+
+            <div class="message-text">
+            </div>
+
+        </div>
+
+    `;
+
+
+    const text =
+        row.querySelector(
+            ".message-text"
+        );
+
+
+    text.textContent =
+        initialText;
+
+
+    els.chatArea
+        .appendChild(
+            row
+        );
+
+
+    els.chatArea.scrollTop =
+        els.chatArea.scrollHeight;
+
+
+    return {
+
+        update(
+            value
+        ) {
+
+            text.textContent =
+                value;
+
+
+            els.chatArea.scrollTop =
+                els.chatArea.scrollHeight;
+
+        },
+
+
+        remove() {
+
+            row.remove();
+
+        }
+
+    };
 
 }
 
@@ -2404,13 +3770,11 @@ function updateClock() {
         new Date();
 
 
-    document
-        .getElementById(
-            "clockTime"
-        )
-        .textContent =
+    els.clockTime.textContent =
         now.toLocaleTimeString(
+
             [],
+
             {
 
                 hour:
@@ -2423,16 +3787,15 @@ function updateClock() {
                     "2-digit"
 
             }
+
         );
 
 
-    document
-        .getElementById(
-            "clockDate"
-        )
-        .textContent =
+    els.clockDate.textContent =
         now.toLocaleDateString(
+
             [],
+
             {
 
                 month:
@@ -2448,6 +3811,7 @@ function updateClock() {
                     "short"
 
             }
+
         );
 
 }
@@ -2465,37 +3829,22 @@ function updateGreeting() {
             .getHours();
 
 
-    let greeting =
+    els.greetingText.textContent =
+
+        hour < 12
+
+        ?
+        "Good morning"
+
+        :
+
+        hour < 17
+
+        ?
+        "Good afternoon"
+
+        :
         "Good evening";
-
-
-    if (
-        hour <
-        12
-    ) {
-
-        greeting =
-            "Good morning";
-
-    }
-
-    else if (
-        hour <
-        17
-    ) {
-
-        greeting =
-            "Good afternoon";
-
-    }
-
-
-    document
-        .getElementById(
-            "greetingText"
-        )
-        .textContent =
-        greeting;
 
 }
 
@@ -2509,29 +3858,45 @@ function setStatus(
     text
 ) {
 
-    statusText.textContent =
+    els.statusText.textContent =
         text;
 
 }
 
 
 
+function setModelStatus(
+    text
+) {
+
+    if (
+        els.modelStatus
+    ) {
+
+        els.modelStatus.textContent =
+            text;
+
+    }
+
+}
+
+
+
 /* ============================================================
-   INPUT SIZE
+   INPUT RESIZE
 ============================================================ */
 
 function resizeInput() {
 
-    userInput.style.height =
+    els.userInput.style.height =
         "auto";
 
 
-    userInput.style.height =
-        Math.min(
-            userInput.scrollHeight,
-            160
-        ) +
-        "px";
+    els.userInput.style.height =
+        `${Math.min(
+            els.userInput.scrollHeight,
+            125
+        )}px`;
 
 }
 
@@ -2607,20 +3972,17 @@ function relativeTime(
     }
 
 
-    if (
+    return (
+
         days ===
         1
-    ) {
 
-        return (
-            "Yesterday"
-        );
+        ?
+        "Yesterday"
 
-    }
-
-
-    return (
+        :
         `${days} days ago`
+
     );
 
 }
@@ -2628,57 +3990,64 @@ function relativeTime(
 
 
 /* ============================================================
-   VOICE
+   VOICE WAKE WORD
 
-   User can say:
-   "Galaxy what is AI"
-   "Galaxy harshavardhan"
-   "Galaxy tell me about space"
+   Say:
+   Galaxy explain gravity
+
+   Galaxy தமிழ் தெரியுமா
+
+   Galaxy create an image of a city
 ============================================================ */
 
 function prepareVoiceActivation() {
 
     /*
-     * Browsers usually require one
-     * user interaction before
-     * microphone permission can begin.
+     * Browsers normally need one
+     * click/key interaction before
+     * asking microphone permission.
      */
 
-    const start = () => {
+    const start =
+        () => {
 
-        if (
-            !state.voiceStarted
-        ) {
+            if (
+                !state.voiceStarted
+            ) {
 
-            startVoiceRecognition();
+                startVoiceRecognition();
 
-        }
+            }
 
 
-        document.removeEventListener(
+            document
+                .removeEventListener(
+                    "click",
+                    start
+                );
+
+
+            document
+                .removeEventListener(
+                    "keydown",
+                    start
+                );
+
+        };
+
+
+    document
+        .addEventListener(
             "click",
             start
         );
 
 
-        document.removeEventListener(
+    document
+        .addEventListener(
             "keydown",
             start
         );
-
-    };
-
-
-    document.addEventListener(
-        "click",
-        start
-    );
-
-
-    document.addEventListener(
-        "keydown",
-        start
-    );
 
 }
 
@@ -2691,7 +4060,8 @@ function prepareVoiceActivation() {
 function startVoiceRecognition() {
 
     const Recognition =
-        window.SpeechRecognition ||
+        window.SpeechRecognition
+        ||
         window.webkitSpeechRecognition;
 
 
@@ -2702,7 +4072,6 @@ function startVoiceRecognition() {
         setStatus(
             "Voice unavailable"
         );
-
 
         return;
 
@@ -2733,36 +4102,56 @@ function startVoiceRecognition() {
         false;
 
 
+
     recognition.onstart =
         () => {
 
-            voiceIndicator
+            els.voiceIndicator
                 .classList
                 .add(
                     "listening"
                 );
 
 
-            setStatus(
-                'Listening for "Galaxy"...'
-            );
+            if (
+                !state.speaking
+            ) {
+
+                setStatus(
+                    'Listening for "Galaxy"…'
+                );
+
+            }
 
         };
+
 
 
     recognition.onresult =
         event => {
 
+            if (
+                state.speaking
+            ) {
+
+                return;
+
+            }
+
+
             for (
                 let i =
                     event.resultIndex;
+
                 i <
                     event.results.length;
+
                 i++
             ) {
 
                 if (
-                    !event.results[i]
+                    !event
+                        .results[i]
                         .isFinal
                 ) {
 
@@ -2771,14 +4160,11 @@ function startVoiceRecognition() {
                 }
 
 
-                const transcript =
-                    event.results[i][0]
-                        .transcript
-                        .trim();
-
-
                 handleVoiceCommand(
-                    transcript
+                    event
+                        .results[i][0]
+                        .transcript
+                        .trim()
                 );
 
             }
@@ -2786,55 +4172,76 @@ function startVoiceRecognition() {
         };
 
 
+
     recognition.onerror =
         () => {
 
-            voiceIndicator
+            els.voiceIndicator
                 .classList
                 .remove(
                     "listening"
                 );
 
 
-            setStatus(
-                "Ready"
-            );
+            if (
+                !state.speaking
+            ) {
+
+                setStatus(
+                    "Ready"
+                );
+
+            }
 
         };
+
 
 
     recognition.onend =
         () => {
 
-            voiceIndicator
+            els.voiceIndicator
                 .classList
                 .remove(
                     "listening"
                 );
 
 
-            setStatus(
-                "Ready"
-            );
+            if (
+                !state.speaking
+            ) {
+
+                setStatus(
+                    "Ready"
+                );
+
+            }
 
 
-            setTimeout(
-                () => {
+            if (
+                !state.speaking
+            ) {
 
-                    try {
+                setTimeout(
+                    () => {
 
-                        recognition.start();
+                        try {
 
-                    }
+                            recognition.start();
 
-                    catch {
-                    }
+                        }
 
-                },
-                1000
-            );
+                        catch {
+                        }
+
+                    },
+                    1000
+                );
+
+            }
 
         };
+
 
 
     try {
@@ -2886,34 +4293,50 @@ function handleVoiceCommand(
 
     let command =
         transcript
-            .slice(
-                index +
-                "galaxy".length
-            )
-            .trim();
 
+        .slice(
+            index +
+            "galaxy".length
+        )
 
-    command =
-        command.replace(
+        .trim()
+
+        .replace(
             /^[,.:;!\-\s]+/,
             ""
         );
 
 
-    if (!command) {
+    if (
+        !command
+    ) {
 
         setStatus(
             "Galaxy heard you"
         );
-
 
         return;
 
     }
 
 
+
+    /*
+     * IMPORTANT:
+     *
+     * Voice source CANNOT unlock
+     * hidden Game Center.
+     */
+
     processMessage(
-        command
+
+        command,
+
+        {
+            source:
+                "voice"
+        }
+
     );
 
 }
@@ -2952,7 +4375,7 @@ function restartVoiceRecognition() {
     );
 
 
-    settingsModal
+    els.settingsModal
         .classList
         .add(
             "hidden-modal"
@@ -2963,7 +4386,441 @@ function restartVoiceRecognition() {
 
 
 /* ============================================================
-   HELPERS
+   GALAXY SPEAKS
+============================================================ */
+
+function speakText(
+    text
+) {
+
+    if (
+        !window.speechSynthesis
+    ) {
+
+        return;
+
+    }
+
+
+    state.speaking =
+        true;
+
+
+    if (
+        state.recognition
+    ) {
+
+        try {
+
+            state.recognition.stop();
+
+        }
+
+        catch {
+        }
+
+    }
+
+
+    speechSynthesis.cancel();
+
+
+
+    const utterance =
+        new SpeechSynthesisUtterance(
+            text
+        );
+
+
+    utterance.rate =
+        1;
+
+
+
+    utterance.onend =
+        () => {
+
+            state.speaking =
+                false;
+
+
+            setTimeout(
+                () => {
+
+                    if (
+                        state.voiceStarted &&
+                        state.recognition
+                    ) {
+
+                        try {
+
+                            state.recognition.start();
+
+                        }
+
+                        catch {
+                        }
+
+                    }
+
+                },
+                600
+            );
+
+        };
+
+
+    speechSynthesis.speak(
+        utterance
+    );
+
+}
+
+
+
+/* ============================================================
+   INDEXEDDB MEDIA STORAGE
+============================================================ */
+
+function openMediaDB() {
+
+    return new Promise(
+        (
+            resolve,
+            reject
+        ) => {
+
+            const request =
+                indexedDB.open(
+                    "galaxy_media_v1",
+                    1
+                );
+
+
+            request.onupgradeneeded =
+                () => {
+
+                    const db =
+                        request.result;
+
+
+                    if (
+                        !db
+                            .objectStoreNames
+                            .contains(
+                                "media"
+                            )
+                    ) {
+
+                        db.createObjectStore(
+
+                            "media",
+
+                            {
+                                keyPath:
+                                    "id"
+                            }
+
+                        );
+
+                    }
+
+                };
+
+
+            request.onsuccess =
+                () => {
+
+                    resolve(
+                        request.result
+                    );
+
+                };
+
+
+            request.onerror =
+                () => {
+
+                    reject(
+                        request.error
+                    );
+
+                };
+
+        }
+    );
+
+}
+
+
+
+/* ============================================================
+   SAVE MEDIA
+============================================================ */
+
+async function saveMediaBlob(
+    blob,
+    mime
+) {
+
+    const id =
+        `media_${Date.now()}_${
+            Math.random()
+                .toString(36)
+                .slice(2, 7)
+        }`;
+
+
+    const db =
+        await openMediaDB();
+
+
+
+    await new Promise(
+        (
+            resolve,
+            reject
+        ) => {
+
+            const transaction =
+                db.transaction(
+                    "media",
+                    "readwrite"
+                );
+
+
+            transaction
+                .objectStore(
+                    "media"
+                )
+                .put({
+
+                    id:
+                        id,
+
+                    blob:
+                        blob,
+
+                    mime:
+                        mime,
+
+                    createdAt:
+                        Date.now()
+
+                });
+
+
+            transaction.oncomplete =
+                resolve;
+
+
+            transaction.onerror =
+                () => {
+
+                    reject(
+                        transaction.error
+                    );
+
+                };
+
+        }
+    );
+
+
+    db.close();
+
+
+    return id;
+
+}
+
+
+
+/* ============================================================
+   GET MEDIA
+============================================================ */
+
+async function getMediaBlob(
+    id
+) {
+
+    const db =
+        await openMediaDB();
+
+
+    const result =
+        await new Promise(
+            (
+                resolve,
+                reject
+            ) => {
+
+                const transaction =
+                    db.transaction(
+                        "media",
+                        "readonly"
+                    );
+
+
+                const request =
+                    transaction
+
+                    .objectStore(
+                        "media"
+                    )
+
+                    .get(
+                        id
+                    );
+
+
+                request.onsuccess =
+                    () => {
+
+                        resolve(
+                            request.result ||
+                            null
+                        );
+
+                    };
+
+
+                request.onerror =
+                    () => {
+
+                        reject(
+                            request.error
+                        );
+
+                    };
+
+            }
+        );
+
+
+    db.close();
+
+
+    return result;
+
+}
+
+
+
+/* ============================================================
+   RESTORE SAVED IMAGE / VIDEO
+============================================================ */
+
+async function restoreMedia(
+    mediaId,
+    type,
+    holder
+) {
+
+    try {
+
+        const record =
+            await getMediaBlob(
+                mediaId
+            );
+
+
+        if (
+            !record?.blob
+        ) {
+
+            holder.textContent =
+                "Saved media is unavailable.";
+
+            return;
+
+        }
+
+
+        const url =
+            URL.createObjectURL(
+                record.blob
+            );
+
+
+        holder.textContent =
+            "";
+
+
+        if (
+            type ===
+            "image"
+        ) {
+
+            const image =
+                document.createElement(
+                    "img"
+                );
+
+
+            image.className =
+                "generated-media generated-image";
+
+
+            image.src =
+                url;
+
+
+            image.alt =
+                "GALAXY generated image";
+
+
+            holder.appendChild(
+                image
+            );
+
+        }
+
+        else {
+
+            const video =
+                document.createElement(
+                    "video"
+                );
+
+
+            video.className =
+                "generated-media generated-video";
+
+
+            video.src =
+                url;
+
+
+            video.controls =
+                true;
+
+
+            video.playsInline =
+                true;
+
+
+            holder.appendChild(
+                video
+            );
+
+        }
+
+    }
+
+    catch {
+
+        holder.textContent =
+            "Saved media is unavailable.";
+
+    }
+
+}
+
+
+
+/* ============================================================
+   SAFE HTML
 ============================================================ */
 
 function escapeHTML(
@@ -2974,48 +4831,49 @@ function escapeHTML(
         value
     )
 
-        .replaceAll(
-            "&",
-            "&amp;"
-        )
+    .replaceAll(
+        "&",
+        "&amp;"
+    )
 
-        .replaceAll(
-            "<",
-            "&lt;"
-        )
+    .replaceAll(
+        "<",
+        "&lt;"
+    )
 
-        .replaceAll(
-            ">",
-            "&gt;"
-        )
+    .replaceAll(
+        ">",
+        "&gt;"
+    )
 
-        .replaceAll(
-            '"',
-            "&quot;"
-        )
+    .replaceAll(
+        '"',
+        "&quot;"
+    )
 
-        .replaceAll(
-            "'",
-            "&#039;"
-        );
+    .replaceAll(
+        "'",
+        "&#039;"
+    );
 
 }
 
 
+
+/* ============================================================
+   DELAY
+============================================================ */
 
 function delay(
     milliseconds
 ) {
 
     return new Promise(
-        resolve => {
-
+        resolve =>
             setTimeout(
                 resolve,
                 milliseconds
-            );
-
-        }
+            )
     );
 
 }
