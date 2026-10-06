@@ -11,7 +11,7 @@
 
     <meta
         name="theme-color"
-        content="#040714"
+        content="#030612"
     >
 
     <title>GALAXY</title>
@@ -28,9 +28,9 @@
 <div class="app-shell">
 
 
-    <!-- =====================================================
+    <!-- ===================================================
          SIDEBAR
-    ====================================================== -->
+    ==================================================== -->
 
     <aside
         class="sidebar"
@@ -38,15 +38,13 @@
     >
 
 
-        <!-- GALAXY BRAND -->
-
         <div class="brand-box">
 
             <div class="galaxy-logo">
                 ✦
             </div>
 
-            <div class="brand-copy">
+            <div>
 
                 <div class="brand-name">
                     Galaxy
@@ -86,10 +84,10 @@
         <!-- =================================================
              HIDDEN GAME CENTER
 
-             IMPORTANT:
-             Starts hidden.
-             JavaScript reveals this only after typing:
+             Only appears after typing exactly:
              harshavardhan
+
+             NOT stored after refresh.
         ================================================== -->
 
         <div
@@ -103,7 +101,7 @@
                 🎮
             </div>
 
-            <div>
+            <div class="game-center-copy">
 
                 <div class="game-center-title">
                     Game Center
@@ -149,7 +147,7 @@
 
 
 
-        <!-- SIDEBAR FOOTER -->
+        <!-- BOTTOM -->
 
         <div class="sidebar-footer">
 
@@ -184,9 +182,9 @@
 
 
 
-    <!-- =====================================================
-         MAIN
-    ====================================================== -->
+    <!-- ===================================================
+         MAIN PANEL
+    ==================================================== -->
 
     <main class="main-panel">
 
@@ -244,10 +242,10 @@
 
 
 
-            <!-- CLOCK -->
-
             <div class="top-widgets">
 
+
+                <!-- CLOCK -->
 
                 <div class="info-card">
 
@@ -261,14 +259,14 @@
                             id="clockTime"
                             class="info-main"
                         >
-                            10:30:45 AM
+                            --:--:--
                         </div>
 
                         <div
                             id="clockDate"
                             class="info-sub"
                         >
-                            May 13, 2025 | Tue
+                            Loading date…
                         </div>
 
                     </div>
@@ -277,22 +275,25 @@
 
 
 
-                <!-- WEATHER PLACEHOLDER -->
+                <!-- LOCAL AI STATUS -->
 
                 <div class="info-card">
 
-                    <div class="weather-symbol">
-                        ⛅
+                    <div class="info-icon model-icon">
+                        ✦
                     </div>
 
                     <div>
 
                         <div class="info-main">
-                            Weather
+                            Local AI
                         </div>
 
-                        <div class="info-sub">
-                            Local mode
+                        <div
+                            id="modelStatus"
+                            class="info-sub"
+                        >
+                            Checking device…
                         </div>
 
                     </div>
@@ -308,7 +309,7 @@
 
 
         <!-- =================================================
-             NORMAL GALAXY HOME
+             NORMAL GALAXY VIEW
         ================================================== -->
 
         <section
@@ -324,8 +325,10 @@
                 class="hero-area"
             >
 
-                <div class="space-layer stars-one"></div>
-                <div class="space-layer stars-two"></div>
+
+                <div class="nebula nebula-one"></div>
+                <div class="nebula nebula-two"></div>
+                <div class="stars"></div>
 
 
                 <div class="hero-content">
@@ -365,7 +368,7 @@
                             data-prompt="Tell me about space"
                         >
 
-                            <div class="quick-icon purple">
+                            <div class="quick-icon">
                                 🪐
                             </div>
 
@@ -383,31 +386,10 @@
 
                         <div
                             class="quick-card"
-                            data-prompt="What is weather?"
+                            data-prompt="Explain artificial intelligence simply"
                         >
 
-                            <div class="quick-icon blue">
-                                🌧️
-                            </div>
-
-                            <h3>
-                                Check weather
-                            </h3>
-
-                            <p>
-                                Weather and atmosphere
-                            </p>
-
-                        </div>
-
-
-
-                        <div
-                            class="quick-card"
-                            data-prompt="What is AI?"
-                        >
-
-                            <div class="quick-icon green">
+                            <div class="quick-icon">
                                 🤖
                             </div>
 
@@ -425,10 +407,10 @@
 
                         <div
                             class="quick-card"
-                            data-prompt="Write a story"
+                            data-prompt="Write a creative short story"
                         >
 
-                            <div class="quick-icon gold">
+                            <div class="quick-icon">
                                 ✨
                             </div>
 
@@ -438,6 +420,27 @@
 
                             <p>
                                 Enter a new world
+                            </p>
+
+                        </div>
+
+
+
+                        <div
+                            class="quick-card"
+                            data-prompt="தமிழில் அறிவியல் பற்றி எளிமையாக சொல்லுங்கள்"
+                        >
+
+                            <div class="quick-icon">
+                                🌐
+                            </div>
+
+                            <h3>
+                                Languages
+                            </h3>
+
+                            <p>
+                                Ask in Tamil and other languages
                             </p>
 
                         </div>
@@ -467,7 +470,7 @@
 
 
         <!-- =================================================
-             GAME CENTER VIEW
+             GAME CENTER
         ================================================== -->
 
         <section
@@ -476,13 +479,11 @@
         >
 
 
-            <div class="game-background"></div>
-
-
             <div class="game-content">
 
 
                 <div class="game-topline">
+
 
                     <div>
 
@@ -506,6 +507,7 @@
                         ← Back to Galaxy
                     </div>
 
+
                 </div>
 
 
@@ -517,7 +519,7 @@
                     </h2>
 
                     <p>
-                        Discover games and gaming experiences.
+                        Discover online game categories.
                     </p>
 
                 </div>
@@ -539,7 +541,7 @@
 
 
         <!-- =================================================
-             MESSAGE COMPOSER
+             COMPOSER
         ================================================== -->
 
         <footer
@@ -554,10 +556,9 @@
                 <textarea
                     id="userInput"
                     rows="1"
-                    placeholder="Message Galaxy..."
+                    placeholder="Message Galaxy…"
                     spellcheck="true"
                 ></textarea>
-
 
 
                 <div class="composer-right">
@@ -566,7 +567,7 @@
                     <div
                         id="voiceIndicator"
                         class="voice-indicator"
-                        title="Galaxy voice"
+                        title="Wake word: Galaxy"
                     >
                         ◉
                     </div>
@@ -577,6 +578,7 @@
                         class="send-control"
                         tabindex="0"
                         role="button"
+                        aria-label="Send"
                     >
                         ➤
                     </div>
@@ -590,13 +592,8 @@
 
             <div class="helper-text">
 
-                Type
-
-                <strong>
-                    harshavardhan
-                </strong>
-
-                to unlock the hidden Game Center.
+                Local AI and media models download on first use
+                and may take time on the first run.
 
             </div>
 
@@ -629,7 +626,10 @@
 
 
         <p>
-            Chats are stored locally on this browser.
+
+            Chats are stored in this browser.
+            Right-click a recent chat to delete only that chat.
+
         </p>
 
 
