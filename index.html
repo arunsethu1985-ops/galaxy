@@ -2,6 +2,7 @@
 <html lang="en">
 
 <head>
+
     <meta charset="UTF-8">
 
     <meta
@@ -20,17 +21,18 @@
         rel="stylesheet"
         href="style.css"
     >
+
 </head>
 
-
 <body>
+
 
 <div class="app-shell">
 
 
-    <!-- ===================================================
+    <!-- =====================================================
          SIDEBAR
-    ==================================================== -->
+    ====================================================== -->
 
     <aside
         class="sidebar"
@@ -65,8 +67,8 @@
         <div
             class="new-chat-row"
             id="newChatRow"
-            tabindex="0"
             role="button"
+            tabindex="0"
         >
 
             <span class="plus">
@@ -84,17 +86,19 @@
         <!-- =================================================
              HIDDEN GAME CENTER
 
-             Only appears after typing exactly:
-             harshavardhan
+             TYPE:
+             123
 
-             NOT stored after refresh.
+             TO REVEAL IT
+
+             REFRESH = HIDDEN AGAIN
         ================================================== -->
 
         <div
             id="gameCenterItem"
             class="game-center-sidebar hidden-game-center"
-            tabindex="0"
             role="button"
+            tabindex="0"
         >
 
             <div class="game-center-icon">
@@ -108,7 +112,7 @@
                 </div>
 
                 <div class="game-center-sub">
-                    Enter the Galaxy
+                    Safe built-in games
                 </div>
 
             </div>
@@ -121,7 +125,7 @@
 
 
 
-        <!-- RECENTS -->
+        <!-- RECENT CHATS -->
 
         <div class="recent-heading">
 
@@ -130,8 +134,8 @@
             </span>
 
             <span
-                id="clearRecentText"
                 class="clear-text"
+                id="clearRecentText"
             >
                 Clear
             </span>
@@ -147,16 +151,16 @@
 
 
 
-        <!-- BOTTOM -->
+        <!-- SIDEBAR FOOTER -->
 
         <div class="sidebar-footer">
 
 
             <div
-                class="settings-row"
                 id="settingsRow"
-                tabindex="0"
+                class="settings-row"
                 role="button"
+                tabindex="0"
             >
 
                 <span class="settings-symbol">
@@ -182,9 +186,9 @@
 
 
 
-    <!-- ===================================================
+    <!-- =====================================================
          MAIN PANEL
-    ==================================================== -->
+    ====================================================== -->
 
     <main class="main-panel">
 
@@ -200,8 +204,8 @@
                 <div
                     id="menuToggle"
                     class="menu-toggle"
-                    tabindex="0"
                     role="button"
+                    tabindex="0"
                 >
                     ☰
                 </div>
@@ -242,10 +246,10 @@
 
 
 
+            <!-- TOP RIGHT -->
+
             <div class="top-widgets">
 
-
-                <!-- CLOCK -->
 
                 <div class="info-card">
 
@@ -266,7 +270,7 @@
                             id="clockDate"
                             class="info-sub"
                         >
-                            Loading date…
+                            Loading…
                         </div>
 
                     </div>
@@ -274,8 +278,6 @@
                 </div>
 
 
-
-                <!-- LOCAL AI STATUS -->
 
                 <div class="info-card">
 
@@ -318,8 +320,6 @@
         >
 
 
-            <!-- HERO -->
-
             <section
                 id="heroArea"
                 class="hero-area"
@@ -357,8 +357,6 @@
                     </p>
 
 
-
-                    <!-- QUICK CARDS -->
 
                     <div class="quick-grid">
 
@@ -398,28 +396,7 @@
                             </h3>
 
                             <p>
-                                Simple and useful explanations
-                            </p>
-
-                        </div>
-
-
-
-                        <div
-                            class="quick-card"
-                            data-prompt="Write a creative short story"
-                        >
-
-                            <div class="quick-icon">
-                                ✨
-                            </div>
-
-                            <h3>
-                                Create a story
-                            </h3>
-
-                            <p>
-                                Enter a new world
+                                Intelligent explanations
                             </p>
 
                         </div>
@@ -440,7 +417,28 @@
                             </h3>
 
                             <p>
-                                Ask in Tamil and other languages
+                                Tamil and more languages
+                            </p>
+
+                        </div>
+
+
+
+                        <div
+                            class="quick-card"
+                            data-prompt="Create an image of a futuristic galaxy city"
+                        >
+
+                            <div class="quick-icon">
+                                🎨
+                            </div>
+
+                            <h3>
+                                Create
+                            </h3>
+
+                            <p>
+                                Images and creative media
                             </p>
 
                         </div>
@@ -501,8 +499,8 @@
                     <div
                         id="leaveGameCenter"
                         class="leave-game"
-                        tabindex="0"
                         role="button"
+                        tabindex="0"
                     >
                         ← Back to Galaxy
                     </div>
@@ -515,11 +513,11 @@
                 <div class="game-heading">
 
                     <h2>
-                        Choose your world
+                        Choose your game
                     </h2>
 
                     <p>
-                        Discover online game categories.
+                        Built directly inside GALAXY. No external game sites.
                     </p>
 
                 </div>
@@ -529,6 +527,77 @@
                 <div
                     id="gameGrid"
                     class="game-grid"
+                >
+                </div>
+
+
+            </div>
+
+
+        </section>
+
+
+
+        <!-- =================================================
+             GAME PLAYER
+        ================================================== -->
+
+        <section
+            id="gamePlayerView"
+            class="game-player-view"
+        >
+
+
+            <div class="game-player-shell">
+
+
+                <div class="game-player-top">
+
+
+                    <div>
+
+                        <div class="game-small-title">
+                            GALAXY GAME CENTER
+                        </div>
+
+                        <h2 id="activeGameTitle">
+                            Game
+                        </h2>
+
+                    </div>
+
+
+                    <div class="game-player-actions">
+
+                        <div
+                            id="restartActiveGame"
+                            class="game-action"
+                            role="button"
+                            tabindex="0"
+                        >
+                            ↻ Restart
+                        </div>
+
+
+                        <div
+                            id="closeActiveGame"
+                            class="game-action"
+                            role="button"
+                            tabindex="0"
+                        >
+                            ← Games
+                        </div>
+
+                    </div>
+
+
+                </div>
+
+
+
+                <div
+                    id="activeGameArea"
+                    class="active-game-area"
                 >
                 </div>
 
@@ -556,7 +625,7 @@
                 <textarea
                     id="userInput"
                     rows="1"
-                    placeholder="Message Galaxy…"
+                    placeholder="Message Galaxy..."
                     spellcheck="true"
                 ></textarea>
 
@@ -567,7 +636,7 @@
                     <div
                         id="voiceIndicator"
                         class="voice-indicator"
-                        title="Wake word: Galaxy"
+                        title="Say Galaxy"
                     >
                         ◉
                     </div>
@@ -576,9 +645,8 @@
                     <div
                         id="sendControl"
                         class="send-control"
-                        tabindex="0"
                         role="button"
-                        aria-label="Send"
+                        tabindex="0"
                     >
                         ➤
                     </div>
@@ -591,10 +659,7 @@
 
 
             <div class="helper-text">
-
-                Local AI and media models download on first use
-                and may take time on the first run.
-
+                Local AI and image models may download on first use.
             </div>
 
 
@@ -626,47 +691,38 @@
 
 
         <p>
-
-            Chats are stored in this browser.
-            Right-click a recent chat to delete only that chat.
-
+            Chats are stored locally in this browser.
+            GALAXY does not create cookies in this code.
         </p>
 
 
-        <div class="settings-options">
+        <div
+            id="clearAllChats"
+            class="settings-option"
+        >
+            Clear all conversations
+        </div>
 
 
-            <div
-                id="clearAllChats"
-                class="settings-option"
-            >
-                Clear all conversations
-            </div>
+        <div
+            id="restartVoice"
+            class="settings-option"
+        >
+            Restart Galaxy voice
+        </div>
 
 
-            <div
-                id="restartVoice"
-                class="settings-option"
-            >
-                Restart Galaxy voice
-            </div>
-
-
-            <div
-                id="closeSettings"
-                class="settings-option"
-            >
-                Close
-            </div>
-
-
+        <div
+            id="closeSettings"
+            class="settings-option"
+        >
+            Close
         </div>
 
 
     </div>
 
 </div>
-
 
 
 <script src="script.js"></script>
